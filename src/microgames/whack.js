@@ -10,7 +10,8 @@
     control: 'aim',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#f4e2c0', '#e0c493'],
+    bg: ['#8bd94a', '#7cc93c'],
+    style: 'paper',
 
     create: function (c) {
       var COLS = 3, ROWS = 2;
@@ -121,7 +122,7 @@
             ctx.restore();
           }
 
-          A.tip(g, c.W / 2, 112, 'のこり ' + Math.max(0, remaining), 26);
+          A.count(g, c.W / 2, 108, String(Math.max(0, remaining)), 40);
 
           // ハンマー
           ctx.save();

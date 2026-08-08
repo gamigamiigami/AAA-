@@ -10,7 +10,8 @@
     control: 'press',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#fbdbe8', '#f0b3cb'],
+    bg: ['#ff6699', '#f5558a'],
+    style: 'toon',
 
     create: function (c) {
       // 4分音符でボールが跳ねてきて、着地の瞬間に押す
@@ -75,7 +76,7 @@
               if (okCount >= notes.length) { c.win(); return; }
             } else {
               c.sfx('hit'); c.shake(12, 0.3);
-              c.fx.floatText(c.W / 2, 250, 'MISS', { color: GG.PAL.shu, size: 34 });
+              c.fx.floatText(c.W / 2, 250, 'MISS', { color: GG.PAL.shu, size: 46, stroke: GG.PAL.paper });
               c.lose(); return;
             }
           }
@@ -84,7 +85,7 @@
             n = notes[i];
             if (!n.done && c.t > n.t + window0) {
               c.sfx('hit'); c.shake(12, 0.3);
-              c.fx.floatText(c.W / 2, 250, 'おそい！', { color: GG.PAL.shu, size: 34 });
+              c.fx.floatText(c.W / 2, 250, 'おそい！', { color: GG.PAL.shu, size: 46, stroke: GG.PAL.paper });
               c.lose(); return;
             }
           }
@@ -146,7 +147,6 @@
             g.circlePath(0, 0, 13).ink(done ? GG.PAL.yamabuki : GG.PAL.paper, 2.4);
             ctx.restore();
           }
-          g.text('タイミングよく おせ', c.W / 2, 172, { size: 24, fill: GG.PAL.ink });
         }
       };
     }

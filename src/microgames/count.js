@@ -10,7 +10,8 @@
     control: 'pick',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#d8ead0', '#b3d4a6'],
+    bg: ['#22b14c', '#1a9e42'],
+    style: 'toon',
 
     create: function (c) {
       var maxN = [4, 5, 6][c.diff - 1];
@@ -116,7 +117,6 @@
             ctx.restore();
           }
 
-          g.text('なんびき？', c.W / 2, 108, { size: 34, fill: GG.PAL.ink });
 
           // ボタン
           for (var j = 0; j < buttons.length; j++) {

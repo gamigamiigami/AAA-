@@ -10,7 +10,8 @@
     control: 'press',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#e2dbf2', '#c3b7e5'],
+    bg: ['#9a6fd8', '#8a5fc8'],
+    style: 'retro',
 
     create: function (c) {
       var BY = 330;
@@ -153,7 +154,6 @@
           g.circlePath(zoneX, cy, 15).ink(GG.PAL.kuchiba, 3.5);
           ctx.restore();
 
-          A.tip(g, 240, 116, 'キラキラを つかめ', 24);
         }
       };
     }

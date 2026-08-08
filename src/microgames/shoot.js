@@ -10,7 +10,8 @@
     control: 'aim',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#dfe7f2', '#bccbdf'],
+    bg: ['#0b64c8', '#0857b4'],
+    style: 'paper',
 
     create: function (c) {
       var n = [2, 3, 4][c.diff - 1];
@@ -131,7 +132,7 @@
             ctx.restore();
           }
 
-          A.tip(g, 122, 512, 'のこり ' + Math.max(0, left), 24);
+          A.count(g, 60, 108, String(Math.max(0, left)), 40);
 
           // 照準
           var cx = c.input.x, cy = c.input.y;

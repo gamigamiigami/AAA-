@@ -10,7 +10,8 @@
     control: 'press',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#e0d8f0', '#bfb4e0'],
+    bg: ['#7b2fbe', '#6d24ad'],
+    style: 'retro',
 
     create: function (c) {
       var A0 = -Math.PI * 0.86, A1 = -Math.PI * 0.14;  // メーターの範囲
@@ -62,7 +63,6 @@
 
         draw: function (g) {
           var ctx = g.c;
-          g.ichimatsu(0, 0, c.W, c.H, 56, GG.PAL.paper, 0.4, c.t * 12);
 
           // 台座
           g.block(cx - 200, cy - 10, 400, 96, '#c19a66', { r: 12, lw: 3 });
@@ -113,7 +113,6 @@
           g.circlePath(cx, cy, 24).ink(GG.PAL.yamabuki, 4);
           g.circlePath(cx - 6, cy - 7, 6).fill('rgba(255,255,255,0.65)');
 
-          g.text('みどりで とめろ', c.W / 2, 128, { size: 30, fill: GG.PAL.ink });
         }
       };
     }

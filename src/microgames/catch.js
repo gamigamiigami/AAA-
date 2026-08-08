@@ -10,7 +10,8 @@
     control: 'move',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#d9edf5', '#aed6e3'],
+    bg: ['#00b4e6', '#00a4d4'],
+    style: 'clay',
 
     create: function (c) {
       var BY = 424;                       // カゴの中心Y
@@ -31,7 +32,7 @@
         prevX = x;
         stars.push({
           x: x, y: y, vy: vy,
-          r: 25, rot: c.rng.range(0, 6.28), spin: c.rng.range(-2, 2),
+          r: 30, rot: c.rng.range(0, 6.28), spin: c.rng.range(-2, 2),
           state: 0                        // 0=落下 1=取得 2=落下失敗
         });
       }
@@ -58,7 +59,7 @@
             if (s.state) continue;
             s.y += s.vy * dt;
             s.rot += s.spin * dt;
-            if (s.y > BY - 34 && s.y < BY + 30 && Math.abs(s.x - basket.x) < 58) {
+            if (s.y > BY - 40 && s.y < BY + 32 && Math.abs(s.x - basket.x) < 62) {
               s.state = 1;
               got++;
               basket.pop = 1;
@@ -138,7 +139,7 @@
           }
 
           // 残り個数
-          A.tip(g, c.W / 2, 110, got + ' / ' + need + ' こ', 28);
+          A.count(g, c.W / 2, 96, got + ' / ' + need);
         }
       };
     }

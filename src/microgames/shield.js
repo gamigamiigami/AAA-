@@ -15,7 +15,8 @@
     control: 'dir',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#d5e2f0', '#aec4dc'],
+    bg: ['#1f3a6e', '#1b3260'],
+    style: 'toon',
 
     create: function (c) {
       var cx = c.W / 2, cy = 300;
@@ -135,7 +136,6 @@
             ctx.restore();
           }
 
-          A.tip(g, c.W / 2, 108, 'くる ほうこうに タテを むけろ', 24);
         }
       };
     }

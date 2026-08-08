@@ -10,7 +10,8 @@
     control: 'move2',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#f5d9d5', '#e6b0a9'],
+    bg: ['#3b2a6e', '#332560'],
+    style: 'retro',
 
     create: function (c) {
       var area = { x: 90, y: 140, w: c.W - 180, h: 300 };
@@ -114,7 +115,6 @@
             mouth: c.result === 'lose' ? 'sad' : 'o'
           });
 
-          g.text('EXIT まで にげろ', c.W / 2, 104, { size: 26, fill: GG.PAL.ink });
         }
       };
     }

@@ -11,7 +11,8 @@
     beats: 16,
     boss: true,
     defaultResult: 'win',
-    bg: ['#e8dcee', '#c4aed2'],
+    bg: ['#7b2fbe', '#6d24ad'],
+    style: 'toon',
 
     create: function (c) {
       var area = { x: 70, y: 120, w: c.W - 140, h: 340 };
@@ -117,7 +118,6 @@
           ctx.save();
           ctx.beginPath(); ctx.rect(area.x, area.y, area.w, area.h); ctx.clip();
           ctx.fillStyle = GG.PAL.paper; ctx.fillRect(area.x, area.y, area.w, area.h);
-          g.ichimatsu(area.x, area.y, area.w, area.h, 54, GG.PAL.ai, 0.05, 0);
           ctx.restore();
 
           // ボス
@@ -180,7 +180,7 @@
 
           // 進行ゲージ
           A.gauge(g, c.W / 2 - 200, 78, 400, 22, 1 - c.progress, GG.PAL.shu);
-          g.text('たえろ！', c.W / 2, 60, { size: 22, fill: GG.PAL.ink });
+          
         }
       };
     }

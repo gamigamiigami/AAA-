@@ -10,7 +10,8 @@
     control: 'mash',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#f8d3ca', '#eeaea3'],
+    bg: ['#e8112d', '#d40a24'],
+    style: 'sketch',
 
     create: function (c) {
       var pos = 0;                        // -1(負け) .. +1(勝ち)
@@ -99,16 +100,6 @@
           g.text('YOU', c.W / 2 - 258, 133, { size: 19, fill: GG.PAL.ink, align: 'right' });
           g.text('RIVAL', c.W / 2 + 258, 133, { size: 19, fill: GG.PAL.ink, align: 'left' });
 
-          // 連打アイコン
-          if (!c.result) {
-            var beat = c.t - lastMash < 0.12 ? 1.2 : 1 + 0.12 * Math.sin(c.t * 22);
-            ctx.save();
-            ctx.translate(c.W / 2, 468);
-            ctx.scale(beat, beat);
-            g.rr(-72, -22, 144, 44, 12).ink(GG.PAL.paper, 3);
-            g.text('れんだ！', 0, 2, { size: 25, fill: GG.PAL.shu });
-            ctx.restore();
-          }
         }
       };
     }

@@ -10,7 +10,8 @@
     control: 'move',
     beats: 8,
     defaultResult: 'win',
-    bg: ['#cfeaee', '#a6d5dc'],
+    bg: ['#7fd8f0', '#6cc9e4'],
+    style: 'clay',
 
     create: function (c) {
       var GY = 438;

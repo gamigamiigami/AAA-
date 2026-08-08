@@ -28,20 +28,30 @@
     // 足
     if (o.feet !== false) {
       var fy = ry * 0.86, fs = r * 0.3;
-      g.ellipsePath(-rx * 0.46, fy, fs, fs * 0.66).ink(U.shade(col, -0.22), 2.4);
-      g.ellipsePath(rx * 0.46, fy, fs, fs * 0.66).ink(U.shade(col, -0.22), 2.4);
+      g.ellipsePath(-rx * 0.46, fy, fs, fs * 0.66).ink(U.shade(col, -0.3), 3.4);
+      g.ellipsePath(rx * 0.46, fy, fs, fs * 0.66).ink(U.shade(col, -0.3), 3.4);
     }
-    // 体（フラット塗り + 細い墨線）
-    g.ellipsePath(0, 0, rx, ry).ink(col, 3.4);
+    // 体: ベタ + 影の面 + ハイライトの面（グラデは使わない）
+    g.ellipsePath(0, 0, rx, ry).ink(col, 4.6);
+    c.save();
+    g.ellipsePath(0, 0, rx, ry); c.clip();
+    c.beginPath();
+    c.ellipse(0, 0, rx, ry, 0, 0, U.TAU);
+    c.ellipse(-rx * 0.4, -ry * 0.4, rx * 1.02, ry * 1.02, 0, 0, U.TAU, true);
+    c.fillStyle = U.shade(col, -0.24);
+    c.fill('evenodd');
+    g.ellipsePath(-rx * 0.38, -ry * 0.44, rx * 0.26, ry * 0.17, -0.6)
+      .fill('rgba(255,255,255,0.85)');
+    c.restore();
 
-    // ほっぺ（和菓子のような淡い紅）
-    g.ellipsePath(-rx * 0.58, ry * 0.2, rx * 0.17, ry * 0.11).fill('rgba(226,88,74,0.28)');
-    g.ellipsePath(rx * 0.58, ry * 0.2, rx * 0.17, ry * 0.11).fill('rgba(226,88,74,0.28)');
+    // ほっぺ
+    g.ellipsePath(-rx * 0.58, ry * 0.2, rx * 0.18, ry * 0.12).fill('rgba(232,17,45,0.3)');
+    g.ellipsePath(rx * 0.58, ry * 0.2, rx * 0.18, ry * 0.12).fill('rgba(232,17,45,0.3)');
 
     // 顔
     g.eyes(0, -ry * 0.16, rx * 0.35, r * 0.17, o.lookX, o.lookY, o.blink);
     var m = o.mouth || 'smile';
-    c.strokeStyle = GG.PAL.ink; c.lineWidth = r * 0.085; c.lineCap = 'round';
+    c.strokeStyle = GG.PAL.ink; c.lineWidth = r * 0.11; c.lineCap = 'round';
     c.beginPath();
     if (m === 'smile') {
       c.arc(0, ry * 0.12, r * 0.2, 0.25, Math.PI - 0.25);
@@ -71,7 +81,7 @@
       if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
     }
     c.closePath();
-    g.ink(color, 3.2);
+    g.ink(color, 4.4);
     g.circlePath(0, 0, r * 0.46).fill(GG.PAL.paper);
     g.circlePath(0, 0, r * 0.2).fill(color);
     c.restore();
@@ -83,7 +93,7 @@
     var c = g.c;
     color = color || GG.PAL.yamabuki;
     c.save(); c.translate(x, y); c.rotate(rot || 0);
-    g.starPath(0, 0, r, r * 0.46, 5, 0).ink(color, 3.2);
+    g.starPath(0, 0, r, r * 0.46, 5, 0).ink(color, 4.4);
     g.starPath(0, 0, r * 0.52, r * 0.24, 5, 0).fill(U.shade(color, 0.5));
     c.restore();
     return A;
@@ -92,7 +102,7 @@
   A.bomb = function (g, x, y, r, fuseT) {
     var c = g.c;
     c.save(); c.translate(x, y);
-    g.circlePath(0, 0, r).ink('#4a4452', 3);
+    g.circlePath(0, 0, r).ink('#3a3a42', 4.4);
     g.circlePath(-r * 0.3, -r * 0.32, r * 0.2).fill('rgba(255,255,255,0.4)');
     g.rr(-r * 0.2, -r * 1.18, r * 0.4, r * 0.3, 3).ink('#8b8496', 2.4);
     c.strokeStyle = '#ffb03a'; c.lineWidth = r * 0.13; c.lineCap = 'round';
@@ -109,12 +119,12 @@
 
   /** 地面のプリセット。和の中間色でまとめ、暗く沈ませない。 */
   A.GROUND = {
-    tsuchi: { top: '#d8b183', body: '#b98b57', deep: '#8f6840' },  // 土
-    kusa:   { top: '#a8c98a', body: '#7fab63', deep: '#5d8547' },  // 草
-    mizu:   { top: '#9ad2da', body: '#6fb4c0', deep: '#4f8f9c' },  // 水
-    ishi:   { top: '#c8ccd4', body: '#a5abb6', deep: '#7f8794' },  // 石畳
-    ita:    { top: '#dcbb90', body: '#c19a66', deep: '#9a7749' },  // 板張り
-    tatami: { top: '#d5cf9a', body: '#b5ae74', deep: '#8f8956' }   // 畳
+    tsuchi: { top: '#e0a860', body: '#c07f38', deep: '#8f5a22' },  // 土
+    kusa:   { top: '#5fd14a', body: '#22b14c', deep: '#158035' },  // 草
+    mizu:   { top: '#5fd0f0', body: '#00a0e0', deep: '#0070b0' },  // 水
+    ishi:   { top: '#c9ced6', body: '#9aa2ae', deep: '#6e7683' },  // 石
+    ita:    { top: '#e0b070', body: '#c08840', deep: '#8f6020' },  // 板
+    tatami: { top: '#dcd48a', body: '#bdb45c', deep: '#8f8836' }   // 畳
   };
 
   /** 地面。波打つ稜線 + 表土の帯 + 墨の細線 */
@@ -146,12 +156,12 @@
     // 稜線のハイライト
     c.save();
     edge(0);
-    c.strokeStyle = GG.PAL.ink; c.lineWidth = 2.4; c.lineCap = 'round';
+    c.strokeStyle = GG.PAL.ink; c.lineWidth = 5; c.lineCap = 'round';
     c.stroke();
     c.restore();
     // 表土と土の境界（墨の細線で締める）
     c.save();
-    c.globalAlpha = 0.5;
+    c.globalAlpha = 1;
     edge(22);
     c.strokeStyle = deep; c.lineWidth = 3;
     c.stroke();
@@ -169,19 +179,27 @@
     g.polyPath([
       [-s * 0.75, -s * 0.3], [s * 0.05, -s * 0.3], [s * 0.05, -s * 0.62],
       [s * 0.82, 0], [s * 0.05, s * 0.62], [s * 0.05, s * 0.3], [-s * 0.75, s * 0.3]
-    ]).ink(color || GG.PAL.yamabuki, 3);
+    ]).ink(color || GG.PAL.yamabuki, 4.4);
     c.restore();
     return A;
   };
 
   /** 進捗バー（共通ゲージ） */
   A.gauge = function (g, x, y, w, h, k, color, label) {
-    g.block(x, y, w, h, GG.PAL.paper, { r: h / 2, lw: 2.6 });
-    var iw = Math.max(0, (w - 8) * U.sat(k));
+    g.block(x, y, w, h, GG.PAL.paper, { r: h / 2, lw: 3.4 });
+    var iw = Math.max(0, (w - 10) * U.sat(k));
     if (iw > 2) {
-      g.rr(x + 4, y + 4, iw, h - 8, (h - 8) / 2).fill(color || GG.PAL.yamabuki);
+      g.rr(x + 5, y + 5, iw, h - 10, (h - 10) / 2).fill(color || GG.PAL.yamabuki);
     }
     if (label) g.text(label, x + w / 2, y + h / 2, { size: h * 0.5, fill: GG.PAL.ink });
+    return A;
+  };
+
+  /** 進捗の数字。濃い背景でも読めるよう、白フチの黒太字で統一する。 */
+  A.count = function (g, x, y, str, size) {
+    g.text(str, x, y, {
+      size: size || 34, fill: GG.PAL.ink, stroke: GG.PAL.paper, lw: (size || 34) * 0.22
+    });
     return A;
   };
 
@@ -192,12 +210,7 @@
     var w = g.measure(str, size) + 40, h = size * 2;
     var c = g.c;
     c.save();
-    c.globalAlpha = c.globalAlpha * 0.96;
-    g.rr(x - w / 2, y - h / 2, w, h, 8).ink(color || GG.PAL.paper, 2.6);
-    // 札の上下に朱の線
-    c.globalAlpha = c.globalAlpha * 0.9;
-    g.rr(x - w / 2 + 7, y - h / 2 + 4, w - 14, 2.5, 1).fill(GG.PAL.shu);
-    g.rr(x - w / 2 + 7, y + h / 2 - 6.5, w - 14, 2.5, 1).fill(GG.PAL.shu);
+    g.rr(x - w / 2, y - h / 2, w, h, 10).ink(color || GG.PAL.paper, 3.4);
     c.restore();
     g.text(str, x, y, { size: size, fill: textColor || GG.PAL.ink });
     return A;

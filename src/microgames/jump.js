@@ -10,7 +10,8 @@
     control: 'press',
     beats: 8,
     defaultResult: 'win',
-    bg: ['#fadfbc', '#f0bd8c'],
+    bg: ['#ff8000', '#f07000'],
+    style: 'pixel',
 
     create: function (c) {
       var GY = 424;

@@ -10,7 +10,8 @@
     control: 'pick',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#f0dcec', '#d9b3d0'],
+    bg: ['#ffd400', '#f0c600'],
+    style: 'sketch',
 
     create: function (c) {
       var grid = [[3, 2], [4, 2], [5, 3]][c.diff - 1];
@@ -18,7 +19,7 @@
       var cw = 132, ch = 118;
       var ox = c.W / 2 - (COLS - 1) * cw / 2;
       var oy = 214;
-      var baseCol = c.rng.pick([GG.PAL.yamabuki, GG.PAL.asagi, GG.PAL.kobai, GG.PAL.fuji]);
+      var baseCol = c.rng.pick([GG.PAL.shu, GG.PAL.ai, GG.PAL.murasaki, GG.PAL.wakaba]);
       var oddIdx = c.rng.int(0, COLS * ROWS - 1);
       // 違いの種類: 色 / 表情。難易度が上がるほど差が小さい
       var mode = c.diff === 1 ? 'color' : c.rng.pick(['color', 'face']);
@@ -68,9 +69,7 @@
 
         draw: function (g) {
           var ctx = g.c;
-          g.mizutama(0, 0, c.W, c.H, 74, 12, GG.PAL.paper, 0.5, c.t * 10);
 
-          g.text('1つだけ ちがう！', c.W / 2, 132, { size: 32, fill: GG.PAL.ink });
 
           for (var i = 0; i < cells.length; i++) {
             var ce = cells[i];

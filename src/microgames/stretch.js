@@ -10,7 +10,8 @@
     control: 'hold',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#fae3bd', '#eec894'],
+    bg: ['#ffb000', '#f0a000'],
+    style: 'pixel',
 
     create: function (c) {
       var GY = 400;
@@ -138,8 +139,6 @@
             g.rr(c.W / 2 - 180 + 5 + (360 - 10) * a0, 113,
               (360 - 10) * (a1 - a0), 20, 8).fill('rgba(123,237,159,0.75)');
             ctx.restore();
-            g.text(growing ? 'はなすと たおれる' : '押しっぱなしで のばす',
-              c.W / 2, 84, { size: 22, fill: GG.PAL.ink });
           }
         }
       };

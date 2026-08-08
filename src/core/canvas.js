@@ -96,12 +96,12 @@
   };
   /**
    * アウトライン付きで塗る。
-   * 和のフラット路線なので、線は「墨色・細め」。呼び出し側の lw をここで一律に絞る。
+   * ベタ塗り + 太い黒フチがこのジャンルの様式なので、線は絞らずそのまま出す。
    */
   P.ink = function (fillStyle, lw, inkColor) {
     if (lw !== 0) {
       this.c.strokeStyle = inkColor || GG.PAL.ink;
-      this.c.lineWidth = (lw === undefined ? 5 : lw) * 2 * 0.6;
+      this.c.lineWidth = (lw === undefined ? 5 : lw) * 2 * 0.95;
       this.c.lineJoin = 'round'; this.c.lineCap = 'round';
       this.c.stroke();
     }
@@ -153,19 +153,30 @@
   };
 
   /** キャラや玉に使う球体。ハイライトとリムライト入り */
+  /**
+   * トゥーンシェードの球。グラデは使わず「ベタ + 影の面 + ハイライトの面」の 3 層。
+   * 光源は常に左上。全オブジェクトで揃えることで画面がまとまる。
+   */
   P.orb = function (x, y, r, color, opt) {
     opt = opt || {};
     var c = this.c;
     if (opt.shadow) {
-      c.save(); c.globalAlpha = c.globalAlpha * 0.14;
+      c.save(); c.globalAlpha = c.globalAlpha * 0.16;
       this.ellipsePath(x + 2, y + r * 0.95, r * 0.8, r * 0.24).fill(GG.PAL.ink);
       c.restore();
     }
-    this.circlePath(x, y, r).ink(color, opt.lw === undefined ? 3 : opt.lw, opt.ink);
+    this.circlePath(x, y, r).ink(color, opt.lw === undefined ? 4 : opt.lw, opt.ink);
     c.save();
     this.circlePath(x, y, r); c.clip();
-    this.ellipsePath(x - r * 0.32, y - r * 0.36, r * 0.3, r * 0.19, -0.5)
-      .fill('rgba(255,255,255,0.5)');
+    // 影の面（右下に寄せた円を差し引く形で三日月を作る）
+    c.beginPath();
+    c.arc(x, y, r, 0, U.TAU);
+    c.arc(x - r * 0.42, y - r * 0.42, r * 1.02, 0, U.TAU, true);
+    c.fillStyle = U.shade(color, -0.26);
+    c.fill('evenodd');
+    // ハイライトの面
+    this.ellipsePath(x - r * 0.36, y - r * 0.4, r * 0.3, r * 0.2, -0.6)
+      .fill('rgba(255,255,255,0.85)');
     c.restore();
     return this;
   };
@@ -193,7 +204,7 @@
         continue;
       }
       this.ellipsePath(ex, y, r, r * 1.12).fill('#fff');
-      this.ellipsePath(ex, y, r, r * 1.12).stroke(GG.PAL.ink, 1.8);
+      this.ellipsePath(ex, y, r, r * 1.12).stroke(GG.PAL.ink, 2.8);
       this.circlePath(ex + lookX * r * 0.35, y + lookY * r * 0.4, r * 0.55).fill(GG.PAL.ink);
       this.circlePath(ex + lookX * r * 0.35 - r * 0.18, y + lookY * r * 0.4 - r * 0.22, r * 0.2)
         .fill('#fff');

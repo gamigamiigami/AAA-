@@ -10,7 +10,8 @@
     control: 'aim',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#e6eede', '#c8d8bb'],
+    bg: ['#c8e070', '#b9d461'],
+    style: 'paper',
 
     create: function (c) {
       var n = [1, 2, 3][c.diff - 1];
@@ -102,7 +103,7 @@
             ctx.restore();
           }
 
-          A.tip(g, c.W / 2, 108, 'のこり ' + Math.max(0, left), 26);
+          A.count(g, c.W / 2, 100, String(Math.max(0, left)), 40);
 
           // ハエたたき
           ctx.save();

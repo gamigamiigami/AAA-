@@ -11,7 +11,8 @@
     beats: 16,
     boss: true,
     defaultResult: 'lose',
-    bg: ['#dde3f2', '#b8c4e0'],
+    bg: ['#0b64c8', '#0857b4'],
+    style: 'clay',
 
     create: function (c) {
       var beatSec = 60 / 132;
@@ -168,8 +169,7 @@
           // 進行
           var doneN = notes.filter(function (n) { return n.done; }).length;
           A.gauge(g, c.W / 2 - 190, 88, 380, 22, doneN / notes.length, GG.PAL.yamabuki);
-          g.text('のこりミス ' + Math.max(0, maxMiss - misses + 1), c.W / 2, 66,
-            { size: 20, fill: GG.PAL.ink });
+          A.count(g, c.W / 2, 62, 'ミス のこり ' + Math.max(0, maxMiss - misses + 1), 22);
         }
       };
     }

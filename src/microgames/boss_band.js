@@ -11,7 +11,7 @@
     beats: 16,
     boss: true,
     defaultResult: 'lose',
-    bg: ['#1b2a6b', '#080c28'],
+    bg: ['#dde3f2', '#b8c4e0'],
 
     create: function (c) {
       var beatSec = 60 / 132;
@@ -57,15 +57,15 @@
               c.stop(0.03);
               c.fx.burst(JUDGE_X, LANE_Y, {
                 n: perfect ? 18 : 10,
-                color: perfect ? ['#ffd93d', '#fff'] : ['#8be9fd', '#fff'],
+                color: perfect ? [GG.PAL.yamabuki, GG.PAL.paper] : [GG.PAL.mizu, GG.PAL.paper],
                 speed: 300, size: 7, shape: 'star'
               });
-              if (perfect) c.fx.ring(JUDGE_X, LANE_Y, { r1: 110, color: '#ffd93d', lw: 6 });
+              if (perfect) c.fx.ring(JUDGE_X, LANE_Y, { r1: 110, color: GG.PAL.yamabuki, lw: 6 });
             } else {
               misses++;
               c.sfx('hit'); c.shake(10, 0.25);
               c.fx.floatText(JUDGE_X, LANE_Y - 80, 'MISS',
-                { color: '#ff5e7d', size: 30, stroke: '#12163a' });
+                { color: GG.PAL.shu, size: 30, });
               if (misses > maxMiss) { c.lose(); return; }
             }
           }
@@ -76,7 +76,7 @@
               n.missed = 1; misses++;
               c.sfx('hit'); c.shake(8, 0.2);
               c.fx.floatText(JUDGE_X, LANE_Y - 80, 'ぬけた！',
-                { color: '#ff5e7d', size: 28, stroke: '#12163a' });
+                { color: GG.PAL.shu, size: 28, });
               if (misses > maxMiss) { c.lose(); return; }
             }
           }
@@ -98,12 +98,12 @@
             ctx.rotate(a + Math.PI / 2);
             ctx.globalAlpha = 0.12 + 0.05 * Math.sin(c.t * 5 + l);
             g.polyPath([[0, 0], [190, 620], [-190, 620]])
-              .fill(['#ff5e7d', '#ffd93d', '#4ecdc4', '#8367ff', '#7bed9f'][l]);
+              .fill([GG.PAL.shu, GG.PAL.yamabuki, GG.PAL.asagi, GG.PAL.fuji, GG.PAL.wakaba][l]);
             ctx.restore();
           }
           ctx.restore();
 
-          A.ground(g, 452, { top: '#3a4a9e', body: '#232c66', deep: '#12163a' });
+          A.ground(g, 452, A.GROUND.ita);
 
           // 観客
           ctx.save();
@@ -111,13 +111,13 @@
             var r = new U.RNG(700 + i);
             var x = r.range(20, c.W - 20), y = 470 + r.range(0, 40);
             var bob = Math.sin(c.t * 5 + i) * (4 + cheer * 8);
-            ctx.globalAlpha = 0.55;
-            g.circlePath(x, y - bob, r.range(16, 24)).fill('#0d1130');
+            ctx.globalAlpha = 0.4;
+            g.circlePath(x, y - bob, r.range(16, 24)).fill('#8b95ad');
           }
           ctx.restore();
 
           // レーン
-          g.block(60, LANE_Y - 62, c.W - 120, 124, '#101838', { r: 22, lw: 4, gloss: 0.05 });
+          g.block(60, LANE_Y - 62, c.W - 120, 124, GG.PAL.paper, { r: 14, lw: 3 });
           ctx.save();
           ctx.beginPath(); g.rr(60, LANE_Y - 62, c.W - 120, 124, 22); ctx.clip();
           // 拍のグリッド
@@ -133,13 +133,13 @@
           ctx.translate(JUDGE_X, LANE_Y);
           var jp = 1 + (1 - beatPhase) * 0.12;
           ctx.scale(jp, jp);
-          g.circlePath(0, 0, 42).stroke('rgba(255,255,255,0.35)', 5);
-          g.circlePath(0, 0, 30).ink('#ffd93d', 4);
+          g.circlePath(0, 0, 42).stroke(GG.PAL.inkSoft, 3);
+          g.circlePath(0, 0, 30).ink(GG.PAL.yamabuki, 4);
           ctx.restore();
           if (flashT < 0.22) {
             ctx.save(); ctx.globalAlpha = 1 - flashT / 0.22;
             g.circlePath(JUDGE_X, LANE_Y, 40 + flashT * 200)
-              .stroke('#ffffff', 8 * (1 - flashT / 0.22));
+              .stroke(GG.PAL.shu, 7 * (1 - flashT / 0.22));
             ctx.restore();
           }
 
@@ -153,7 +153,7 @@
             ctx.save();
             ctx.globalAlpha = n.missed ? 0.28 : U.sat(prog * 8);
             if (n.missed) ctx.globalAlpha *= Math.max(0, 1 - (c.t - n.t - 0.2));
-            g.orb(x, LANE_Y, 22, n.missed ? '#5a6180' : '#ff5e7d', { shadow: false });
+            g.orb(x, LANE_Y, 22, n.missed ? '#b3aeb8' : GG.PAL.shu, { shadow: false });
             ctx.restore();
           }
 
@@ -161,15 +161,15 @@
           ctx.save();
           ctx.translate(120, 250);
           ctx.scale(drumSq, 2 - drumSq);
-          A.blob(g, { x: 0, y: 0, r: 46, color: '#ffd93d', feet: false, mouth: 'o' });
+          A.blob(g, { x: 0, y: 0, r: 46, color: GG.PAL.yamabuki, feet: false, mouth: 'o' });
           ctx.restore();
-          g.ellipsePath(120, 300, 62, 16).ink('#e8c07a', 4);
+          g.ellipsePath(120, 300, 62, 16).ink('#c19a66', 3);
 
           // 進行
           var doneN = notes.filter(function (n) { return n.done; }).length;
-          A.gauge(g, c.W / 2 - 190, 88, 380, 22, doneN / notes.length, '#ffd93d');
+          A.gauge(g, c.W / 2 - 190, 88, 380, 22, doneN / notes.length, GG.PAL.yamabuki);
           g.text('のこりミス ' + Math.max(0, maxMiss - misses + 1), c.W / 2, 66,
-            { size: 20, fill: '#fff', lw: 4 });
+            { size: 20, fill: GG.PAL.ink });
         }
       };
     }

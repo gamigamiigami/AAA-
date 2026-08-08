@@ -41,7 +41,7 @@
   P.burst = function (x, y, opt) {
     opt = opt || {};
     var n = opt.n === undefined ? 12 : opt.n;
-    var colors = Array.isArray(opt.color) ? opt.color : [opt.color || '#ffd93d'];
+    var colors = Array.isArray(opt.color) ? opt.color : [opt.color || GG.PAL.yamabuki];
     for (var i = 0; i < n; i++) {
       var dir = (opt.dir === undefined ? this.rng.range(0, U.TAU)
         : opt.dir + this.rng.range(-1, 1) * (opt.spread === undefined ? 0.6 : opt.spread));
@@ -65,7 +65,7 @@
 
   P.confetti = function (x, y, n, colors) {
     return this.burst(x, y, {
-      n: n || 26, color: colors || ['#ff5e7d', '#ffd93d', '#4ecdc4', '#8367ff', '#7bed9f'],
+      n: n || 26, color: colors || [GG.PAL.shu, GG.PAL.yamabuki, GG.PAL.asagi, GG.PAL.fuji, GG.PAL.wakaba],
       speed: 420, size: 9, life: 1.1, gravity: 780, shape: 'rect', spin: 16
     });
   };
@@ -77,7 +77,7 @@
       x: x, y: y, t: 0,
       life: opt.life || 0.4,
       r0: opt.r0 || 6, r1: opt.r1 || 90,
-      col: opt.color || '#ffffff',
+      col: opt.color || GG.PAL.paper,
       lw: opt.lw || 8
     });
     return this;
@@ -88,7 +88,7 @@
     this.texts.push({
       x: x, y: y, str: str, t: 0,
       life: opt.life || 0.85,
-      col: opt.color || '#fff',
+      col: opt.color || GG.PAL.paper,
       size: opt.size || 34,
       vy: opt.vy === undefined ? -110 : opt.vy,
       stroke: opt.stroke

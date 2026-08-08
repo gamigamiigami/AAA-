@@ -10,7 +10,7 @@
     control: 'press',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#ff6ba8', '#5b1447'],
+    bg: ['#fbdbe8', '#f0b3cb'],
 
     create: function (c) {
       // 4分音符でボールが跳ねてきて、着地の瞬間に押す
@@ -65,18 +65,17 @@
               c.fx.burst(c.W / 2, 340, {
                 n: notes[best].judge === 'PERFECT' ? 22 : 12,
                 color: notes[best].judge === 'PERFECT'
-                  ? ['#ffd93d', '#ffffff'] : ['#8be9fd', '#ffffff'],
+                  ? [GG.PAL.yamabuki, '#ffffff'] : [GG.PAL.mizu, '#ffffff'],
                 speed: 300, size: 7, shape: 'star'
               });
               c.fx.ring(c.W / 2, 340, { r1: 120, color: '#ffffff', lw: 7 });
               c.fx.floatText(c.W / 2, 250, notes[best].judge, {
-                color: notes[best].judge === 'PERFECT' ? '#ffd93d' : '#8be9fd',
-                size: 34, stroke: '#3a1030'
-              });
+                color: notes[best].judge === 'PERFECT' ? GG.PAL.yamabuki : GG.PAL.mizu,
+                size: 34, });
               if (okCount >= notes.length) { c.win(); return; }
             } else {
               c.sfx('hit'); c.shake(12, 0.3);
-              c.fx.floatText(c.W / 2, 250, 'MISS', { color: '#ff5e7d', size: 34, stroke: '#3a1030' });
+              c.fx.floatText(c.W / 2, 250, 'MISS', { color: GG.PAL.shu, size: 34 });
               c.lose(); return;
             }
           }
@@ -85,7 +84,7 @@
             n = notes[i];
             if (!n.done && c.t > n.t + window0) {
               c.sfx('hit'); c.shake(12, 0.3);
-              c.fx.floatText(c.W / 2, 250, 'おそい！', { color: '#ff5e7d', size: 34, stroke: '#3a1030' });
+              c.fx.floatText(c.W / 2, 250, 'おそい！', { color: GG.PAL.shu, size: 34 });
               c.lose(); return;
             }
           }
@@ -98,19 +97,19 @@
           // ビートに合わせて明滅する床
           var beatPhase = U.wrap(c.t / (60 / 132), 1);
           ctx.save();
-          ctx.globalAlpha = 0.12 + (1 - beatPhase) * 0.16;
-          g.clear('#ffffff');
+          ctx.globalAlpha = 0.10 + (1 - beatPhase) * 0.14;
+          g.clear(GG.PAL.paper);
           ctx.restore();
 
-          A.ground(g, GY + 26, { top: '#ffb3d9', body: '#b0357f', deep: '#6b1a4c' });
+          A.ground(g, GY + 26, A.GROUND.ita);
 
           // 判定ライン
           ctx.save();
           var lp = 1 + 0.06 * (1 - beatPhase);
           ctx.translate(c.W / 2, GY + 24);
           ctx.scale(lp, 1);
-          g.ellipsePath(0, 0, 92, 20).ink('#ffd93d', 4);
-          g.ellipsePath(0, 0, 66, 13).fill('rgba(255,255,255,0.5)');
+          g.ellipsePath(0, 0, 92, 20).ink(GG.PAL.yamabuki, 3.2);
+          g.ellipsePath(0, 0, 66, 13).fill('#f0e6d0');
           ctx.restore();
 
           // これから来るノーツ（左から流れてくる）
@@ -126,7 +125,7 @@
             ctx.save();
             ctx.globalAlpha = U.sat(k * 6);
             g.dropShadow(x, GY + 24, 26 * (1 - (GY - y) / 300), 8, 0.25);
-            g.orb(x, y, 26, i === 0 || notes[i - 1].done ? '#ffd93d' : '#ff9ecb', { shadow: false });
+            g.orb(x, y, 26, i === 0 || notes[i - 1].done ? GG.PAL.yamabuki : '#ff9ecb', { shadow: false });
             ctx.restore();
           }
 
@@ -134,7 +133,7 @@
           if (flashT < 0.25) {
             ctx.save();
             ctx.globalAlpha = 1 - flashT / 0.25;
-            g.circlePath(c.W / 2, GY, 40 + flashT * 160).stroke('#ffffff', 8 * (1 - flashT / 0.25));
+            g.circlePath(c.W / 2, GY, 40 + flashT * 160).stroke(GG.PAL.shu, 7 * (1 - flashT / 0.25));
             ctx.restore();
           }
 
@@ -144,10 +143,10 @@
             var done = notes[j].done;
             var sc = done ? 1 + comboPop * 0.3 : 1;
             ctx.save(); ctx.translate(bx, 122); ctx.scale(sc, sc);
-            g.circlePath(0, 0, 13).ink(done ? '#ffd93d' : 'rgba(255,255,255,0.22)', 3);
+            g.circlePath(0, 0, 13).ink(done ? GG.PAL.yamabuki : GG.PAL.paper, 2.4);
             ctx.restore();
           }
-          g.text('タイミングよく おせ', c.W / 2, 172, { size: 24, fill: '#fff', lw: 4.5 });
+          g.text('タイミングよく おせ', c.W / 2, 172, { size: 24, fill: GG.PAL.ink });
         }
       };
     }

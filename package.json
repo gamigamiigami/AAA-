@@ -1,7 +1,7 @@
 {
-  "name": "micro-mania",
+  "name": "minigame-matsuri",
   "version": "1.0.0",
-  "description": "ミニゲーム18種のノンストップゲーム。ブラウザ単体・依存ゼロ・完全オフライン。",
+  "description": "ミニゲームまつり — ミニゲーム18種のノンストップゲーム。ブラウザ単体・依存ゼロ・完全オフライン。",
   "private": true,
   "scripts": {
     "start": "npx --yes http-server . -p 8080 -c-1",

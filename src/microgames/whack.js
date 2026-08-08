@@ -10,7 +10,7 @@
     control: 'aim',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#f7b733', '#a4501a'],
+    bg: ['#f4e2c0', '#e0c493'],
 
     create: function (c) {
       var COLS = 3, ROWS = 2;
@@ -63,15 +63,15 @@
                 if (hh.kind === 2) {
                   c.sfx('hit');
                   c.fx.burst(hh.x, hh.y - 30, {
-                    n: 26, color: ['#ff5e7d', '#ff9f43', '#2b2233'], speed: 380, size: 10
+                    n: 26, color: [GG.PAL.shu, GG.PAL.kuchiba, '#2b2233'], speed: 380, size: 10
                   });
-                  c.shake(18, 0.4); c.flash(0.35, '#ff5e7d');
+                  c.shake(18, 0.4); c.flash(0.35, GG.PAL.shu);
                   c.lose(); return;
                 }
                 c.sfx('thud'); c.stop(0.06);
                 c.shake(7, 0.2);
                 c.fx.burst(hh.x, hh.y - 30, {
-                  n: 14, color: ['#ffd93d', '#ffffff'], speed: 280, size: 7, shape: 'star'
+                  n: 14, color: [GG.PAL.yamabuki, '#ffffff'], speed: 280, size: 7, shape: 'star'
                 });
                 c.fx.ring(hh.x, hh.y - 30, { r1: 90, color: '#ffffff', lw: 7 });
                 remaining--;
@@ -84,15 +84,15 @@
 
         draw: function (g) {
           var ctx = g.c;
-          A.ground(g, 168, { top: '#d9a166', body: '#8a5a2b', deep: '#4e3117' });
+          A.ground(g, 168, A.GROUND.tsuchi);
 
           for (var i = 0; i < holes.length; i++) {
             var h = holes[i];
             // 穴（盛り土のふちで立体感を出す）
-            g.ellipsePath(h.x, h.y + 7, 66, 27).fill('#a8763c');
-            g.ellipsePath(h.x, h.y + 3, 64, 25).fill('#c08d4e');
-            g.ellipsePath(h.x, h.y, 56, 22).fill('#2a1a09');
-            g.ellipsePath(h.x, h.y - 3, 56, 20).fill('#180e04');
+            g.ellipsePath(h.x, h.y + 7, 66, 27).fill('#a37b4e');
+            g.ellipsePath(h.x, h.y + 3, 64, 25).fill('#c79a63');
+            g.ellipsePath(h.x, h.y, 56, 22).fill('#5d4526');
+            g.ellipsePath(h.x, h.y - 3, 56, 20).fill('#42301a');
 
             if (h.kind && (h.up > 0.01 || h.hit)) {
               ctx.save();
@@ -117,7 +117,7 @@
             }
             // 穴のふち
             ctx.save(); ctx.globalAlpha = 0.6;
-            g.ellipsePath(h.x, h.y + 2, 57, 22).stroke('#c08d4e', 6);
+            g.ellipsePath(h.x, h.y + 2, 57, 22).stroke('#c79a63', 5);
             ctx.restore();
           }
 
@@ -128,9 +128,9 @@
           ctx.translate(hammer.x, hammer.y);
           ctx.rotate(-0.5 + U.easeOutCubic(1 - hammer.swing) * 0.0 + hammer.swing * 1.5);
           ctx.translate(0, -6);
-          g.rr(-8, 0, 16, 78, 8).ink('#a9744a', 3.5);
-          g.rr(-40, -34, 80, 46, 12).ink('#e84f5f', 4);
-          g.rr(-34, -28, 68, 14, 7).fill('rgba(255,255,255,0.32)');
+          g.rr(-8, 0, 16, 78, 8).ink('#c19a66', 2.6);
+          g.rr(-40, -34, 80, 46, 12).ink(GG.PAL.shu, 4);
+          g.rr(-34, -28, 68, 14, 7).fill('rgba(255,255,255,0.28)');
           ctx.restore();
         }
       };

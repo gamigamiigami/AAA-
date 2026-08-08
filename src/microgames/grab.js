@@ -10,7 +10,7 @@
     control: 'press',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#8367ff', '#2a1a63'],
+    bg: ['#e2dbf2', '#c3b7e5'],
 
     create: function (c) {
       var BY = 330;
@@ -64,9 +64,9 @@
               got.taken = 0.001; grabbed = true;
               c.sfx('coin'); c.stop(0.06); c.shake(7, 0.22);
               c.fx.burst(got.x, BY - 30, {
-                n: 22, color: ['#ffd93d', '#ffffff', '#8be9fd'], speed: 320, size: 8, shape: 'star'
+                n: 22, color: [GG.PAL.yamabuki, '#ffffff', GG.PAL.mizu], speed: 320, size: 8, shape: 'star'
               });
-              c.fx.ring(got.x, BY - 30, { r1: 120, color: '#ffd93d', lw: 7 });
+              c.fx.ring(got.x, BY - 30, { r1: 120, color: GG.PAL.yamabuki, lw: 7 });
               c.win();
             } else {
               c.sfx('hit'); c.shake(12, 0.3);
@@ -80,17 +80,17 @@
 
         draw: function (g) {
           var ctx = g.c;
-          A.ground(g, 470, { top: '#5b47a8', body: '#3a2a72', deep: '#221551' });
+          A.ground(g, 470, A.GROUND.ishi);
 
           // ベルトコンベア
-          g.block(-20, BY, c.W + 40, 54, '#2b2050', { r: 12, lw: 4, gloss: 0.06 });
+          g.block(-20, BY, c.W + 40, 54, '#7f8fa6', { r: 10, lw: 3 });
           ctx.save();
           ctx.beginPath(); ctx.rect(0, BY, c.W, 54); ctx.clip();
-          ctx.globalAlpha = 0.35;
+          ctx.globalAlpha = 0.22;
           for (var s = 0; s < 26; s++) {
             var sx = U.wrap(s * 46 + (grabbed ? 0 : c.t * spd), c.W + 92) - 46;
-            ctx.fillStyle = '#7c6bd6';
-            ctx.fillRect(sx, BY, 16, 54);
+            ctx.fillStyle = GG.PAL.paper;
+            ctx.fillRect(sx, BY, 18, 54);
           }
           ctx.restore();
 
@@ -101,10 +101,10 @@
           ctx.setLineDash([16, 12]);
           ctx.lineDashOffset = -c.t * 40;
           g.rr(zoneX - zoneW / 2 * pulse, BY - 104, zoneW * pulse, 146, 16)
-            .stroke('#ffd93d', 5);
+            .stroke(GG.PAL.yamabuki, 5);
           ctx.setLineDash([]);
           ctx.globalAlpha = 0.14;
-          g.rr(zoneX - zoneW / 2, BY - 104, zoneW, 146, 16).fill('#ffd93d');
+          g.rr(zoneX - zoneW / 2, BY - 104, zoneW, 146, 16).fill(GG.PAL.yamabuki);
           ctx.restore();
 
           // アイテム
@@ -126,12 +126,12 @@
               ctx.restore();
               ctx.save();
               ctx.translate(it.x, y); ctx.rotate(Math.sin(it.rot) * 0.16);
-              g.polyPath([[0, -32], [28, -6], [16, 30], [-16, 30], [-28, -6]]).ink('#ffd93d', 4);
+              g.polyPath([[0, -32], [28, -6], [16, 30], [-16, 30], [-28, -6]]).ink(GG.PAL.yamabuki, 4);
               g.polyPath([[0, -32], [0, 30], [-28, -6]]).fill('rgba(255,255,255,0.35)');
               ctx.restore();
             } else {
-              g.block(it.x - 26, y - 26, 52, 52, '#6b6187', { r: 10 });
-              g.text('×', it.x, y, { size: 30, fill: '#39304f', stroke: false, shadow: false });
+              g.block(it.x - 26, y - 26, 52, 52, '#a9a2b5', { r: 8 });
+              g.text('×', it.x, y, { size: 30, fill: GG.PAL.paper });
             }
             ctx.restore();
           }
@@ -139,18 +139,18 @@
           // クレーン
           var cy = claw.y + claw.down * 116;
           ctx.save();
-          ctx.strokeStyle = '#c7bce8'; ctx.lineWidth = 7;
+          ctx.strokeStyle = GG.PAL.ink; ctx.lineWidth = 4;
           ctx.beginPath(); ctx.moveTo(zoneX, 60); ctx.lineTo(zoneX, cy); ctx.stroke();
-          g.rr(zoneX - 60, 40, 120, 26, 10).ink('#a99ce0', 3.5);
+          g.rr(zoneX - 60, 40, 120, 26, 8).ink('#8a8296', 2.6);
           var open = claw.closing > 0 ? U.lerp(1, 0.15, U.sat(claw.closing / 0.18)) : 1;
           for (var d = -1; d <= 1; d += 2) {
             ctx.save();
             ctx.translate(zoneX, cy);
             ctx.rotate(d * (0.35 + open * 0.5));
-            g.rr(-8, 0, 16, 52, 8).ink('#ffd93d', 3.5);
+            g.rr(-8, 0, 16, 52, 8).ink(GG.PAL.yamabuki, 3.5);
             ctx.restore();
           }
-          g.circlePath(zoneX, cy, 15).ink('#ff9f43', 3.5);
+          g.circlePath(zoneX, cy, 15).ink(GG.PAL.kuchiba, 3.5);
           ctx.restore();
 
           A.tip(g, 240, 116, 'キラキラを つかめ', 24);

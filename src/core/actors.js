@@ -28,31 +28,25 @@
     // 足
     if (o.feet !== false) {
       var fy = ry * 0.86, fs = r * 0.3;
-      g.ellipsePath(-rx * 0.46, fy, fs, fs * 0.66).ink(U.shade(col, -0.32), 3);
-      g.ellipsePath(rx * 0.46, fy, fs, fs * 0.66).ink(U.shade(col, -0.32), 3);
+      g.ellipsePath(-rx * 0.46, fy, fs, fs * 0.66).ink(U.shade(col, -0.22), 2.4);
+      g.ellipsePath(rx * 0.46, fy, fs, fs * 0.66).ink(U.shade(col, -0.22), 2.4);
     }
-    // 体
-    g.ellipsePath(0, 0, rx, ry).ink(col, 4.5);
-    c.save();
-    g.ellipsePath(0, 0, rx, ry); c.clip();
-    g.ellipsePath(-rx * 0.34, -ry * 0.42, rx * 0.44, ry * 0.3, -0.45)
-      .fill('rgba(255,255,255,0.5)');
-    g.ellipsePath(0, ry * 0.75, rx * 1.1, ry * 0.5).fill('rgba(0,0,0,0.13)');
-    c.restore();
+    // 体（フラット塗り + 細い墨線）
+    g.ellipsePath(0, 0, rx, ry).ink(col, 3.4);
 
-    // ほっぺ
-    g.ellipsePath(-rx * 0.56, ry * 0.18, rx * 0.19, ry * 0.13).fill('rgba(255,110,140,0.55)');
-    g.ellipsePath(rx * 0.56, ry * 0.18, rx * 0.19, ry * 0.13).fill('rgba(255,110,140,0.55)');
+    // ほっぺ（和菓子のような淡い紅）
+    g.ellipsePath(-rx * 0.58, ry * 0.2, rx * 0.17, ry * 0.11).fill('rgba(226,88,74,0.28)');
+    g.ellipsePath(rx * 0.58, ry * 0.2, rx * 0.17, ry * 0.11).fill('rgba(226,88,74,0.28)');
 
     // 顔
     g.eyes(0, -ry * 0.16, rx * 0.35, r * 0.17, o.lookX, o.lookY, o.blink);
     var m = o.mouth || 'smile';
-    c.strokeStyle = '#2a2040'; c.lineWidth = r * 0.09; c.lineCap = 'round';
+    c.strokeStyle = GG.PAL.ink; c.lineWidth = r * 0.085; c.lineCap = 'round';
     c.beginPath();
     if (m === 'smile') {
       c.arc(0, ry * 0.12, r * 0.2, 0.25, Math.PI - 0.25);
     } else if (m === 'o') {
-      g.ellipsePath(0, ry * 0.2, r * 0.14, r * 0.17).ink('#5b2a48', 2.4);
+      g.ellipsePath(0, ry * 0.2, r * 0.14, r * 0.17).ink('#8c5460', 1.8);
       c.beginPath();
     } else if (m === 'flat') {
       c.moveTo(-r * 0.16, ry * 0.2); c.lineTo(r * 0.16, ry * 0.2);
@@ -67,7 +61,7 @@
   /** トゲ玉（危険物の統一表現） */
   A.spike = function (g, x, y, r, color, rot) {
     var c = g.c;
-    color = color || '#4a4363';
+    color = color || GG.PAL.shu;
     c.save(); c.translate(x, y); c.rotate(rot || 0);
     var n = 9;
     c.beginPath();
@@ -77,9 +71,9 @@
       if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
     }
     c.closePath();
-    g.ink(color, 4);
-    g.circlePath(0, 0, r * 0.5).fill(U.shade(color, -0.25));
-    g.circlePath(-r * 0.16, -r * 0.2, r * 0.16).fill('rgba(255,255,255,0.4)');
+    g.ink(color, 3.2);
+    g.circlePath(0, 0, r * 0.46).fill(GG.PAL.paper);
+    g.circlePath(0, 0, r * 0.2).fill(color);
     c.restore();
     return A;
   };
@@ -87,10 +81,10 @@
   /** ごほうび系の星 */
   A.star = function (g, x, y, r, color, rot) {
     var c = g.c;
-    color = color || '#ffd93d';
+    color = color || GG.PAL.yamabuki;
     c.save(); c.translate(x, y); c.rotate(rot || 0);
-    g.starPath(0, 0, r, r * 0.46, 5, 0).ink(color, 4);
-    g.starPath(0, -r * 0.1, r * 0.5, r * 0.22, 5, 0).fill(U.shade(color, 0.45));
+    g.starPath(0, 0, r, r * 0.46, 5, 0).ink(color, 3.2);
+    g.starPath(0, 0, r * 0.52, r * 0.24, 5, 0).fill(U.shade(color, 0.5));
     c.restore();
     return A;
   };
@@ -98,9 +92,9 @@
   A.bomb = function (g, x, y, r, fuseT) {
     var c = g.c;
     c.save(); c.translate(x, y);
-    g.circlePath(0, 0, r).ink('#3a3350', 4);
-    g.circlePath(-r * 0.3, -r * 0.32, r * 0.24).fill('rgba(255,255,255,0.45)');
-    g.rr(-r * 0.2, -r * 1.18, r * 0.4, r * 0.3, 3).ink('#7a6f96', 3);
+    g.circlePath(0, 0, r).ink('#4a4452', 3);
+    g.circlePath(-r * 0.3, -r * 0.32, r * 0.2).fill('rgba(255,255,255,0.4)');
+    g.rr(-r * 0.2, -r * 1.18, r * 0.4, r * 0.3, 3).ink('#8b8496', 2.4);
     c.strokeStyle = '#ffb03a'; c.lineWidth = r * 0.13; c.lineCap = 'round';
     c.beginPath();
     c.moveTo(0, -r * 1.15);
@@ -113,7 +107,17 @@
     return A;
   };
 
-  /** 地面。草の縁 + 土のグラデーション + 縁のハイライト */
+  /** 地面のプリセット。和の中間色でまとめ、暗く沈ませない。 */
+  A.GROUND = {
+    tsuchi: { top: '#d8b183', body: '#b98b57', deep: '#8f6840' },  // 土
+    kusa:   { top: '#a8c98a', body: '#7fab63', deep: '#5d8547' },  // 草
+    mizu:   { top: '#9ad2da', body: '#6fb4c0', deep: '#4f8f9c' },  // 水
+    ishi:   { top: '#c8ccd4', body: '#a5abb6', deep: '#7f8794' },  // 石畳
+    ita:    { top: '#dcbb90', body: '#c19a66', deep: '#9a7749' },  // 板張り
+    tatami: { top: '#d5cf9a', body: '#b5ae74', deep: '#8f8956' }   // 畳
+  };
+
+  /** 地面。波打つ稜線 + 表土の帯 + 墨の細線 */
   A.ground = function (g, y, opt) {
     opt = opt || {};
     var c = g.c, W = GG.VIEW_W, H = GG.VIEW_H;
@@ -130,7 +134,7 @@
     }
     edge(0);
     c.lineTo(W, H); c.lineTo(0, H); c.closePath();
-    c.fillStyle = g.grad(0, y, 0, H, [[0, body], [1, deep]]);
+    c.fillStyle = body;      // グラデで暗く落とさず、平らな一色で置く
     c.fill();
 
     // 表土の帯
@@ -142,25 +146,17 @@
     // 稜線のハイライト
     c.save();
     edge(0);
-    c.strokeStyle = U.shade(top, 0.45); c.lineWidth = 4; c.lineCap = 'round';
+    c.strokeStyle = GG.PAL.ink; c.lineWidth = 2.4; c.lineCap = 'round';
     c.stroke();
     c.restore();
-    // 表土と土の境界に影
+    // 表土と土の境界（墨の細線で締める）
     c.save();
-    c.globalAlpha = 0.18;
+    c.globalAlpha = 0.5;
     edge(22);
-    c.strokeStyle = '#000'; c.lineWidth = 6;
+    c.strokeStyle = deep; c.lineWidth = 3;
     c.stroke();
     c.restore();
 
-    // 土の中の質感（固定シードなのでチラつかない）
-    c.save(); c.globalAlpha = 0.1;
-    for (var i = 0; i < 14; i++) {
-      var r = new U.RNG(1000 + i);
-      g.ellipsePath(r.range(0, W), y + 40 + r.range(0, Math.max(20, H - y - 40)),
-        r.range(16, 40), r.range(8, 18)).fill('#000');
-    }
-    c.restore();
     return A;
   };
 
@@ -173,33 +169,37 @@
     g.polyPath([
       [-s * 0.75, -s * 0.3], [s * 0.05, -s * 0.3], [s * 0.05, -s * 0.62],
       [s * 0.82, 0], [s * 0.05, s * 0.62], [s * 0.05, s * 0.3], [-s * 0.75, s * 0.3]
-    ]).ink(color || '#ffd93d', 4);
+    ]).ink(color || GG.PAL.yamabuki, 3);
     c.restore();
     return A;
   };
 
   /** 進捗バー（共通ゲージ） */
   A.gauge = function (g, x, y, w, h, k, color, label) {
-    g.block(x, y, w, h, '#1a1430', { r: h / 2, lw: 3.5, gloss: 0 });
-    var iw = Math.max(0, (w - 10) * U.sat(k));
+    g.block(x, y, w, h, GG.PAL.paper, { r: h / 2, lw: 2.6 });
+    var iw = Math.max(0, (w - 8) * U.sat(k));
     if (iw > 2) {
-      g.rr(x + 5, y + 5, iw, h - 10, (h - 10) / 2).fill(color || '#ffd93d');
-      g.rr(x + 5, y + 5, iw, (h - 10) * 0.45, (h - 10) / 3).fill('rgba(255,255,255,0.3)');
+      g.rr(x + 4, y + 4, iw, h - 8, (h - 8) / 2).fill(color || GG.PAL.yamabuki);
     }
-    if (label) g.text(label, x + w / 2, y + h / 2, { size: h * 0.5, fill: '#fff', lw: 3.5 });
+    if (label) g.text(label, x + w / 2, y + h / 2, { size: h * 0.5, fill: GG.PAL.ink });
     return A;
   };
 
   /** 吹き出しつきの一言（ゲーム内の補助説明） */
+  /** 木札ふうの一言。縁日の立て札の見立て。 */
   A.tip = function (g, x, y, str, size, color, textColor) {
     size = size || 20;
-    var w = g.measure(str, size) + 36;
-    g.block(x - w / 2, y - size, w, size * 2, color || 'rgba(14,9,26,0.78)',
-      { r: size, lw: 0, gloss: 0, shadow: false });
-    g.text(str, x, y, {
-      size: size, fill: textColor || '#fff', lw: 3, shadow: false,
-      stroke: textColor ? 'rgba(0,0,0,0.35)' : undefined
-    });
+    var w = g.measure(str, size) + 40, h = size * 2;
+    var c = g.c;
+    c.save();
+    c.globalAlpha = c.globalAlpha * 0.96;
+    g.rr(x - w / 2, y - h / 2, w, h, 8).ink(color || GG.PAL.paper, 2.6);
+    // 札の上下に朱の線
+    c.globalAlpha = c.globalAlpha * 0.9;
+    g.rr(x - w / 2 + 7, y - h / 2 + 4, w - 14, 2.5, 1).fill(GG.PAL.shu);
+    g.rr(x - w / 2 + 7, y + h / 2 - 6.5, w - 14, 2.5, 1).fill(GG.PAL.shu);
+    c.restore();
+    g.text(str, x, y, { size: size, fill: textColor || GG.PAL.ink });
     return A;
   };
 

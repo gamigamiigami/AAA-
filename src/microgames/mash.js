@@ -10,7 +10,7 @@
     control: 'mash',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#ff6b6b', '#7c1f3d'],
+    bg: ['#f8d3ca', '#eeaea3'],
 
     create: function (c) {
       var pos = 0;                        // -1(負け) .. +1(勝ち)
@@ -37,7 +37,7 @@
             ropeWave = 1;
             c.sfx('click');
             c.fx.burst(c.W * 0.5 - 40, 300, {
-              n: 3, color: ['#ffd93d', '#ffffff'], speed: 260,
+              n: 3, color: [GG.PAL.yamabuki, '#ffffff'], speed: 260,
               dir: -Math.PI, spread: 0.9, size: 6, life: 0.35
             });
             c.shake(3, 0.1);
@@ -60,44 +60,44 @@
 
         draw: function (g) {
           var ctx = g.c;
-          A.ground(g, 400, { top: '#ffd0a0', body: '#c96b4a', deep: '#8a3f2c' });
+          A.ground(g, 400, A.GROUND.tsuchi);
 
           var cx = c.W / 2 + pos * 190;
           var hy = 320;
 
           // ロープ
           ctx.save();
-          ctx.strokeStyle = '#e8c07a'; ctx.lineWidth = 13; ctx.lineCap = 'round';
+          ctx.strokeStyle = '#d8b183'; ctx.lineWidth = 13; ctx.lineCap = 'round';
           ctx.beginPath();
           ctx.moveTo(cx - 250, hy + 8);
           ctx.quadraticCurveTo(cx, hy + 26 + Math.sin(c.t * 30) * ropeWave * 8, cx + 250, hy + 8);
           ctx.stroke();
-          ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 5;
+          ctx.strokeStyle = 'rgba(64,58,72,0.22)'; ctx.lineWidth = 5;
           ctx.stroke();
           ctx.restore();
 
           // 中央マーカー
           ctx.save();
           ctx.globalAlpha = 0.9;
-          g.rr(c.W / 2 - 4, 176, 8, 260, 4).fill('rgba(255,255,255,0.35)');
+          g.rr(c.W / 2 - 3, 190, 6, 200, 3).fill('rgba(64,58,72,0.16)');
           ctx.restore();
-          g.polyPath([[cx, hy - 34], [cx + 15, hy - 8], [cx - 15, hy - 8]]).ink('#ffd93d', 3);
+          g.polyPath([[cx, hy - 34], [cx + 15, hy - 8], [cx - 15, hy - 8]]).ink(GG.PAL.yamabuki, 3);
 
           A.blob(g, {
-            x: cx - 132, y: hy - 30, r: 46, color: '#ffd93d',
+            x: cx - 132, y: hy - 30, r: 46, color: GG.PAL.yamabuki,
             squash: heroSq, shadowY: 404, lookX: 0.7,
             rot: -0.16, mouth: 'o'
           });
           A.blob(g, {
-            x: cx + 132, y: hy - 30, r: 46, color: '#8367ff',
+            x: cx + 132, y: hy - 30, r: 46, color: GG.PAL.fuji,
             squash: rivalSq, shadowY: 404, lookX: -0.7,
             rot: 0.16, mouth: c.result === 'win' ? 'sad' : 'flat'
           });
 
           // ゲージ
-          A.gauge(g, c.W / 2 - 230, 116, 460, 34, (pos + 1) / 2, '#ffd93d');
-          g.text('YOU', c.W / 2 - 258, 133, { size: 19, fill: '#ffd93d', align: 'right', lw: 3.5 });
-          g.text('RIVAL', c.W / 2 + 258, 133, { size: 19, fill: '#c3b0ff', align: 'left', lw: 3.5 });
+          A.gauge(g, c.W / 2 - 230, 116, 460, 34, (pos + 1) / 2, GG.PAL.yamabuki);
+          g.text('YOU', c.W / 2 - 258, 133, { size: 19, fill: GG.PAL.ink, align: 'right' });
+          g.text('RIVAL', c.W / 2 + 258, 133, { size: 19, fill: GG.PAL.ink, align: 'left' });
 
           // 連打アイコン
           if (!c.result) {
@@ -105,8 +105,8 @@
             ctx.save();
             ctx.translate(c.W / 2, 468);
             ctx.scale(beat, beat);
-            g.rr(-72, -22, 144, 44, 22).ink('#1a1330', 3.5);
-            g.text('れんだ！', 0, 2, { size: 25, fill: '#fff', lw: 4, shadow: false });
+            g.rr(-72, -22, 144, 44, 12).ink(GG.PAL.paper, 3);
+            g.text('れんだ！', 0, 2, { size: 25, fill: GG.PAL.shu });
             ctx.restore();
           }
         }

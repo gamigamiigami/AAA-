@@ -94,11 +94,14 @@
     this.c.lineJoin = 'round'; this.c.lineCap = 'round';
     this.c.stroke(); return this;
   };
-  /** アウトライン付きで塗る。ink 省略時は fill を暗くした色 */
+  /**
+   * アウトライン付きで塗る。
+   * 和のフラット路線なので、線は「墨色・細め」。呼び出し側の lw をここで一律に絞る。
+   */
   P.ink = function (fillStyle, lw, inkColor) {
     if (lw !== 0) {
-      this.c.strokeStyle = inkColor || 'rgba(28,22,44,0.92)';
-      this.c.lineWidth = (lw || 5) * 2;
+      this.c.strokeStyle = inkColor || GG.PAL.ink;
+      this.c.lineWidth = (lw === undefined ? 5 : lw) * 2 * 0.6;
       this.c.lineJoin = 'round'; this.c.lineCap = 'round';
       this.c.stroke();
     }
@@ -132,18 +135,18 @@
     opt = opt || {};
     var r = opt.r === undefined ? Math.min(w, h) * 0.22 : opt.r;
     var c = this.c;
-    if (opt.shadow !== false) {
+    if (opt.shadow) {
       c.save();
-      c.globalAlpha = (c.globalAlpha) * 0.22;
-      this.rr(x + (opt.sx || 5), y + (opt.sy || 7), w, h, r).fill('#120c22');
+      c.globalAlpha = (c.globalAlpha) * 0.14;
+      this.rr(x + (opt.sx || 3), y + (opt.sy || 5), w, h, r).fill(GG.PAL.ink);
       c.restore();
     }
-    this.rr(x, y, w, h, r).ink(color, opt.lw === undefined ? 4 : opt.lw, opt.ink);
-    if (opt.gloss !== false) {
+    this.rr(x, y, w, h, r).ink(color, opt.lw === undefined ? 3 : opt.lw, opt.ink);
+    if (opt.gloss) {
       c.save();
       this.rr(x, y, w, h, r); c.clip();
-      this.rr(x + w * 0.08, y + h * 0.09, w * 0.84, h * 0.3, r * 0.7)
-        .fill('rgba(255,255,255,' + (opt.gloss || 0.22) + ')');
+      this.rr(x + w * 0.08, y + h * 0.09, w * 0.84, h * 0.28, r * 0.7)
+        .fill('rgba(255,255,255,' + opt.gloss + ')');
       c.restore();
     }
     return this;
@@ -153,19 +156,16 @@
   P.orb = function (x, y, r, color, opt) {
     opt = opt || {};
     var c = this.c;
-    if (opt.shadow !== false) {
-      c.save(); c.globalAlpha = c.globalAlpha * 0.2;
-      this.ellipsePath(x + 3, y + r * 0.95, r * 0.85, r * 0.28).fill('#120c22');
+    if (opt.shadow) {
+      c.save(); c.globalAlpha = c.globalAlpha * 0.14;
+      this.ellipsePath(x + 2, y + r * 0.95, r * 0.8, r * 0.24).fill(GG.PAL.ink);
       c.restore();
     }
-    this.circlePath(x, y, r).ink(color, opt.lw === undefined ? 4 : opt.lw, opt.ink);
+    this.circlePath(x, y, r).ink(color, opt.lw === undefined ? 3 : opt.lw, opt.ink);
     c.save();
     this.circlePath(x, y, r); c.clip();
-    this.ellipsePath(x - r * 0.3, y - r * 0.38, r * 0.42, r * 0.3, -0.5)
-      .fill('rgba(255,255,255,0.55)');
-    this.circlePath(x + r * 0.18, y + r * 0.2, r * 0.95)
-      .fill(this.rgrad(x + r * 0.2, y + r * 0.25, r * 0.4, r * 1.1,
-        [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.28)']]));
+    this.ellipsePath(x - r * 0.32, y - r * 0.36, r * 0.3, r * 0.19, -0.5)
+      .fill('rgba(255,255,255,0.5)');
     c.restore();
     return this;
   };
@@ -173,8 +173,8 @@
   /** 地面に落ちる楕円影 */
   P.dropShadow = function (x, y, rx, ry, a) {
     var c = this.c;
-    c.save(); c.globalAlpha = c.globalAlpha * (a === undefined ? 0.25 : a);
-    this.ellipsePath(x, y, rx, ry).fill('#120c22');
+    c.save(); c.globalAlpha = c.globalAlpha * (a === undefined ? 0.16 : a);
+    this.ellipsePath(x, y, rx, ry).fill(GG.PAL.ink);
     c.restore();
     return this;
   };
@@ -188,13 +188,13 @@
       if (blink) {
         c.beginPath();
         c.moveTo(ex - r, y); c.quadraticCurveTo(ex, y + r * 0.5, ex + r, y);
-        c.strokeStyle = '#221a33'; c.lineWidth = r * 0.45; c.lineCap = 'round';
+        c.strokeStyle = GG.PAL.ink; c.lineWidth = r * 0.45; c.lineCap = 'round';
         c.stroke();
         continue;
       }
       this.ellipsePath(ex, y, r, r * 1.12).fill('#fff');
-      this.ellipsePath(ex, y, r, r * 1.12).stroke('rgba(28,22,44,0.85)', 2.5);
-      this.circlePath(ex + lookX * r * 0.35, y + lookY * r * 0.4, r * 0.55).fill('#221a33');
+      this.ellipsePath(ex, y, r, r * 1.12).stroke(GG.PAL.ink, 1.8);
+      this.circlePath(ex + lookX * r * 0.35, y + lookY * r * 0.4, r * 0.55).fill(GG.PAL.ink);
       this.circlePath(ex + lookX * r * 0.35 - r * 0.18, y + lookY * r * 0.4 - r * 0.22, r * 0.2)
         .fill('#fff');
     }
@@ -218,7 +218,7 @@
     c.textAlign = o.align || 'center';
     c.textBaseline = o.baseline || 'middle';
     c.lineJoin = 'round'; c.miterLimit = 2;
-    if (o.shadow !== false) {
+    if (o.shadow) {
       c.globalAlpha = c.globalAlpha * (o.shadowA || 0.3);
       c.fillStyle = o.shadowC || '#150f26';
       c.fillText(str, x + (o.shadowX || 0), y + (o.shadowY === undefined ? 5 : o.shadowY));
@@ -228,12 +228,12 @@
       c.textBaseline = o.baseline || 'middle';
       c.lineJoin = 'round'; c.miterLimit = 2;
     }
-    if (o.stroke !== false) {
-      c.strokeStyle = o.stroke || 'rgba(28,22,44,0.95)';
-      c.lineWidth = o.lw === undefined ? Math.max(4, (o.size || 32) * 0.16) : o.lw;
+    if (o.stroke) {
+      c.strokeStyle = o.stroke;
+      c.lineWidth = o.lw === undefined ? Math.max(3, (o.size || 32) * 0.13) : o.lw;
       c.strokeText(str, x, y);
     }
-    c.fillStyle = o.fill || '#ffffff';
+    c.fillStyle = o.fill || GG.PAL.ink;
     c.fillText(str, x, y);
     c.restore();
     return this;
@@ -271,6 +271,84 @@
       this.c.restore();
       cx += cw + track;
     }
+    return this;
+  };
+
+  // --- 和柄パターン（背景の情報密度を、放射線ではなく地紋で作る） ---
+
+  /** 市松 */
+  P.ichimatsu = function (x, y, w, h, cell, color, alpha, offset) {
+    var c = this.c;
+    c.save();
+    c.globalAlpha = c.globalAlpha * (alpha === undefined ? 0.16 : alpha);
+    c.beginPath(); c.rect(x, y, w, h); c.clip();
+    c.fillStyle = color;
+    var ox = (offset || 0) % (cell * 2);
+    for (var j = -1; j * cell < h + cell; j++) {
+      for (var i = -1; i * cell < w + cell * 2; i++) {
+        if ((i + j) % 2) continue;
+        c.fillRect(x + i * cell - ox, y + j * cell, cell, cell);
+      }
+    }
+    c.restore();
+    return this;
+  };
+
+  /** 水玉 */
+  P.mizutama = function (x, y, w, h, step, r, color, alpha, offset) {
+    var c = this.c;
+    c.save();
+    c.globalAlpha = c.globalAlpha * (alpha === undefined ? 0.18 : alpha);
+    c.beginPath(); c.rect(x, y, w, h); c.clip();
+    var ox = (offset || 0) % (step * 2);
+    for (var j = -1; j * step < h + step; j++) {
+      for (var i = -1; i * step < w + step * 2; i++) {
+        var px = x + i * step + (j % 2 ? step / 2 : 0) - ox;
+        this.circlePath(px, y + j * step, r).fill(color);
+      }
+    }
+    c.restore();
+    return this;
+  };
+
+  /** 青海波（重なる半円） */
+  P.seigaiha = function (x, y, w, h, r, color, alpha, offset) {
+    var c = this.c;
+    c.save();
+    c.globalAlpha = c.globalAlpha * (alpha === undefined ? 0.2 : alpha);
+    c.beginPath(); c.rect(x, y, w, h); c.clip();
+    c.strokeStyle = color; c.lineWidth = 2.2;
+    var ox = (offset || 0) % (r * 2);
+    for (var j = -1; j * r < h + r * 2; j++) {
+      for (var i = -1; i * r * 2 < w + r * 4; i++) {
+        var px = x + i * r * 2 + (j % 2 ? r : 0) - ox, py = y + j * r;
+        for (var k = 1; k <= 3; k++) {
+          c.beginPath();
+          c.arc(px, py, r * k / 3, Math.PI, 0);
+          c.stroke();
+        }
+      }
+    }
+    c.restore();
+    return this;
+  };
+
+  /** のれん（画面上部の飾り。縁日の入口の記号） */
+  P.noren = function (y, h, panels, colors, alpha) {
+    var c = this.c, W = this.W;
+    c.save();
+    c.globalAlpha = c.globalAlpha * (alpha === undefined ? 1 : alpha);
+    var pw = W / panels;
+    for (var i = 0; i < panels; i++) {
+      c.fillStyle = colors[i % colors.length];
+      // 上 40% はつながり、下はスリットで分かれる（暖簾の構造）
+      c.fillRect(i * pw, y, pw, h * 0.42);
+      c.fillRect(i * pw + 2, y + h * 0.42, pw - 4, h * 0.58);
+    }
+    c.fillStyle = GG.PAL.ink;
+    c.globalAlpha = c.globalAlpha * 0.85;
+    c.fillRect(0, y, W, 4);
+    c.restore();
     return this;
   };
 

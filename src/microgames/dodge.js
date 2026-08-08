@@ -10,7 +10,7 @@
     control: 'move',
     beats: 8,
     defaultResult: 'win',
-    bg: ['#7b5bd6', '#2c1f52'],
+    bg: ['#cfe0f2', '#a8c4de'],
 
     create: function (c) {
       var GY = 442;
@@ -47,7 +47,7 @@
             d.y += d.vy * dt;
             d.rot += d.spin * dt;
             if (U.circHit(hero.x, GY - 29, hero.r * 0.74, d.x, d.y, d.r * 0.8)) {
-              c.fx.burst(d.x, d.y, { n: 16, color: ['#ff5e7d', '#ffffff'], speed: 300, size: 8 });
+              c.fx.burst(d.x, d.y, { n: 16, color: [GG.PAL.shu, '#ffffff'], speed: 300, size: 8 });
               c.sfx('hit');
               c.lose();
               return;
@@ -67,7 +67,7 @@
 
         draw: function (g) {
           var ctx = g.c;
-          A.ground(g, GY + 12, { top: '#b6a4ff', body: '#5b47a8', deep: '#33265f' });
+          A.ground(g, GY + 12, A.GROUND.ishi);
 
           // 落下予告線（読みやすさのため）
           ctx.save();
@@ -77,14 +77,14 @@
             if (d.dead || d.y > GY - 20) continue;
             var near = U.sat(1 - (GY - d.y) / 420);
             ctx.globalAlpha = 0.08 + near * 0.22;
-            ctx.fillStyle = '#ff6b9d';
+            ctx.fillStyle = GG.PAL.shu;
             ctx.fillRect(d.x - 2.5, d.y + d.r, 5, GY - d.y - d.r);
-            g.ellipsePath(d.x, GY + 6, d.r * (0.5 + near * 0.7), d.r * 0.24).fill('#ff6b9d');
+            g.ellipsePath(d.x, GY + 6, d.r * (0.5 + near * 0.7), d.r * 0.24).fill(GG.PAL.kobai);
           }
           ctx.restore();
 
           A.blob(g, {
-            x: hero.x, y: GY - 29, r: hero.r, color: '#ffd93d',
+            x: hero.x, y: GY - 29, r: hero.r, color: GG.PAL.yamabuki,
             squash: hero.squash, shadowY: GY + 14,
             lookX: 0, lookY: -0.6, mouth: c.result === 'lose' ? 'sad' : 'o'
           });
@@ -92,7 +92,7 @@
           for (var k = 0; k < drops.length; k++) {
             var dd = drops[k];
             if (dd.dead) continue;
-            A.spike(g, dd.x, dd.y, dd.r, '#ff4d6d', dd.rot);
+            A.spike(g, dd.x, dd.y, dd.r, GG.PAL.shu, dd.rot);
           }
         }
       };

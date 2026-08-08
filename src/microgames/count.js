@@ -10,7 +10,7 @@
     control: 'pick',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#42d6a4', '#146b52'],
+    bg: ['#d8ead0', '#b3d4a6'],
 
     create: function (c) {
       var maxN = [4, 5, 6][c.diff - 1];
@@ -29,7 +29,7 @@
         }
         items.push({
           x: p.x, y: p.y, r: 30, ph: c.rng.range(0, 6.28),
-          delay: i * 0.09, col: c.rng.pick(['#ffd93d', '#ff8fa3', '#8be9fd', '#ffffff'])
+          delay: i * 0.09, col: c.rng.pick([GG.PAL.yamabuki, GG.PAL.kobai, GG.PAL.mizu, GG.PAL.wakaba])
         });
       }
 
@@ -81,7 +81,7 @@
             if (chosen.v === answer) {
               c.sfx('coin');
               c.fx.burst(chosen.x + chosen.w / 2, chosen.y + 20, {
-                n: 20, color: ['#ffd93d', '#ffffff'], speed: 300, size: 8, shape: 'star'
+                n: 20, color: [GG.PAL.yamabuki, '#ffffff'], speed: 300, size: 8, shape: 'star'
               });
               c.win();
             } else {
@@ -96,7 +96,7 @@
           ctx.save(); ctx.globalAlpha = 0.13;
           for (var s = 0; s < 10; s++) {
             var sx = U.wrap(s * 110 + c.t * 30, c.W + 220) - 110;
-            g.circlePath(sx, 120 + (s % 3) * 90, 46).fill('#fff');
+            g.circlePath(sx, 120 + (s % 3) * 90, 46).fill(GG.PAL.paper);
           }
           ctx.restore();
 
@@ -116,18 +116,16 @@
             ctx.restore();
           }
 
-          g.text('なんびき？', c.W / 2, 108, { size: 34, fill: '#fff', lw: 5.5 });
+          g.text('なんびき？', c.W / 2, 108, { size: 34, fill: GG.PAL.ink });
 
           // ボタン
           for (var j = 0; j < buttons.length; j++) {
             var b = buttons[j];
             var sel = (this.cursor === j);
             var lift = b.hov * 6 + (sel ? 5 : 0) - b.press * 8;
-            var col = (b.hov > 0.3 || sel) ? '#ffd93d' : '#f5f0ff';
-            g.block(b.x, b.y - lift, b.w, b.h, col, { r: 18, lw: 4 });
-            g.text(String(b.v), b.x + b.w / 2, b.y + b.h / 2 - lift, {
-              size: 40, fill: '#2b2244', stroke: 'rgba(255,255,255,0.9)', lw: 4, shadow: false
-            });
+            var col = (b.hov > 0.3 || sel) ? GG.PAL.yamabuki : GG.PAL.paper;
+            g.block(b.x, b.y - lift, b.w, b.h, col, { r: 12, lw: 3 });
+            g.text(String(b.v), b.x + b.w / 2, b.y + b.h / 2 - lift, { size: 40, fill: GG.PAL.ink });
           }
         }
       };

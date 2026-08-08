@@ -15,7 +15,7 @@
     control: 'dir',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#4a6fa5', '#151f36'],
+    bg: ['#d5e2f0', '#aec4dc'],
 
     create: function (c) {
       var cx = c.W / 2, cy = 300;
@@ -65,14 +65,14 @@
                 s.blocked = 0.001; blocked++; blockPop = 1;
                 c.sfx('thud'); c.stop(0.06); c.shake(9, 0.24);
                 c.fx.burst(s.x, s.y, {
-                  n: 18, color: ['#ffd93d', '#ffffff'], speed: 330,
+                  n: 18, color: [GG.PAL.yamabuki, '#ffffff'], speed: 330,
                   dir: Math.atan2(v[1], v[0]), spread: 1.1, size: 8
                 });
-                c.fx.ring(cx + v[0] * 66, cy + v[1] * 66, { r1: 120, color: '#ffd93d', lw: 8 });
+                c.fx.ring(cx + v[0] * 66, cy + v[1] * 66, { r1: 120, color: GG.PAL.yamabuki, lw: 8 });
                 if (blocked >= shots.length) { c.win(); return; }
               } else {
-                c.sfx('hit'); c.shake(16, 0.4); c.flash(0.3, '#ff5e7d');
-                c.fx.burst(cx, cy, { n: 24, color: ['#ff5e7d', '#fff'], speed: 360, size: 9 });
+                c.sfx('hit'); c.shake(16, 0.4); c.flash(0.3, GG.PAL.shu);
+                c.fx.burst(cx, cy, { n: 24, color: [GG.PAL.shu, '#fff'], speed: 360, size: 9 });
                 c.lose(); return;
               }
             }
@@ -83,10 +83,10 @@
           var ctx = g.c;
           ctx.save(); ctx.globalAlpha = 0.13;
           for (var i = 0; i < 5; i++) {
-            g.circlePath(cx, cy, 90 + i * 78 + Math.sin(c.t * 2 + i) * 6).stroke('#fff', 3);
+            g.circlePath(cx, cy, 90 + i * 78 + Math.sin(c.t * 2 + i) * 6).stroke(GG.PAL.paper, 3);
           }
           ctx.restore();
-          A.ground(g, 458, { top: '#7f93b8', body: '#3d4f73', deep: '#212b45' });
+          A.ground(g, 458, A.GROUND.ishi);
 
           // 予告インジケータ
           for (var k = 0; k < shots.length; k++) {
@@ -96,13 +96,13 @@
             var v = VEC[s.dir];
             ctx.save();
             ctx.globalAlpha = 0.25 + 0.55 * Math.abs(Math.sin(c.t * 9));
-            A.arrow(g, cx + v[0] * 300, cy + v[1] * 200, OPPOSITE[s.dir], 42, '#ff5e7d');
+            A.arrow(g, cx + v[0] * 300, cy + v[1] * 200, OPPOSITE[s.dir], 42, GG.PAL.shu);
             ctx.restore();
           }
 
           // プレイヤー
           A.blob(g, {
-            x: cx, y: cy, r: 40, color: '#4ecdc4', feet: false,
+            x: cx, y: cy, r: 40, color: GG.PAL.asagi, feet: false,
             lookX: VEC[facing][0] * 0.8, lookY: VEC[facing][1] * 0.8,
             mouth: c.result === 'lose' ? 'sad' : 'flat',
             shadowY: 470
@@ -115,8 +115,8 @@
           ctx.translate(cx + v2[0] * (68 - pushed), cy + v2[1] * (68 - pushed));
           ctx.rotate(Math.atan2(v2[1], v2[0]) + Math.PI / 2);
           ctx.scale(1 + turn * 0.16, 1 - turn * 0.12);
-          g.rr(-46, -14, 92, 28, 12).ink('#ffd93d', 4.5);
-          g.rr(-38, -9, 76, 10, 5).fill('rgba(255,255,255,0.4)');
+          g.rr(-46, -14, 92, 28, 12).ink(GG.PAL.yamabuki, 4.5);
+          g.rr(-38, -9, 76, 10, 5).fill('rgba(255,255,255,0.45)');
           ctx.restore();
 
           // 弾
@@ -128,10 +128,10 @@
             ctx.translate(sh.x, sh.y);
             ctx.rotate(Math.atan2(-vv[1], -vv[0]));
             ctx.globalAlpha = 0.4;
-            g.ellipsePath(-34, 0, 40, 12).fill('#ff5e7d');
+            g.ellipsePath(-34, 0, 40, 12).fill(GG.PAL.shu);
             ctx.globalAlpha = 1;
-            g.ellipsePath(0, 0, 26, 17).ink('#ff5e7d', 4);
-            g.ellipsePath(-6, -4, 9, 6).fill('rgba(255,255,255,0.55)');
+            g.ellipsePath(0, 0, 26, 17).ink(GG.PAL.shu, 4);
+            g.ellipsePath(-6, -4, 9, 6).fill('rgba(255,255,255,0.5)');
             ctx.restore();
           }
 

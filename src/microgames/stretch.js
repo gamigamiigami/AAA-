@@ -10,7 +10,7 @@
     control: 'hold',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#ff9f43', '#7d3c98'],
+    bg: ['#fae3bd', '#eec894'],
 
     create: function (c) {
       var GY = 400;
@@ -52,7 +52,7 @@
               var ok = tip >= rightEdge && tip <= rightEdge + platW;
               this._ok = ok;
               if (!ok) {
-                c.fx.burst(tip, GY, { n: 14, color: ['#ff5e7d', '#fff'], speed: 260, size: 7 });
+                c.fx.burst(tip, GY, { n: 14, color: [GG.PAL.shu, '#fff'], speed: 260, size: 7 });
               }
             }
             return;
@@ -80,17 +80,17 @@
           ctx.save(); ctx.globalAlpha = 0.3;
           for (var i = 0; i < 4; i++) {
             var cx = U.wrap(i * 300 - c.t * 26, c.W + 300) - 150;
-            g.ellipsePath(cx, 120 + i * 34, 74, 28).fill('#fff');
+            g.ellipsePath(cx, 120 + i * 34, 74, 28).fill(GG.PAL.paper);
           }
           ctx.restore();
 
           // 谷底
-          ctx.fillStyle = g.grad(0, GY, 0, c.H, [[0, 'rgba(20,8,40,0.1)'], [1, 'rgba(12,4,28,0.75)']]);
+          ctx.fillStyle = g.grad(0, GY, 0, c.H, [[0, 'rgba(64,58,72,0.05)'], [1, 'rgba(64,58,72,0.32)']]);
           ctx.fillRect(0, GY, c.W, c.H - GY);
 
           function pillar(x, w) {
-            g.block(x, GY, w, c.H - GY + 20, '#4a2f6e', { r: 10, gloss: 0.08 });
-            g.rr(x - 6, GY - 16, w + 12, 26, 8).ink('#7bed9f', 4);
+            g.block(x, GY, w, c.H - GY + 20, '#b98b57', { r: 8 });
+            g.rr(x - 6, GY - 16, w + 12, 26, 8).ink('#a8c98a', 3);
           }
           pillar(0, leftEdge);
           pillar(rightEdge, platW);
@@ -99,10 +99,10 @@
           ctx.save();
           var mp = 0.6 + 0.4 * Math.sin(c.t * 6);
           ctx.globalAlpha = 0.25 + mp * 0.2;
-          g.rr(rightEdge, GY - 150, platW, 140, 10).fill('#ffd93d');
+          g.rr(rightEdge, GY - 150, platW, 140, 10).fill(GG.PAL.yamabuki);
           ctx.globalAlpha = 0.9;
           ctx.setLineDash([12, 9]); ctx.lineDashOffset = -c.t * 34;
-          g.rr(rightEdge, GY - 150, platW, 140, 10).stroke('#ffd93d', 4);
+          g.rr(rightEdge, GY - 150, platW, 140, 10).stroke(GG.PAL.yamabuki, 4);
           ctx.setLineDash([]);
           ctx.restore();
           A.tip(g, rightEdge + platW / 2, GY - 168, 'ここ！', 19,
@@ -113,15 +113,15 @@
           ctx.save();
           ctx.translate(leftEdge, GY - 14);
           ctx.rotate(-Math.PI / 2 + bridgeA);
-          g.rr(0, -8, L, 16, 6).ink('#e8c07a', 4);
+          g.rr(0, -8, L, 16, 6).ink('#d8b183', 3);
           for (var s = 20; s < L; s += 34) {
-            g.rr(s, -8, 6, 16, 3).fill('rgba(0,0,0,0.16)');
+            g.rr(s, -8, 6, 16, 3).fill('rgba(64,58,72,0.2)');
           }
           ctx.restore();
 
           // ヒーロー
           A.blob(g, {
-            x: hero.x, y: hero.y, r: 26, color: '#4ecdc4',
+            x: hero.x, y: hero.y, r: 26, color: GG.PAL.asagi,
             shadowY: hero.y < GY ? GY - 12 : undefined,
             rot: fall > 0.3 ? (c.t * 6) % 6.28 : Math.sin(walk * 20) * 0.08,
             lookX: 0.7,
@@ -131,7 +131,7 @@
           // ゲージ
           if (!released) {
             var need = U.sat(len / (gap + platW));
-            A.gauge(g, c.W / 2 - 180, 110, 360, 26, U.sat(len / 460), '#ffd93d');
+            A.gauge(g, c.W / 2 - 180, 110, 360, 26, U.sat(len / 460), GG.PAL.yamabuki);
             // ちょうど良い範囲をゲージ上に表示
             var a0 = gap / 460, a1 = (gap + platW) / 460;
             ctx.save(); ctx.globalAlpha = 0.85;
@@ -139,7 +139,7 @@
               (360 - 10) * (a1 - a0), 20, 8).fill('rgba(123,237,159,0.75)');
             ctx.restore();
             g.text(growing ? 'はなすと たおれる' : '押しっぱなしで のばす',
-              c.W / 2, 84, { size: 22, fill: '#fff', lw: 4 });
+              c.W / 2, 84, { size: 22, fill: GG.PAL.ink });
           }
         }
       };

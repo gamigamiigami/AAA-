@@ -10,7 +10,7 @@
     control: 'move2',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#e84393', '#3d0f36'],
+    bg: ['#f5d9d5', '#e6b0a9'],
 
     create: function (c) {
       var area = { x: 90, y: 140, w: c.W - 180, h: 300 };
@@ -27,7 +27,7 @@
           amp: c.rng.range(50, 100),
           spd: c.rng.range(1.6, 2.6) * [1, 1.25, 1.5][c.diff - 1],
           ph: c.rng.range(0, 6.28),
-          th: 14
+          th: 18
         });
       }
 
@@ -48,8 +48,8 @@
             var hit = l.v ? Math.abs(hero.x - p) < l.th / 2 + 15
               : Math.abs(hero.y - p) < l.th / 2 + 15;
             if (hit) {
-              c.sfx('hit'); c.shake(15, 0.35); c.flash(0.3, '#ff5e7d');
-              c.fx.burst(hero.x, hero.y, { n: 22, color: ['#ff5e7d', '#fff'], speed: 340, size: 8 });
+              c.sfx('hit'); c.shake(15, 0.35); c.flash(0.3, GG.PAL.shu);
+              c.fx.burst(hero.x, hero.y, { n: 22, color: [GG.PAL.shu, '#fff'], speed: 340, size: 8 });
               c.lose(); return;
             }
           }
@@ -63,15 +63,14 @@
         draw: function (g) {
           var ctx = g.c;
           // 部屋
-          g.block(area.x - 18, area.y - 18, area.w + 36, area.h + 36, '#2b0f2c',
-            { r: 22, lw: 5, gloss: 0.04 });
+          g.block(area.x - 18, area.y - 18, area.w + 36, area.h + 36, '#c19a66', { r: 14, lw: 3 });
           ctx.save();
           ctx.beginPath(); ctx.rect(area.x, area.y, area.w, area.h); ctx.clip();
-          ctx.fillStyle = '#42163f'; ctx.fillRect(area.x, area.y, area.w, area.h);
-          ctx.globalAlpha = 0.14;
+          ctx.fillStyle = GG.PAL.paper; ctx.fillRect(area.x, area.y, area.w, area.h);
+          ctx.globalAlpha = 0.05;
           for (var tx = 0; tx < area.w + 60; tx += 60) {
             for (var ty = 0; ty < area.h + 60; ty += 60) {
-              g.rr(area.x + tx - 20, area.y + ty - 20, 46, 46, 8).fill('#fff');
+              g.rr(area.x + tx - 20, area.y + ty - 20, 46, 46, 6).fill(GG.PAL.ai);
             }
           }
           ctx.restore();
@@ -81,41 +80,41 @@
           ctx.save();
           ctx.translate(goal.x, goal.y); ctx.scale(gp, gp);
           ctx.globalAlpha = 0.35;
-          g.circlePath(0, 0, 58).fill('#7bed9f');
+          g.circlePath(0, 0, 58).fill(GG.PAL.wakaba);
           ctx.globalAlpha = 1;
-          g.rr(-30, -46, 60, 92, 26).ink('#7bed9f', 4.5);
-          g.text('EXIT', 0, 0, { size: 17, fill: '#123a24', stroke: false, shadow: false });
+          g.rr(-30, -46, 60, 92, 26).ink(GG.PAL.wakaba, 4.5);
+          g.text('EXIT', 0, 0, { size: 17, fill: GG.PAL.paper });
           ctx.restore();
 
           // レーザー
           for (var i = 0; i < lasers.length; i++) {
             var l = lasers[i], p = laserPos(l, c.t);
             ctx.save();
-            ctx.globalAlpha = 0.35;
-            if (l.v) g.rr(p - l.th, area.y, l.th * 2, area.h, 8).fill('#ff2d55');
-            else g.rr(area.x, p - l.th, area.w, l.th * 2, 8).fill('#ff2d55');
+            ctx.globalAlpha = 0.22;
+            if (l.v) g.rr(p - l.th, area.y, l.th * 2, area.h, 8).fill(GG.PAL.shu);
+            else g.rr(area.x, p - l.th, area.w, l.th * 2, 8).fill(GG.PAL.shu);
             ctx.globalAlpha = 1;
             if (l.v) {
-              g.rr(p - l.th / 2, area.y, l.th, area.h, 6).fill('#ff5e7d');
-              g.rr(p - 2.5, area.y, 5, area.h, 3).fill('#fff');
-              g.circlePath(p, area.y, 11).ink('#c0392b', 3);
-              g.circlePath(p, area.y + area.h, 11).ink('#c0392b', 3);
+              g.rr(p - l.th / 2, area.y, l.th, area.h, 6).fill(GG.PAL.shu);
+              g.rr(p - 2.5, area.y, 5, area.h, 3).fill(GG.PAL.paper);
+              g.circlePath(p, area.y, 11).ink(GG.PAL.shu, 2.4);
+              g.circlePath(p, area.y + area.h, 11).ink(GG.PAL.shu, 2.4);
             } else {
-              g.rr(area.x, p - l.th / 2, area.w, l.th, 6).fill('#ff5e7d');
-              g.rr(area.x, p - 2.5, area.w, 5, 3).fill('#fff');
-              g.circlePath(area.x, p, 11).ink('#c0392b', 3);
-              g.circlePath(area.x + area.w, p, 11).ink('#c0392b', 3);
+              g.rr(area.x, p - l.th / 2, area.w, l.th, 6).fill(GG.PAL.shu);
+              g.rr(area.x, p - 2.5, area.w, 5, 3).fill(GG.PAL.paper);
+              g.circlePath(area.x, p, 11).ink(GG.PAL.shu, 2.4);
+              g.circlePath(area.x + area.w, p, 11).ink(GG.PAL.shu, 2.4);
             }
             ctx.restore();
           }
 
           A.blob(g, {
-            x: hero.x, y: hero.y, r: 22, color: '#ffd93d', feet: false,
+            x: hero.x, y: hero.y, r: 22, color: GG.PAL.yamabuki, feet: false,
             lookX: U.clamp((goal.x - hero.x) / 200, -1, 1),
             mouth: c.result === 'lose' ? 'sad' : 'o'
           });
 
-          g.text('EXIT まで にげろ', c.W / 2, 104, { size: 26, fill: '#fff', lw: 4.5 });
+          g.text('EXIT まで にげろ', c.W / 2, 104, { size: 26, fill: GG.PAL.ink });
         }
       };
     }

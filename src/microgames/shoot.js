@@ -10,7 +10,7 @@
     control: 'aim',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#2f4a6b', '#101a2c'],
+    bg: ['#dfe7f2', '#bccbdf'],
 
     create: function (c) {
       var n = [2, 3, 4][c.diff - 1];
@@ -60,11 +60,11 @@
                 tt.hit = 0.001; got = true; left--;
                 c.sfx('pop'); c.stop(0.05); c.shake(6, 0.18);
                 c.fx.burst(tt.x, tt.y, {
-                  n: 18, color: ['#ff5e7d', '#ffd93d', '#ffffff'], speed: 330, size: 8
+                  n: 18, color: [GG.PAL.shu, GG.PAL.yamabuki, '#ffffff'], speed: 330, size: 8
                 });
                 c.fx.ring(tt.x, tt.y, { r1: 110, color: '#ffffff', lw: 7 });
                 c.fx.floatText(tt.x, tt.y - 30, 'HIT!',
-                  { color: '#ffd93d', size: 30, stroke: '#5a3d00' });
+                  { color: GG.PAL.yamabuki, size: 30, stroke: '#5a3d00' });
                 if (left <= 0) { c.win(); return; }
                 break;
               }
@@ -81,7 +81,7 @@
           ctx.save(); ctx.globalAlpha = 0.22;
           for (var i = 1; i <= 4; i++) {
             var w = c.W * (0.3 + i * 0.17), h = 300 * (0.32 + i * 0.17);
-            g.rr(c.W / 2 - w / 2, 296 - h / 2, w, h, 22).stroke('#7fd7ff', 3);
+            g.rr(c.W / 2 - w / 2, 296 - h / 2, w, h, 22).stroke(GG.PAL.mizu, 3);
           }
           ctx.restore();
           // 天幕（HUD の帯を避けて 66px から下げる）
@@ -90,7 +90,7 @@
             var sw = c.W / 12;
             g.polyPath([[s * sw, TENT], [(s + 1) * sw, TENT],
               [(s + 1) * sw, TENT + 44], [s * sw + sw / 2, TENT + 70], [s * sw, TENT + 44]])
-              .fill(s % 2 ? '#e8425f' : '#f5f0ff');
+              .fill(s % 2 ? GG.PAL.shu : GG.PAL.paper);
           }
           ctx.save(); ctx.globalAlpha = 0.25;
           ctx.fillStyle = '#000'; ctx.fillRect(0, TENT + 44, c.W, 12);
@@ -99,13 +99,13 @@
           for (var l = 0; l < 7; l++) {
             var lx = 70 + l * 140, ly = 190 + Math.sin(c.t * 1.6 + l) * 6;
             ctx.save(); ctx.globalAlpha = 0.9;
-            ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2;
+            ctx.strokeStyle = GG.PAL.inkSoft; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(lx, 122); ctx.lineTo(lx, ly - 14); ctx.stroke();
-            g.ellipsePath(lx, ly, 13, 17).ink(['#ffd93d', '#ff8fa3', '#8be9fd'][l % 3], 2.6);
+            g.ellipsePath(lx, ly, 13, 17).ink([GG.PAL.yamabuki, GG.PAL.kobai, GG.PAL.mizu][l % 3], 2.6);
             ctx.restore();
           }
-          A.ground(g, 462, { top: '#4a6a94', body: '#2c4463', deep: '#16283e' });
-          g.block(-20, 470, c.W + 40, 90, '#7a4f2e', { r: 14, lw: 4, gloss: 0.1 });
+          A.ground(g, 462, A.GROUND.ita);
+          g.block(-20, 470, c.W + 40, 90, '#b98b57', { r: 10, lw: 3 });
 
           for (var k = 0; k < targets.length; k++) {
             var t = targets[k];
@@ -117,17 +117,17 @@
             if (t.hit) { sc *= 1 + t.hit * 3; ctx.globalAlpha = Math.max(0, 1 - t.hit * 4); }
             ctx.scale(sc, sc);
             ctx.rotate(Math.sin(t.rot) * 0.12);
-            g.circlePath(0, 0, t.r).ink('#f5f0ff', 4);
-            g.circlePath(0, 0, t.r * 0.74).fill('#ff5e7d');
-            g.circlePath(0, 0, t.r * 0.48).fill('#f5f0ff');
-            g.circlePath(0, 0, t.r * 0.22).fill('#ff5e7d');
+            g.circlePath(0, 0, t.r).ink(GG.PAL.paper, 3);
+            g.circlePath(0, 0, t.r * 0.74).fill(GG.PAL.shu);
+            g.circlePath(0, 0, t.r * 0.48).fill(GG.PAL.paper);
+            g.circlePath(0, 0, t.r * 0.22).fill(GG.PAL.shu);
             ctx.restore();
           }
 
           for (var s = 0; s < shots.length; s++) {
             var sh = shots[s], kk = sh.t / 0.3;
             ctx.save(); ctx.globalAlpha = 1 - kk;
-            g.circlePath(sh.x, sh.y, 6 + kk * 22).stroke('#ffd93d', 4 * (1 - kk));
+            g.circlePath(sh.x, sh.y, 6 + kk * 22).stroke(GG.PAL.yamabuki, 4 * (1 - kk));
             ctx.restore();
           }
 
@@ -138,16 +138,16 @@
           ctx.save();
           ctx.translate(cx, cy);
           var rr = 22 + recoil * 10;
-          ctx.strokeStyle = '#ffd93d'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+          ctx.strokeStyle = GG.PAL.yamabuki; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
           ctx.globalAlpha = 0.95;
-          g.circlePath(0, 0, rr).stroke('#ffd93d', 3.5);
+          g.circlePath(0, 0, rr).stroke(GG.PAL.yamabuki, 3.5);
           ctx.beginPath();
           ctx.moveTo(-rr - 12, 0); ctx.lineTo(-rr + 4, 0);
           ctx.moveTo(rr + 12, 0); ctx.lineTo(rr - 4, 0);
           ctx.moveTo(0, -rr - 12); ctx.lineTo(0, -rr + 4);
           ctx.moveTo(0, rr + 12); ctx.lineTo(0, rr - 4);
           ctx.stroke();
-          g.circlePath(0, 0, 3).fill('#ffd93d');
+          g.circlePath(0, 0, 3).fill(GG.PAL.yamabuki);
           ctx.restore();
         }
       };

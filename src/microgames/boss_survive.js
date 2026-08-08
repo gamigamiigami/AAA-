@@ -11,7 +11,7 @@
     beats: 16,
     boss: true,
     defaultResult: 'win',
-    bg: ['#3d1a5b', '#0e0620'],
+    bg: ['#e8dcee', '#c4aed2'],
 
     create: function (c) {
       var area = { x: 70, y: 120, w: c.W - 140, h: 340 };
@@ -24,7 +24,7 @@
       function spawn(x, y, ang, sp, r, col) {
         bullets.push({
           x: x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
-          r: r || 12, col: col || '#ff5e7d', t: 0
+          r: r || 12, col: col || GG.PAL.ai, t: 0
         });
       }
 
@@ -49,7 +49,7 @@
           if (newPhase !== phase) {
             phase = newPhase; phaseT = 0; wave = 0;
             boss.hitPop = 1;
-            c.sfx('boss'); c.shake(10, 0.3); c.flash(0.16, '#ff5e7d');
+            c.sfx('boss'); c.shake(10, 0.3); c.flash(0.16, GG.PAL.shu);
           }
 
           if (!c.result) {
@@ -61,7 +61,7 @@
                 for (i = 0; i < 3; i++) {
                   spawn(boss.x, boss.y + 40,
                     Math.PI / 2 + (i - 1) * 0.42 + c.rng.range(-0.12, 0.12),
-                    230 * spdK, 13, '#ff5e7d');
+                    230 * spdK, 13, GG.PAL.ai);
                 }
                 c.sfx('blip');
               }
@@ -72,7 +72,7 @@
                 var off = c.rng.range(0, 0.5);
                 for (i = 0; i < 7; i++) {
                   spawn(boss.x, boss.y + 40,
-                    Math.PI / 2 + (i - 3) * 0.28 + off, 210 * spdK, 12, '#ffd93d');
+                    Math.PI / 2 + (i - 3) * 0.28 + off, 210 * spdK, 12, GG.PAL.murasaki);
                 }
                 c.sfx('blip');
               }
@@ -82,10 +82,10 @@
                 wave++;
                 var a = Math.atan2(hero.y - boss.y, hero.x - boss.x);
                 for (i = -1; i <= 1; i++) {
-                  spawn(boss.x, boss.y + 40, a + i * 0.2, 275 * spdK, 12, '#ff9f43');
+                  spawn(boss.x, boss.y + 40, a + i * 0.2, 275 * spdK, 12, GG.PAL.shu);
                 }
                 for (i = 0; i < 4; i++) {
-                  spawn(boss.x, boss.y + 40, Math.PI / 2 + i * 1.57 + c.t, 175 * spdK, 11, '#ff5e7d');
+                  spawn(boss.x, boss.y + 40, Math.PI / 2 + i * 1.57 + c.t, 175 * spdK, 11, GG.PAL.ai);
                 }
                 c.sfx('blip');
               }
@@ -100,8 +100,8 @@
               bullets.splice(k, 1); continue;
             }
             if (!c.result && U.circHit(hero.x, hero.y, hero.r * 0.75, b.x, b.y, b.r * 0.8)) {
-              c.sfx('hit'); c.shake(18, 0.45); c.flash(0.35, '#ff5e7d');
-              c.fx.burst(hero.x, hero.y, { n: 26, color: ['#ff5e7d', '#fff'], speed: 380, size: 9 });
+              c.sfx('hit'); c.shake(18, 0.45); c.flash(0.35, GG.PAL.shu);
+              c.fx.burst(hero.x, hero.y, { n: 26, color: [GG.PAL.shu, '#fff'], speed: 380, size: 9 });
               c.lose(); return;
             }
           }
@@ -111,19 +111,13 @@
           var ctx = g.c;
           // アリーナ
           ctx.save();
-          ctx.globalAlpha = 0.5;
-          g.block(area.x - 14, area.y - 14, area.w + 28, area.h + 28, '#180a2e',
-            { r: 24, lw: 5, gloss: 0.04 });
+          ctx.globalAlpha = 1;
+          g.block(area.x - 14, area.y - 14, area.w + 28, area.h + 28, '#c19a66', { r: 14, lw: 3 });
           ctx.restore();
           ctx.save();
           ctx.beginPath(); ctx.rect(area.x, area.y, area.w, area.h); ctx.clip();
-          ctx.globalAlpha = 0.1;
-          for (var gx = 0; gx < area.w + 50; gx += 50) {
-            ctx.fillStyle = '#fff'; ctx.fillRect(area.x + gx, area.y, 2, area.h);
-          }
-          for (var gy = 0; gy < area.h + 50; gy += 50) {
-            ctx.fillStyle = '#fff'; ctx.fillRect(area.x, area.y + gy, area.w, 2);
-          }
+          ctx.fillStyle = GG.PAL.paper; ctx.fillRect(area.x, area.y, area.w, area.h);
+          g.ichimatsu(area.x, area.y, area.w, area.h, 54, GG.PAL.ai, 0.05, 0);
           ctx.restore();
 
           // ボス
@@ -137,18 +131,18 @@
             var a = -0.3 + i * 0.32;
             ctx.save();
             ctx.rotate(a + Math.sin(c.t * 3 + i) * 0.14);
-            g.rr(-7, 40, 14, 56, 7).ink('#7b2d8f', 3.5);
+            g.rr(-7, 40, 14, 56, 7).ink('#8b6fb0', 2.6);
             ctx.restore();
           }
-          g.circlePath(0, 0, boss.r).ink(U.shade('#a2278f', boss.angry * 0.15), 5);
+          g.circlePath(0, 0, boss.r).ink(U.shade('#6b5a9e', boss.angry * 0.12), 3.4);
           ctx.save();
           g.circlePath(0, 0, boss.r); ctx.clip();
-          g.ellipsePath(-boss.r * 0.3, -boss.r * 0.35, boss.r * 0.4, boss.r * 0.28, -0.4)
-            .fill('rgba(255,255,255,0.35)');
+          g.ellipsePath(-boss.r * 0.32, -boss.r * 0.36, boss.r * 0.3, boss.r * 0.19, -0.4)
+            .fill('rgba(255,255,255,0.4)');
           ctx.restore();
           // 顔
           g.eyes(0, -6, 24, 13, U.clamp((320 - boss.x) / 300, -1, 1), 0.4, false);
-          ctx.strokeStyle = '#2a0c2e'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+          ctx.strokeStyle = GG.PAL.ink; ctx.lineWidth = 5; ctx.lineCap = 'round';
           ctx.beginPath();
           ctx.moveTo(-32, -30); ctx.lineTo(-12, -20);
           ctx.moveTo(32, -30); ctx.lineTo(12, -20);
@@ -166,7 +160,7 @@
             g.circlePath(b.x - b.vx * 0.02, b.y - b.vy * 0.02, b.r * 1.5).fill(b.col);
             ctx.globalAlpha = 1;
             g.circlePath(b.x, b.y, b.r).ink(b.col, 3);
-            g.circlePath(b.x - b.r * 0.28, b.y - b.r * 0.3, b.r * 0.34).fill('rgba(255,255,255,0.75)');
+            g.circlePath(b.x - b.r * 0.28, b.y - b.r * 0.3, b.r * 0.3).fill('rgba(255,255,255,0.6)');
             ctx.restore();
           }
 
@@ -174,19 +168,19 @@
           for (var t = hero.trail.length - 1; t >= 0; t--) {
             ctx.save();
             ctx.globalAlpha = 0.06 * (1 - t / hero.trail.length) * 4;
-            g.circlePath(hero.trail[t].x, hero.trail[t].y, hero.r * (1 - t * 0.06)).fill('#4ecdc4');
+            g.circlePath(hero.trail[t].x, hero.trail[t].y, hero.r * (1 - t * 0.06)).fill(GG.PAL.yamabuki);
             ctx.restore();
           }
           A.blob(g, {
-            x: hero.x, y: hero.y, r: hero.r + 8, color: '#4ecdc4', feet: false,
+            x: hero.x, y: hero.y, r: hero.r + 8, color: GG.PAL.yamabuki, feet: false,
             mouth: c.result === 'lose' ? 'sad' : 'o'
           });
           // 判定点を明示（弾幕の礼儀）
-          g.circlePath(hero.x, hero.y, 4).fill('#ffffff');
+          g.circlePath(hero.x, hero.y, 4).fill(GG.PAL.paper);
 
           // 進行ゲージ
-          A.gauge(g, c.W / 2 - 200, 78, 400, 22, 1 - c.progress, '#ff5e7d');
-          g.text('たえろ！', c.W / 2, 60, { size: 22, fill: '#fff', lw: 4 });
+          A.gauge(g, c.W / 2 - 200, 78, 400, 22, 1 - c.progress, GG.PAL.shu);
+          g.text('たえろ！', c.W / 2, 60, { size: 22, fill: GG.PAL.ink });
         }
       };
     }

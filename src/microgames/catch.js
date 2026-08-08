@@ -10,7 +10,7 @@
     control: 'move',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#3fa9f5', '#12406e'],
+    bg: ['#d9edf5', '#aed6e3'],
 
     create: function (c) {
       var BY = 424;                       // カゴの中心Y
@@ -64,10 +64,10 @@
               basket.pop = 1;
               c.sfx('coin');
               c.fx.burst(s.x, s.y, {
-                n: 12, color: ['#ffd93d', '#ffffff', '#ffe89b'],
+                n: 12, color: [GG.PAL.yamabuki, '#ffffff', '#f6dca4'],
                 speed: 250, size: 6, life: 0.5, shape: 'star'
               });
-              c.fx.floatText(s.x, s.y - 26, '+1', { color: '#ffd93d', size: 30, stroke: '#5a3d00' });
+              c.fx.floatText(s.x, s.y - 26, '+1', { color: GG.PAL.yamabuki, size: 30, stroke: '#5a3d00' });
               if (got >= need) { c.win(); return; }
             } else if (s.y > c.H + 40) {
               s.state = 2;
@@ -86,13 +86,13 @@
           for (var k = 0; k < 4; k++) {
             var r = new U.RNG(90 + k);
             var cx = U.wrap(r.range(0, c.W) + c.t * 22, c.W + 240) - 120, cy = r.range(110, 250);
-            g.ellipsePath(cx, cy, 66, 30).fill('#fff');
-            g.ellipsePath(cx - 42, cy + 8, 40, 22).fill('#fff');
-            g.ellipsePath(cx + 44, cy + 10, 36, 20).fill('#fff');
+            g.ellipsePath(cx, cy, 66, 30).fill(GG.PAL.paper);
+            g.ellipsePath(cx - 42, cy + 8, 40, 22).fill(GG.PAL.paper);
+            g.ellipsePath(cx + 44, cy + 10, 36, 20).fill(GG.PAL.paper);
           }
           ctx.restore();
 
-          A.ground(g, 470, { top: '#7bd3ff', body: '#2f7fc4', deep: '#1d5285' });
+          A.ground(g, 470, A.GROUND.kusa);
 
           // 落下予告
           ctx.save();
@@ -101,7 +101,7 @@
             if (s.state) continue;
             var near = U.sat(1 - (BY - s.y) / 460);
             ctx.globalAlpha = 0.1 + near * 0.25;
-            g.ellipsePath(s.x, BY + 34, 34 * (0.5 + near * 0.6), 9).fill('#ffd93d');
+            g.ellipsePath(s.x, BY + 34, 34 * (0.5 + near * 0.6), 9).fill(GG.PAL.yamabuki);
           }
           ctx.restore();
 
@@ -112,15 +112,15 @@
           var pop = 1 + basket.pop * 0.14;
           ctx.scale(pop, 2 - pop);
           g.dropShadow(0, 52, 56, 12, 0.3);
-          g.polyPath([[-58, -22], [58, -22], [46, 34], [-46, 34]]).ink('#c97b3a', 4.5);
+          g.polyPath([[-58, -22], [58, -22], [46, 34], [-46, 34]]).ink('#c19a66', 3.2);
           ctx.save();
           g.polyPath([[-58, -22], [58, -22], [46, 34], [-46, 34]]); ctx.clip();
           for (var w = -60; w < 60; w += 15) {
-            g.rr(w, -24, 6, 62, 3).fill('rgba(255,255,255,0.16)');
+            g.rr(w, -24, 6, 62, 3).fill('rgba(255,255,255,0.35)');
           }
-          g.rr(-60, 6, 120, 7, 3).fill('rgba(0,0,0,0.16)');
+          g.rr(-60, 6, 120, 7, 3).fill('rgba(64,58,72,0.18)');
           ctx.restore();
-          g.rr(-64, -30, 128, 15, 7).ink('#e8a15c', 4);
+          g.rr(-64, -30, 128, 15, 7).ink('#d8b183', 3);
           ctx.restore();
 
           // 星
@@ -134,7 +134,7 @@
               [[0, 'rgba(255,240,170,0.75)'], [0.42, 'rgba(255,217,61,0.28)'],
                [1, 'rgba(255,217,61,0)']]));
             ctx.restore();
-            A.star(g, st.x, st.y, st.r, '#ffd93d', st.rot);
+            A.star(g, st.x, st.y, st.r, GG.PAL.yamabuki, st.rot);
           }
 
           // 残り個数

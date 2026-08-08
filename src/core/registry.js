@@ -7,6 +7,27 @@
   GG.VIEW_W = 960;
   GG.VIEW_H = 540;
 
+  /* アートディレクション: 縁日／和のポップ。
+   * 「暗いネオングラデ + 太い黒フチ + 放射線 + ツヤ」= 西洋のモバイルゲーム語彙なので使わない。
+   * 高明度・低彩度の和色をフラットに置き、線は細く、墨は真っ黒にしない。 */
+  GG.PAL = {
+    ink:      '#403a48',   // 墨（純黒は使わない）
+    inkSoft:  'rgba(64,58,72,0.55)',
+    paper:    '#fbf6ec',   // 白練
+    kinari:   '#f5ecd9',   // 生成り
+    shu:      '#e2584a',   // 朱
+    kobai:    '#ef9aa6',   // 紅梅
+    ai:       '#31608c',   // 藍
+    asagi:    '#4fa9b4',   // 浅葱
+    mizu:     '#9ad2da',   // 水色
+    wakaba:   '#7fab63',   // 若葉
+    yamabuki: '#eeb43c',   // 山吹
+    kuchiba:  '#dc9350',   // 朽葉
+    fuji:     '#8f8ac2',   // 藤
+    murasaki: '#6b5a9e',   // 紫
+    sumire:   '#c9a6d8'    // 菫
+  };
+
   var services = Object.create(null);
   GG.provide = function (name, obj) { services[name] = obj; return obj; };
   GG.get = function (name) {

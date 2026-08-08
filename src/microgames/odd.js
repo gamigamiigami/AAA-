@@ -10,7 +10,7 @@
     control: 'pick',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#f368e0', '#4a1450'],
+    bg: ['#f0dcec', '#d9b3d0'],
 
     create: function (c) {
       var grid = [[3, 2], [4, 2], [5, 3]][c.diff - 1];
@@ -18,7 +18,7 @@
       var cw = 132, ch = 118;
       var ox = c.W / 2 - (COLS - 1) * cw / 2;
       var oy = 214;
-      var baseCol = c.rng.pick(['#ffd93d', '#4ecdc4', '#ff8fa3', '#a29bfe']);
+      var baseCol = c.rng.pick([GG.PAL.yamabuki, GG.PAL.asagi, GG.PAL.kobai, GG.PAL.fuji]);
       var oddIdx = c.rng.int(0, COLS * ROWS - 1);
       // 違いの種類: 色 / 表情。難易度が上がるほど差が小さい
       var mode = c.diff === 1 ? 'color' : c.rng.pick(['color', 'face']);
@@ -52,9 +52,9 @@
                 if (ce.odd) {
                   c.sfx('coin'); c.stop(0.05);
                   c.fx.burst(ce.x, ce.y, {
-                    n: 22, color: ['#ffd93d', '#fff'], speed: 320, size: 8, shape: 'star'
+                    n: 22, color: [GG.PAL.yamabuki, '#fff'], speed: 320, size: 8, shape: 'star'
                   });
-                  c.fx.ring(ce.x, ce.y, { r1: 140, color: '#ffd93d', lw: 8 });
+                  c.fx.ring(ce.x, ce.y, { r1: 140, color: GG.PAL.yamabuki, lw: 8 });
                   c.win();
                 } else {
                   c.sfx('hit'); c.shake(12, 0.3);
@@ -68,16 +68,9 @@
 
         draw: function (g) {
           var ctx = g.c;
-          ctx.save(); ctx.globalAlpha = 0.1;
-          for (var s = 0; s < 20; s++) {
-            var a = s / 20 * U.TAU + c.t * 0.15;
-            ctx.save(); ctx.translate(c.W / 2, 300); ctx.rotate(a);
-            g.polyPath([[0, 0], [700, -46], [700, 46]]).fill('#fff');
-            ctx.restore();
-          }
-          ctx.restore();
+          g.mizutama(0, 0, c.W, c.H, 74, 12, GG.PAL.paper, 0.5, c.t * 10);
 
-          g.text('1つだけ ちがう！', c.W / 2, 132, { size: 32, fill: '#fff', lw: 5.5 });
+          g.text('1つだけ ちがう！', c.W / 2, 132, { size: 32, fill: GG.PAL.ink });
 
           for (var i = 0; i < cells.length; i++) {
             var ce = cells[i];

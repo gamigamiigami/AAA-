@@ -10,7 +10,7 @@
     control: 'move',
     beats: 8,
     defaultResult: 'win',
-    bg: ['#48dbfb', '#0a5a7a'],
+    bg: ['#cfeaee', '#a6d5dc'],
 
     create: function (c) {
       var GY = 438;
@@ -51,7 +51,7 @@
 
           if (Math.abs(pole.a) > LIMIT) {
             c.sfx('hit'); c.shake(12, 0.35);
-            c.fx.burst(hero.x, GY - 120, { n: 16, color: ['#ff5e7d', '#fff'], speed: 300, size: 8 });
+            c.fx.burst(hero.x, GY - 120, { n: 16, color: [GG.PAL.shu, '#fff'], speed: 300, size: 8 });
             c.lose();
           }
         },
@@ -61,32 +61,32 @@
           ctx.save(); ctx.globalAlpha = 0.28;
           for (var i = 0; i < 3; i++) {
             var cx = U.wrap(i * 340 - c.t * 34, c.W + 340) - 170;
-            g.ellipsePath(cx, 130 + i * 46, 78, 32).fill('#fff');
-            g.ellipsePath(cx + 52, 138 + i * 46, 52, 24).fill('#fff');
+            g.ellipsePath(cx, 130 + i * 46, 78, 32).fill(GG.PAL.paper);
+            g.ellipsePath(cx + 52, 138 + i * 46, 52, 24).fill(GG.PAL.paper);
           }
           ctx.restore();
-          A.ground(g, GY + 14, { top: '#7bed9f', body: '#2f9e5f', deep: '#1c6b40' });
+          A.ground(g, GY + 14, A.GROUND.kusa);
 
           // 傾きメーター（危険度の可視化）
           var k = U.clamp(pole.a / 0.62, -1, 1);
           var mw = 300;
-          g.block(c.W / 2 - mw / 2, 104, mw, 22, '#12203a', { r: 11, lw: 3, gloss: 0 });
+          g.block(c.W / 2 - mw / 2, 104, mw, 22, GG.PAL.paper, { r: 11, lw: 2.6 });
           var danger = Math.abs(k);
-          var col = danger > 0.7 ? '#ff5e7d' : (danger > 0.45 ? '#ffd93d' : '#7bed9f');
+          var col = danger > 0.7 ? GG.PAL.shu : (danger > 0.45 ? GG.PAL.yamabuki : GG.PAL.wakaba);
           g.circlePath(c.W / 2 + k * (mw / 2 - 16), 115, 13).ink(col, 3);
-          g.rr(c.W / 2 - 2, 100, 4, 30, 2).fill('rgba(255,255,255,0.5)');
+          g.rr(c.W / 2 - 2, 100, 4, 30, 2).fill(GG.PAL.inkSoft);
 
           var headY = GY - 58;
           // 棒
           ctx.save();
           ctx.translate(hero.x, headY - 26);
           ctx.rotate(pole.a);
-          g.rr(-7, -pole.len, 14, pole.len + 8, 7).ink('#e8c07a', 3.5);
-          A.star(g, 0, -pole.len - 6, 22, '#ffd93d', c.t * 1.4);
+          g.rr(-7, -pole.len, 14, pole.len + 8, 7).ink('#d8b183', 2.6);
+          A.star(g, 0, -pole.len - 6, 22, GG.PAL.yamabuki, c.t * 1.4);
           ctx.restore();
 
           A.blob(g, {
-            x: hero.x, y: headY, r: 34, color: '#ff8fa3',
+            x: hero.x, y: headY, r: 34, color: GG.PAL.kobai,
             shadowY: GY + 14,
             lookX: U.clamp(pole.a * 2, -1, 1), lookY: -0.7,
             rot: U.clamp(pole.a * 0.25, -0.2, 0.2),

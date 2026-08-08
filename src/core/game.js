@@ -16,7 +16,8 @@
   var W = GG.VIEW_W, H = GG.VIEW_H;
   GG.SAFE = { x: 30, y: 74, w: W - 60, h: H - 74 - 66 };
 
-  var HEART_COL = ['#ff5e7d', '#ff3d6e'];
+  var PAL = GG.PAL;
+  var WIPE_COLS = null;
 
   function Game(canvas, audio, input, opts) {
     this.canvas = canvas;
@@ -88,7 +89,7 @@
     this._applySpeed();
     this.audio.intensity = 0.8;
     this.audio.startMusic();
-    this.showInterlude('STAGE 1', 'いくぞ！', '#4ecdc4', 4);
+    this.showInterlude('一日目', 'はじまるよ！', PAL.ai, 4);
   };
 
   P._applySpeed = function () {
@@ -171,12 +172,12 @@
     this.resultTimer = 0;
     if (r === 'win') {
       this.audio.sfx('win');
-      this.fx.flash(0.28, '#ffffff');
+      this.fx.flash(0.3, PAL.paper);
       this.fx.punch(0.05);
     } else {
       this.audio.sfx('lose');
       this.fx.shake(16, 0.4);
-      this.fx.flash(0.3, '#ff3b5c');
+      this.fx.flash(0.26, PAL.shu);
       this.hitStop = 0.14;
     }
   };
@@ -205,11 +206,11 @@
       this.speedLevel++;
       this._applySpeed();
       this.audio.sfx('speedup');
-      this.showInterlude('SPEED UP!', 'はやくなるぞ', '#ffd93d', 3);
+      this.showInterlude('はやくなる', 'ついてこられるか？', PAL.kuchiba, 3);
       return;
     }
     if ((this.gameIndex + 1) % BOSS_EVERY === 0) {
-      this.showInterlude('BOSS STAGE', 'きあいを いれろ', '#ff5e7d', 3);
+      this.showInterlude('大 し ょ う ぶ', 'きあいを いれろ', PAL.shu, 3);
       return;
     }
     this.nextMicrogame();
@@ -373,222 +374,208 @@
   };
 
   /** ミニゲーム共通の背景。全ゲームで統一された「世界観の額縁」を作る。 */
+  /**
+   * ミニゲーム共通の背景。
+   * 放射線やネオングラデではなく、和の地紋（青海波・市松・水玉）で情報密度を作る。
+   */
   P.drawBackdrop = function (g, def) {
     var c = g.c, t = this.globalT;
     c.fillStyle = g.grad(0, 0, 0, H, [[0, def.bg[0]], [1, def.bg[1]]]);
     c.fillRect(0, 0, W, H);
 
-    // 上からの柔らかい光
-    c.save();
-    c.fillStyle = g.rgrad(W * 0.5, -80, 40, 560,
-      [[0, 'rgba(255,255,255,0.20)'], [1, 'rgba(255,255,255,0)']]);
-    c.fillRect(0, 0, W, H);
-    c.restore();
-
-    // 斜めストライプ（面を締める。ぼんやりした玉ボケより情報密度が上がる）
-    c.save();
-    c.globalAlpha = 0.045;
-    c.translate(-t * 16 % 132, 0);
-    for (var s = -2; s < 12; s++) {
-      c.save();
-      c.translate(s * 132, 0); c.rotate(0.32);
-      c.fillStyle = '#ffffff';
-      c.fillRect(0, -260, 46, H + 520);
-      c.restore();
-    }
-    c.restore();
-
-    // 漂う小さな粒（IDから決まる固定配置なので毎回同じ絵になる）
+    // 地紋は ID から決まるので、同じゲームなら毎回同じ絵になる
     var seed = 0;
     for (var i = 0; i < def.id.length; i++) seed = (seed * 31 + def.id.charCodeAt(i)) >>> 0;
-    var r = new U.RNG(seed || 7);
-    c.save();
-    for (var k = 0; k < 26; k++) {
-      var ph = r.range(0, 6.28);
-      var x = r.range(0, W), y = U.wrap(r.range(0, H) - t * r.range(6, 20), H + 60) - 30;
-      c.globalAlpha = 0.05 + 0.08 * (0.5 + 0.5 * Math.sin(t * 1.4 + ph));
-      g.circlePath(x + Math.sin(t * 0.7 + ph) * 14, y, r.range(2.5, 7)).fill('#ffffff');
-    }
-    c.restore();
+    var kind = seed % 3;
+    if (kind === 0) g.seigaiha(0, 0, W, H, 44, '#ffffff', 0.16, t * 9);
+    else if (kind === 1) g.ichimatsu(0, 0, W, H, 62, '#ffffff', 0.09, t * 7);
+    else g.mizutama(0, 0, W, H, 70, 9, '#ffffff', 0.13, t * 7);
 
-    // 上下の帯（HUDの座り場所を作り、画面を締める）
+    // 上下の縁。HUD の居場所を作りつつ、紙の額装のように画面を締める
     c.save();
-    c.globalAlpha = 0.16;
-    c.fillStyle = g.grad(0, 0, 0, 70, [[0, '#000'], [1, 'rgba(0,0,0,0)']]);
-    c.fillRect(0, 0, W, 70);
-    c.fillStyle = g.grad(0, H, 0, H - 64, [[0, '#000'], [1, 'rgba(0,0,0,0)']]);
-    c.fillRect(0, H - 64, W, 64);
+    c.globalAlpha = 0.30;
+    c.fillStyle = PAL.paper;
+    c.fillRect(0, 0, W, 66);
+    c.fillRect(0, H - 56, W, 56);
+    c.globalAlpha = 0.30;
+    c.fillStyle = PAL.ink;
+    c.fillRect(0, 66, W, 2);
+    c.fillRect(0, H - 58, W, 2);
     c.restore();
   };
-
+  /** 画面の縁。暗く落とすビネットはやめ、朱の細い額縁だけ置く。 */
   P._drawVignette = function (g) {
     var c = g.c;
     c.save();
-    c.fillStyle = g.rgrad(W / 2, H / 2, H * 0.45, H * 1.05,
-      [[0, 'rgba(0,0,0,0)'], [1, 'rgba(8,4,20,0.5)']]);
-    c.fillRect(0, 0, W, H);
+    c.globalAlpha = 0.5;
+    c.strokeStyle = PAL.shu;
+    c.lineWidth = 5;
+    c.strokeRect(2.5, 2.5, W - 5, H - 5);
     c.restore();
   };
-
-  // --- HUD ------------------------------------------------------------
   P._drawHud = function (g) {
     var c = g.c, i;
 
-    // ライフ
+    // ライフ = 提灯。消えると灯が落ちる。
+    var lw0 = 26 + MAX_LIVES * 34;
+    g.block(18, 14, lw0, 48, PAL.paper, { r: 12, lw: 2.6 });
     for (i = 0; i < MAX_LIVES; i++) {
       var alive = i < this.lives;
-      var x = 44 + i * 42, y = 38;
+      var x = 44 + i * 34, y = 38;
       var pop = this.heartPop[i] || 0;
-      var s = 15 * (1 + pop * 0.9);
+      var sz = 1 + pop * 0.5;
       c.save();
+      c.translate(x, y);
+      c.scale(sz, sz);
       if (!alive) c.globalAlpha = 0.28;
-      if (pop > 0) c.globalAlpha = 0.28 + U.pulse(pop) * 0.7;
-      g.heartPath(x, y, s).ink(alive ? HEART_COL[0] : '#20182f', 3.2);
+      if (pop > 0) c.globalAlpha = 0.28 + U.pulse(pop) * 0.72;
+      g.rr(-6, -18, 12, 5, 2).fill(PAL.ink);
+      g.ellipsePath(0, 0, 12, 15).ink(alive ? PAL.shu : PAL.kinari, 2);
       if (alive) {
-        g.circlePath(x - s * 0.35, y - s * 0.25, s * 0.22).fill('rgba(255,255,255,0.75)');
+        c.save();
+        g.ellipsePath(0, 0, 12, 15); c.clip();
+        c.globalAlpha = c.globalAlpha * 0.4;
+        for (var q = -1; q < 3; q++) { c.fillStyle = PAL.paper; c.fillRect(-14, -8 + q * 7, 28, 2); }
+        c.restore();
       }
+      g.rr(-6, 13, 12, 5, 2).fill(PAL.ink);
       c.restore();
     }
 
     // スコア
     var label = String(this.score);
-    var lw = g.measure('CLEAR', 15), nw = g.measure(label, 27);
-    var pw = 20 + lw + 14 + nw + 20;
-    var px = W - 24 - pw;
-    g.block(px, 18, pw, 40, '#1d1633', { r: 20, lw: 3, gloss: 0.1 });
-    g.text('CLEAR', px + 20, 39, {
-      size: 15, fill: '#9d92c4', align: 'left', stroke: false, shadow: false
-    });
-    g.text(label, px + pw - 20, 38, { size: 27, fill: '#ffd93d', align: 'right', lw: 4 });
+    var tw = g.measure('クリア', 14), nw = g.measure(label, 26);
+    var pw = 18 + tw + 12 + nw + 18;
+    var px = W - 20 - pw;
+    g.block(px, 18, pw, 40, PAL.paper, { r: 12, lw: 2.6 });
+    g.text('クリア', px + 18, 39, { size: 14, fill: PAL.inkSoft, align: 'left' });
+    g.text(label, px + pw - 18, 38, { size: 26, fill: PAL.shu, align: 'right' });
 
-    // タイマー（ビートのビーズ）
+    // 残り時間（拍ごとの珠）
     if (this.state === 'play' || this.state === 'prompt') {
       var total = this.cur.def.beats;
       var used = this.state === 'play' ? this.beatsIn() : 0;
       var leftB = U.clamp(total - used, 0, total);
       var n = Math.min(total, 16);
       var stepBeats = total / n;
-      var bw = 15, gap = 7, tw = n * bw + (n - 1) * gap;
-      var bx = W / 2 - tw / 2, by = H - 34;
+      var bw = 14, gap = 8, ww = n * bw + (n - 1) * gap;
+      var bx = W / 2 - ww / 2, by = H - 30;
       var urgent = leftB <= 2.5;
       for (i = 0; i < n; i++) {
         var full = (i + 1) * stepBeats <= leftB;
         var partial = !full && i * stepBeats < leftB;
-        var col = urgent ? '#ff4d6d' : '#7bffd4';
-        c.save();
+        var col = urgent ? PAL.shu : PAL.ai;
         var sc = 1;
         if (partial) sc = 0.55 + 0.45 * U.sat((leftB - i * stepBeats) / stepBeats);
-        if (urgent && full) sc = 1 + 0.16 * Math.max(0, Math.sin(this.audio.beat * Math.PI * 2));
-        g.circlePath(bx + i * (bw + gap) + bw / 2, by, (bw / 2) * (full || partial ? sc : 0.72));
+        if (urgent && full) sc = 1 + 0.14 * Math.max(0, Math.sin(this.audio.beat * Math.PI * 2));
+        c.save();
+        g.circlePath(bx + i * (bw + gap) + bw / 2, by, (bw / 2) * sc);
         if (full || partial) {
-          c.globalAlpha = partial ? 0.55 + 0.45 * sc : 1;
-          g.ink(col, 2.6);
+          if (partial) c.globalAlpha = 0.5 + 0.5 * sc;
+          g.ink(col, 2);
         } else {
-          c.globalAlpha = 0.32; g.fill('#0e0a1a');
+          g.ink(PAL.paper, 2);
         }
         c.restore();
       }
     }
   };
-
-  // --- 命令語 ----------------------------------------------------------
+  /** 命令語。朱（ボスは藍）のベタ帯に白抜き文字。祭のポスターの見立て。 */
   P._drawPrompt = function (g) {
-    var c = g.c, def = this.cur.def;
-    var b = U.sat(this.beatsIn() / 2);
-    var appear = U.sat(this.beatsIn() / 0.55);
-    var out = U.sat((this.beatsIn() - 1.5) / 0.5);
+    var c = g.c, def = this.cur.def, self = this;
+    var b = this.beatsIn();
+    var appear = U.sat(b / 0.5);
+    var out = U.sat((b - 1.55) / 0.45);
+    var band = def.boss ? PAL.ai : PAL.shu;
 
     c.save();
-    c.globalAlpha = 1 - out * 0.15;
 
-    // 背後のリボン
-    var ribbonW = W * U.easeOutQuint(appear);
+    // 帯（左右から一気に開く）
+    var bwid = W * U.easeOutQuint(appear);
     c.save();
     c.translate(W / 2, H * 0.42);
-    c.rotate(-0.028);
-    c.globalAlpha = (1 - out) * 0.95;
-    g.rr(-ribbonW / 2, -66, ribbonW, 132, 6).fill('rgba(14,9,26,0.62)');
-    g.rr(-ribbonW / 2, -66, ribbonW, 8, 4).fill(U.alpha(def.boss ? '#ff5e7d' : '#ffd93d', 0.9));
-    g.rr(-ribbonW / 2, 58, ribbonW, 8, 4).fill(U.alpha(def.boss ? '#ff5e7d' : '#ffd93d', 0.9));
+    c.globalAlpha = 1 - out;
+    c.fillStyle = band;
+    c.fillRect(-bwid / 2, -62, bwid, 124);
+    c.fillStyle = PAL.paper;
+    c.fillRect(-bwid / 2, -68, bwid, 5);
+    c.fillRect(-bwid / 2, 63, bwid, 5);
     c.restore();
 
     // 命令語（1文字ずつ弾む）
-    var self = this;
     c.save();
     c.translate(W / 2, H * 0.42);
-    c.rotate(-0.028);
     c.globalAlpha = 1 - out;
-    g.textEach(def.verb, 0, -8, {
-      size: 82, fill: '#ffffff', lw: 13, letter: 4,
-      shadowY: 7, shadowA: 0.45
-    }, function (i, n) {
-      var k = U.sat((self.beatsIn() - i * 0.055) / 0.42);
+    g.textEach(def.verb, 0, -6, {
+      size: 76, fill: PAL.paper, letter: 8
+    }, function (i) {
+      var k = U.sat((self.beatsIn() - i * 0.05) / 0.4);
       return {
-        scale: 0.2 + U.easeOutBack(k) * 0.8,
-        dy: (1 - U.easeOutBack(k)) * -26,
-        rot: (1 - k) * (i % 2 ? 0.3 : -0.3),
+        scale: 0.35 + U.easeOutBack(k) * 0.65,
+        dy: (1 - U.easeOutBack(k)) * -18,
         alpha: U.sat(k * 3)
       };
     });
     if (def.verbEn) {
-      c.globalAlpha = (1 - out) * U.sat((this.beatsIn() - 0.35) / 0.3) * 0.85;
-      g.text(def.verbEn, 0, 48, { size: 22, fill: '#ffe89b', lw: 4, letter: 2 });
+      c.globalAlpha = (1 - out) * U.sat((b - 0.35) / 0.3) * 0.75;
+      g.text(def.verbEn, 0, 44, { size: 17, fill: PAL.paper, letter: 4 });
     }
     c.restore();
 
-    // 操作ヒント
+    // 操作ヒント（木札）
     var hint = GG.CONTROL_HINT[def.control];
-    var ha = U.sat((this.beatsIn() - 0.5) / 0.4) * (1 - out);
+    var ha = U.sat((b - 0.5) / 0.4) * (1 - out);
     c.globalAlpha = ha;
-    var hy = H * 0.60 + (1 - ha) * 20;   // リボンのすぐ下。キャラに被らせない
-    var label = hint.label;
-    var hw = g.measure(label, 21) + 92;
-    g.block(W / 2 - hw / 2, hy - 26, hw, 52, '#1a1330', { r: 26, lw: 3, gloss: 0.08 });
-    this._drawControlIcon(g, W / 2 - hw / 2 + 34, hy, hint.icon);
-    g.text(label, W / 2 - hw / 2 + 62, hy + 1, {
-      size: 21, fill: '#ffffff', align: 'left', lw: 3.5, shadow: false
+    var hy = H * 0.62 + (1 - ha) * 16;
+    var hw = g.measure(hint.label, 20) + 96;
+    g.block(W / 2 - hw / 2, hy - 25, hw, 50, PAL.paper, { r: 10, lw: 2.6 });
+    this._drawControlIcon(g, W / 2 - hw / 2 + 32, hy, hint.icon);
+    g.text(hint.label, W / 2 - hw / 2 + 58, hy + 1, {
+      size: 20, fill: PAL.ink, align: 'left'
     });
     c.restore();
   };
-
   P._drawControlIcon = function (g, x, y, icon) {
     var c = g.c, pulse = 0.5 + 0.5 * Math.sin(this.globalT * 7);
     c.save();
     c.translate(x, y);
     if (icon === 'btn' || icon === 'mash' || icon === 'hold') {
       var press = icon === 'mash' ? pulse * 3 : (icon === 'hold' ? 2.5 : pulse * 2);
-      g.rr(-15, -13 + press, 30, 22, 8).fill('#0d0918');
-      g.rr(-15, -15, 30, 22, 8).ink('#ffd93d', 2.6);
-      if (icon === 'mash') {
-        g.text('!', 0, -4, { size: 17, fill: '#1a1330', stroke: false, shadow: false });
-      }
+      g.rr(-14, -13 + press, 28, 21, 6).fill(PAL.kinari);
+      g.rr(-14, -14, 28, 21, 6).ink(PAL.yamabuki, 2.2);
+      if (icon === 'mash') g.text('!', 0, -4, { size: 15, fill: PAL.ink });
     } else if (icon === 'pad' || icon === 'pad4') {
       var arm = 8, th = 9;
-      g.rr(-arm - th, -th / 2 - 1, (arm + th) * 2, th, 4).ink('#4ecdc4', 2.4);
-      if (icon === 'pad4') g.rr(-th / 2, -arm - th, th, (arm + th) * 2, 4).ink('#4ecdc4', 2.4);
+      g.rr(-arm - th, -th / 2 - 1, (arm + th) * 2, th, 3).ink(PAL.asagi, 2.2);
+      if (icon === 'pad4') g.rr(-th / 2, -arm - th, th, (arm + th) * 2, 3).ink(PAL.asagi, 2.2);
     } else if (icon === 'aim') {
-      g.circlePath(0, 0, 13).stroke('#ff8ba7', 3.5);
-      g.circlePath(0, 0, 4).fill('#ff8ba7');
-      c.strokeStyle = '#ff8ba7'; c.lineWidth = 3; c.lineCap = 'round';
+      g.circlePath(0, 0, 12).stroke(PAL.shu, 2.6);
+      g.circlePath(0, 0, 3.5).fill(PAL.shu);
+      c.strokeStyle = PAL.shu; c.lineWidth = 2.6; c.lineCap = 'round';
       c.beginPath();
-      c.moveTo(-19, 0); c.lineTo(-15, 0); c.moveTo(19, 0); c.lineTo(15, 0);
-      c.moveTo(0, -19); c.lineTo(0, -15); c.moveTo(0, 19); c.lineTo(0, 15);
+      c.moveTo(-18, 0); c.lineTo(-14, 0); c.moveTo(18, 0); c.lineTo(14, 0);
+      c.moveTo(0, -18); c.lineTo(0, -14); c.moveTo(0, 18); c.lineTo(0, 14);
       c.stroke();
     }
     c.restore();
   };
-
-  // --- 結果スタンプ ----------------------------------------------------
+  /** 結果。アメコミ的な集中線はやめ、色紙に判子を捺した見立てにする。 */
   P._drawStamp = function (g) {
     var c = g.c;
     var win = this.result === 'win';
-    var k = U.sat(this.beatsIn() / 0.35);
-    var s = win ? U.lerp(2.4, 1, U.easeOutQuint(k)) : U.lerp(0.3, 1, U.easeOutElastic(k));
-    var rot = win ? (1 - k) * 0.5 - 0.05 : U.lerp(-0.5, -0.08, U.easeOutBack(k));
+    var k = U.sat(this.beatsIn() / 0.32);
+    var s = win ? U.lerp(1.9, 1, U.easeOutQuint(k)) : U.lerp(0.4, 1, U.easeOutBack(k));
+    var rot = U.lerp(win ? 0.22 : -0.3, win ? 0.02 : -0.045, U.easeOutQuint(k));
+    var col = win ? PAL.ai : PAL.shu;
 
+    // 画面を紙で覆う
     c.save();
-    c.globalAlpha = 0.42 * U.sat(k * 3);
-    g.clear(win ? 'rgba(20,60,40,0.5)' : 'rgba(70,10,25,0.6)');
+    c.globalAlpha = 0.40 * U.sat(k * 3);
+    g.clear(PAL.paper);
+    c.restore();
+    c.save();
+    c.globalAlpha = 0.3 * U.sat(k * 3);
+    g.ichimatsu(0, 0, W, H, 58, col, 0.22, this.globalT * 22);
     c.restore();
 
     c.save();
@@ -596,244 +583,240 @@
     c.rotate(rot);
     c.scale(s, s);
 
-    var col = win ? '#7bed9f' : '#ff5e7d';
-    var txt = win ? 'クリア！' : 'ミス！';
+    var txt = win ? 'クリア！' : 'ざんねん！';
     var en = win ? 'CLEAR' : 'MISS';
+    var tw = g.measure(txt, 82) + 96;
 
-    // 放射
+    // 色紙
+    g.block(-tw / 2, -78, tw, 156, PAL.paper, { r: 6, lw: 3.4 });
+    c.fillStyle = col;
+    c.fillRect(-tw / 2 + 10, -68, tw - 20, 6);
+    c.fillRect(-tw / 2 + 10, 62, tw - 20, 6);
+    g.text(txt, 0, -12, { size: 82, fill: col });
+    g.text(en, 0, 42, { size: 17, fill: PAL.inkSoft, letter: 6 });
+
+    // 判子
     c.save();
-    c.globalAlpha = 0.3 * U.sat(k * 2);
-    for (var i = 0; i < 14; i++) {
-      var a = i / 14 * U.TAU + this.globalT * (win ? 0.5 : -0.3);
-      c.save(); c.rotate(a);
-      g.polyPath([[0, 0], [520, -34], [520, 34]]).fill(U.alpha(win ? '#ffffff' : '#ff2d55', 0.5));
-      c.restore();
-    }
+    c.translate(tw / 2 - 24, -52);
+    c.rotate(-0.12);
+    c.globalAlpha = 0.9;
+    g.rr(-19, -19, 38, 38, 5).ink('rgba(0,0,0,0)', 3.4, PAL.shu);
+    g.text(win ? '合' : '否', 0, 1, { size: 24, fill: PAL.shu });
     c.restore();
 
-    var tw = g.measure(txt, 96) + 110;
-    g.block(-tw / 2, -74, tw, 148, '#16112a', { r: 32, lw: 6, gloss: 0.12 });
-    g.rr(-tw / 2 + 12, -62, tw - 24, 8, 4).fill(U.alpha(win ? '#7bed9f' : '#ff5e7d', 0.55));
-    g.text(txt, 0, -14, { size: 96, fill: col, lw: 14, shadowY: 8 });
-    g.text(en, 0, 46, { size: 22, fill: U.alpha(win ? '#7bed9f' : '#ff5e7d', 0.9), lw: 3.5, letter: 6 });
     c.restore();
   };
-
-  // --- インタールード --------------------------------------------------
   P._drawInterludeBg = function (g) {
     var c = g.c, t = this.globalT, il = this.interlude;
-    c.fillStyle = g.grad(0, 0, 0, H, [[0, '#2a1c4d'], [1, '#150e29']]);
+    c.fillStyle = PAL.kinari;
     c.fillRect(0, 0, W, H);
-    // 走るストライプ
-    c.save();
-    c.globalAlpha = 0.13;
-    c.translate(0, 0);
-    for (var i = -12; i < 26; i++) {
-      var x = U.wrap(i * 70 - t * 210, W + 900) - 200;
-      c.save(); c.translate(x, 0); c.rotate(0.22);
-      c.fillStyle = i % 2 ? il.color : '#ffffff';
-      c.fillRect(0, -200, 34, H + 400);
-      c.restore();
-    }
-    c.restore();
+    g.seigaiha(0, 0, W, H, 42, il.color, 0.22, t * 26);
+    // のれん
+    g.noren(0, 34, 9, [il.color, PAL.paper], 0.95);
+    g.noren(H - 34, 34, 9, [PAL.paper, il.color], 0.95);
   };
-
   P._drawInterlude = function (g) {
     var c = g.c, il = this.interlude;
     var b = this.beatsIn();
-    var k = U.sat(b / 0.5);
+    var k = U.sat(b / 0.45);
     var out = U.sat((b - (il.beats - 0.5)) / 0.5);
 
     c.save();
-    c.translate(W / 2, H / 2 - 10);
+    c.translate(W / 2, H / 2);
     c.globalAlpha = 1 - out;
-    var s = U.lerp(0.4, 1, U.easeOutBack(k)) * (1 + out * 0.25);
+    var s = U.lerp(0.55, 1, U.easeOutBack(k)) * (1 + out * 0.2);
     c.scale(s, s);
-    c.rotate((1 - U.easeOutBack(k)) * 0.25);
 
-    var tw = g.measure(il.title, 72) + 100;
-    c.save();
-    c.rotate(-0.03);
-    g.block(-tw / 2, -60, tw, 118, '#1c1338', { r: 26, lw: 5, gloss: 0.12 });
-    g.text(il.title, 0, -18, { size: 72, fill: il.color, lw: 10, shadowY: 6 });
-    g.text(il.sub, 0, 32, { size: 24, fill: '#ffffff', lw: 4 });
-    c.restore();
+    var tw = Math.max(g.measure(il.title, 64), g.measure(il.sub, 24)) + 120;
+    g.block(-tw / 2, -74, tw, 148, PAL.paper, { r: 8, lw: 3.4 });
+    c.fillStyle = il.color;
+    c.fillRect(-tw / 2 + 12, -64, tw - 24, 6);
+    c.fillRect(-tw / 2 + 12, 58, tw - 24, 6);
+    g.text(il.title, 0, -20, { size: 64, fill: il.color });
+    g.text(il.sub, 0, 30, { size: 24, fill: PAL.ink });
     c.restore();
 
-    // 拍に合わせて弾む三角
+    // 拍に合わせて開く扇
     for (var i = -1; i <= 1; i += 2) {
-      var bp = U.sat(1 - (this.audio.beat % 1)) ;
+      var bp = U.sat(1 - (this.audio.beat % 1));
       c.save();
-      c.globalAlpha = (1 - out) * 0.9;
-      c.translate(W / 2 + i * (250 + bp * 22), H / 2 - 10);
+      c.globalAlpha = (1 - out) * 0.95;
+      c.translate(W / 2 + i * (tw / 2 * 0 + 300 + bp * 18), H / 2);
       c.scale(i, 1);
-      g.polyPath([[0, -22], [26, 0], [0, 22]]).ink(il.color, 3);
+      g.polyPath([[-18, -26], [22, 0], [-18, 26]]).ink(il.color, 2.6);
       c.restore();
     }
   };
-
-  // --- 画面転換 --------------------------------------------------------
+  /** 市松のマスが縮んで消えていく転換。虹色シェブロンより和の語彙に合う。 */
   P._drawWipe = function (g) {
     if (this.wipeT >= this.wipeDur) return;
     var c = g.c, k = this.wipeT / this.wipeDur;
-    var bands = 7, bh = H / bands;
-    var cols = ['#ff5e7d', '#ffd93d', '#4ecdc4', '#8367ff', '#7bed9f', '#ff9f43', '#f368e0'];
-    for (var i = 0; i < bands; i++) {
-      var d = U.sat((k - i * 0.045) / (1 - 0.045 * bands));
-      var x = U.easeInOutCubic(d) * (W + 260);
-      c.save();
-      c.translate(x, 0);
-      c.fillStyle = cols[i % cols.length];
-      c.beginPath();
-      c.moveTo(-W - 60, i * bh);
-      c.lineTo(0, i * bh);
-      c.lineTo(60, (i + 1) * bh);
-      c.lineTo(-W, (i + 1) * bh);
-      c.closePath();
-      c.fill();
-      c.restore();
+    var cell = 60, cols = Math.ceil(W / cell), rows = Math.ceil(H / cell);
+    var span = 0.45;
+    for (var j = 0; j < rows; j++) {
+      for (var i = 0; i < cols; i++) {
+        var delay = (i / cols) * (1 - span) + ((i + j) % 2) * 0.06;
+        var sc = 1 - U.sat((k - delay) / span);
+        if (sc <= 0.001) continue;
+        c.save();
+        c.translate(i * cell + cell / 2, j * cell + cell / 2);
+        c.rotate((1 - sc) * 0.5);
+        c.scale(sc, sc);
+        c.fillStyle = (i + j) % 2 ? PAL.shu : PAL.kinari;
+        c.fillRect(-cell / 2 - 1, -cell / 2 - 1, cell + 2, cell + 2);
+        c.restore();
+      }
     }
   };
-
-  // --- タイトル --------------------------------------------------------
   P._drawTitle = function (g) {
     var c = g.c, t = this.titleT;
-    c.fillStyle = g.grad(0, 0, W, H, [[0, '#6b3fd4'], [0.55, '#c0399f'], [1, '#ff6b6b']]);
-    c.fillRect(0, 0, W, H);
 
-    // 回転するサンバースト
-    c.save();
-    c.translate(W / 2, H * 0.44);
-    c.rotate(t * 0.16);
-    c.globalAlpha = 0.11;
-    for (var i = 0; i < 18; i++) {
-      c.save(); c.rotate(i / 18 * U.TAU);
-      g.polyPath([[0, 0], [900, -60], [900, 60]]).fill('#ffffff');
+    c.fillStyle = PAL.kinari;
+    c.fillRect(0, 0, W, H);
+    g.seigaiha(0, 0, W, H, 34, PAL.ai, 0.13, t * 12);
+
+    // 上ののれん
+    g.noren(0, 42, 9, [PAL.shu, PAL.paper], 1);
+
+    // 提灯
+    for (var i = 0; i < 2; i++) {
+      var lx = i === 0 ? 96 : W - 96;
+      var sway = Math.sin(t * 1.5 + i * 1.7) * 0.08;
+      c.save();
+      c.translate(lx, 42);
+      c.rotate(sway);
+      c.strokeStyle = PAL.ink; c.lineWidth = 3;
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 54); c.stroke();
+      c.translate(0, 54);
+      g.rr(-13, -8, 26, 10, 3).ink(PAL.ink, 0);
+      g.ellipsePath(0, 40, 34, 44).ink(PAL.shu, 3);
+      c.save();
+      g.ellipsePath(0, 40, 34, 44); c.clip();
+      c.globalAlpha = 0.35;
+      for (var b = -1; b < 6; b++) {
+        c.fillStyle = PAL.paper;
+        c.fillRect(-40, -4 + b * 15, 80, 3);
+      }
+      c.restore();
+      g.text('祭', 0, 40, { size: 30, fill: PAL.paper });
+      g.rr(-13, 78, 26, 10, 3).ink(PAL.ink, 0);
       c.restore();
     }
-    c.restore();
 
     this.fx.draw(g);
 
-    // 下段のマスコットたち（何のゲームか一目で伝える顔ぶれ）
+    // マスコット
     var mascots = [
-      { x: 0.07, col: '#ffd93d', r: 46, ph: 0 },
-      { x: 0.20, col: '#4ecdc4', r: 34, ph: 1.1 },
-      { x: 0.81, col: '#ff8fa3', r: 38, ph: 2.2 },
-      { x: 0.94, col: '#8be9fd', r: 50, ph: 3.4 }
+      { x: 0.10, col: PAL.yamabuki, r: 44, ph: 0 },
+      { x: 0.235, col: PAL.asagi, r: 33, ph: 1.1 },
+      { x: 0.775, col: PAL.kobai, r: 37, ph: 2.2 },
+      { x: 0.905, col: PAL.wakaba, r: 47, ph: 3.4 }
     ];
     for (var mi = 0; mi < mascots.length; mi++) {
       var m = mascots[mi];
       var hop = Math.abs(Math.sin(t * 2.6 + m.ph));
-      var by = H * 0.94 - hop * 42;
       GG.A.blob(g, {
-        x: W * m.x, y: by, r: m.r, color: m.col,
-        squash: 1 + (1 - hop) * 0.12 - hop * 0.06,
-        shadowY: H * 0.94 + m.r * 0.9,
+        x: W * m.x, y: H * 0.885 - hop * 34, r: m.r * 0.88, color: m.col,
+        squash: 1 + (1 - hop) * 0.1 - hop * 0.05,
+        shadowY: H * 0.885 + m.r * 0.8,
         lookX: Math.sin(t * 1.4 + m.ph) * 0.6, lookY: -0.2,
-        rot: Math.sin(t * 2.6 + m.ph) * 0.12,
+        rot: Math.sin(t * 2.6 + m.ph) * 0.1,
         mouth: 'smile'
       });
     }
 
-    // ロゴ
+    // 題字（墨の題字に朱のずらし影 = 和のポスターの手法）
     c.save();
-    c.translate(W / 2, H * 0.36);
-    var bob = Math.sin(t * 2.2) * 6;
-    c.save();
-    c.translate(0, bob);
-    c.rotate(Math.sin(t * 1.3) * 0.02);
+    c.translate(W / 2, H * 0.365 + Math.sin(t * 2.2) * 4);
     var self = this;
-    g.textEach('MICRO', 0, -46, {
-      size: 96, fill: '#ffd93d', lw: 15, letter: 6, shadowY: 9, shadowA: 0.4
-    }, function (i, n) {
-      return { dy: Math.sin(t * 4 - i * 0.5) * 7, rot: Math.sin(t * 2 - i * 0.4) * 0.045 };
-    });
-    g.textEach('MANIA', 0, 44, {
-      size: 96, fill: '#ffffff', lw: 15, letter: 6, shadowY: 9, shadowA: 0.4
-    }, function (i, n) {
-      return { dy: Math.sin(t * 4 - i * 0.5 - 1.4) * 7, rot: Math.sin(t * 2 - i * 0.4 - 1) * 0.045 };
-    });
-    c.restore();
+    function logo(dx, dy, col) {
+      g.textEach('ミニゲームまつり', dx, dy, {
+        size: 78, fill: col, letter: 2
+      }, function (i) {
+        return { dy: Math.sin(t * 3.4 - i * 0.42) * 6, rot: Math.sin(t * 1.8 - i * 0.36) * 0.035 };
+      });
+    }
+    logo(5, 5, PAL.shu);
+    logo(0, 0, PAL.ink);
     c.restore();
 
-    g.text('ミニゲーム ' + GG.MICROGAMES.length + ' しゅるい ノンストップ', W / 2, H * 0.605,
-      { size: 23, fill: '#ffffff', lw: 4.5 });
+    // 副題
+    c.save();
+    c.translate(W / 2, H * 0.545);
+    var sw = 430;
+    c.fillStyle = PAL.ink;
+    c.fillRect(-sw / 2, -17, sw, 34);
+    g.text('ミニゲーム ' + GG.MICROGAMES.length + ' しゅるい ノンストップ', 0, 1,
+      { size: 20, fill: PAL.paper, letter: 1 });
+    c.restore();
 
     // スタート案内
-    var pulse = 0.55 + 0.45 * Math.sin(t * 4.4);
+    var pulse = 0.5 + 0.5 * Math.sin(t * 4.4);
     c.save();
-    c.globalAlpha = 0.55 + pulse * 0.45;
-    var sw = 420;
-    g.block(W / 2 - sw / 2, H * 0.71, sw, 62, '#20143d',
-      { r: 31, lw: 4, gloss: 0.12, sy: 8 });
-    g.text('スペース / クリック で スタート', W / 2, H * 0.71 + 32,
-      { size: 24, fill: '#ffd93d', lw: 4 });
+    c.globalAlpha = 0.6 + pulse * 0.4;
+    var bw = 400;
+    g.block(W / 2 - bw / 2, H * 0.655, bw, 58, PAL.paper, { r: 10, lw: 4 });
+    g.text('スペース / クリック で スタート', W / 2, H * 0.655 + 30,
+      { size: 22, fill: PAL.shu });
     c.restore();
 
-    g.text('BEST  ' + this.best, W / 2, H * 0.885, { size: 21, fill: '#ffe0f0', lw: 4 });
-    g.text('M: ミュート   ESC: ポーズ', W / 2, H - 24,
-      { size: 14, fill: 'rgba(255,255,255,0.65)', stroke: false, shadow: false });
+    GG.A.tip(g, W / 2, H * 0.795, 'さいこう記録  ' + this.best, 18);
+    g.text('M: ミュート   ESC: ポーズ', W / 2, H - 18,
+      { size: 13, fill: PAL.inkSoft });
   };
-
-  // --- ゲームオーバー --------------------------------------------------
   P._drawGameover = function (g) {
     var c = g.c, t = this.stateT;
-    c.fillStyle = g.grad(0, 0, 0, H, [[0, '#2b1030'], [1, '#120716']]);
+    c.fillStyle = PAL.kinari;
     c.fillRect(0, 0, W, H);
-    c.save();
-    c.globalAlpha = 0.08;
-    c.translate(W / 2, H / 2); c.rotate(this.globalT * 0.1);
-    for (var i = 0; i < 12; i++) {
-      c.save(); c.rotate(i / 12 * U.TAU);
-      g.polyPath([[0, 0], [900, -70], [900, 70]]).fill('#ff5e7d');
-      c.restore();
-    }
-    c.restore();
+    g.ichimatsu(0, 0, W, H, 62, PAL.shu, 0.08, this.globalT * 10);
+    g.noren(0, 30, 9, [PAL.shu, PAL.paper], 0.95);
+    g.noren(H - 30, 30, 9, [PAL.paper, PAL.shu], 0.95);
     this.fx.draw(g);
 
-    var k = U.sat(t / 0.6);
+    var k = U.sat(t / 0.55);
     c.save();
-    c.translate(W / 2, H * 0.3);
-    c.scale(U.lerp(1.6, 1, U.easeOutQuint(k)), U.lerp(1.6, 1, U.easeOutQuint(k)));
+    c.translate(W / 2, H * 0.31);
+    var sc = U.lerp(1.45, 1, U.easeOutQuint(k));
+    c.scale(sc, sc);
     c.globalAlpha = U.sat(t / 0.3);
-    g.text('GAME OVER', 0, 0, { size: 78, fill: '#ff5e7d', lw: 12, shadowY: 8 });
+    g.text('おしまい', 7, 7, { size: 74, fill: PAL.shu });
+    g.text('おしまい', 0, 0, { size: 74, fill: PAL.ink });
     c.restore();
 
-    if (t > 0.45) {
-      var a = U.sat((t - 0.45) / 0.4);
+    if (t > 0.42) {
+      var a = U.sat((t - 0.42) / 0.4);
       c.save(); c.globalAlpha = a;
-      c.translate(W / 2, H * 0.55 + (1 - a) * 18);
-      var pw = 430;
-      g.block(-pw / 2, -62, pw, 124, '#1d1233', { r: 24, lw: 4, gloss: 0.1 });
-      g.text('クリアした ミニゲーム', 0, -34, { size: 18, fill: '#b9a9e0', stroke: false, shadow: false });
-      g.text(String(this.score), 0, 6, { size: 62, fill: '#ffd93d', lw: 9 });
-      g.text((this.newBest ? '★ NEW BEST ★' : 'BEST  ' + this.best), 0, 44,
-        { size: 19, fill: this.newBest ? '#7bed9f' : '#ffffff', lw: 3.5 });
+      c.translate(W / 2, H * 0.56 + (1 - a) * 16);
+      var pw = 420;
+      g.block(-pw / 2, -64, pw, 128, PAL.paper, { r: 8, lw: 3.2 });
+      c.fillStyle = PAL.ai;
+      c.fillRect(-pw / 2 + 12, -54, pw - 24, 5);
+      g.text('クリアした ミニゲーム', 0, -32, { size: 17, fill: PAL.inkSoft });
+      g.text(String(this.score), 0, 6, { size: 58, fill: PAL.shu });
+      g.text(this.newBest ? '★ さいこう記録 こうしん ★' : 'さいこう記録  ' + this.best, 0, 44,
+        { size: 18, fill: this.newBest ? PAL.wakaba : PAL.ink });
       c.restore();
     }
-    if (t > 1.0) {
-      var p = 0.5 + 0.5 * Math.sin(this.globalT * 4.5);
-      c.save(); c.globalAlpha = 0.5 + p * 0.5;
+    if (t > 0.95) {
+      var pl = 0.5 + 0.5 * Math.sin(this.globalT * 4.5);
+      c.save(); c.globalAlpha = 0.55 + pl * 0.45;
       g.text('スペース / クリック で もういちど', W / 2, H * 0.83,
-        { size: 24, fill: '#ffffff', lw: 4 });
+        { size: 22, fill: PAL.ink });
       c.restore();
     }
   };
-
   P._drawPause = function (g) {
     var c = g.c;
     c.save();
-    c.globalAlpha = 0.72; g.clear('#0b0718'); c.restore();
-    g.text('PAUSE', W / 2, H / 2 - 16, { size: 64, fill: '#ffd93d', lw: 10 });
-    g.text('ESC で さいかい', W / 2, H / 2 + 42, { size: 22, fill: '#fff', lw: 4 });
+    c.globalAlpha = 0.86; g.clear(PAL.kinari); c.restore();
+    g.ichimatsu(0, 0, W, H, 60, PAL.ai, 0.12, 0);
+    g.text('やすみ', W / 2, H / 2 - 14, { size: 58, fill: PAL.ink });
+    g.text('ESC で さいかい', W / 2, H / 2 + 40, { size: 21, fill: PAL.shu });
   };
-
   P._drawMuted = function (g) {
     if (!this.audio.muted) return;
-    g.text('🔇 MUTE (M)', W - 16, H - 18,
-      { size: 15, fill: 'rgba(255,255,255,0.8)', align: 'right', stroke: false, shadow: false });
+    g.text('MUTE (M)', W - 16, H - 16,
+      { size: 14, fill: PAL.inkSoft, align: 'right' });
   };
-
   GG.Game = Game;
 })(window.GG = window.GG || {});

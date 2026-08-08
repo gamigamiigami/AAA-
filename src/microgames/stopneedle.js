@@ -10,7 +10,7 @@
     control: 'press',
     beats: 8,
     defaultResult: 'lose',
-    bg: ['#5f27cd', '#241157'],
+    bg: ['#e0d8f0', '#bfb4e0'],
 
     create: function (c) {
       var A0 = -Math.PI * 0.86, A1 = -Math.PI * 0.14;  // メーターの範囲
@@ -44,13 +44,13 @@
               var px = cx + Math.cos(ang(p)) * R, py = cy + Math.sin(ang(p)) * R;
               c.fx.burst(px, py, {
                 n: judgedPerfect ? 30 : 16,
-                color: judgedPerfect ? ['#ffd93d', '#ffffff', '#7bed9f'] : ['#7bed9f', '#ffffff'],
+                color: judgedPerfect ? [GG.PAL.yamabuki, '#ffffff', GG.PAL.wakaba] : [GG.PAL.wakaba, '#ffffff'],
                 speed: 340, size: 8, shape: 'star'
               });
               c.fx.ring(px, py, { r1: 130, color: '#ffffff', lw: 8 });
               if (judgedPerfect) {
                 c.fx.floatText(cx, cy - 130, 'PERFECT!',
-                  { color: '#ffd93d', size: 42, stroke: '#5a3d00' });
+                  { color: GG.PAL.yamabuki, size: 42, stroke: '#5a3d00' });
               }
               c.win();
             } else {
@@ -62,30 +62,24 @@
 
         draw: function (g) {
           var ctx = g.c;
-          ctx.save(); ctx.globalAlpha = 0.1;
-          for (var i = 0; i < 16; i++) {
-            ctx.save(); ctx.translate(cx, cy); ctx.rotate(i / 16 * U.TAU + c.t * 0.2);
-            g.polyPath([[0, 0], [700, -40], [700, 40]]).fill('#fff');
-            ctx.restore();
-          }
-          ctx.restore();
+          g.ichimatsu(0, 0, c.W, c.H, 56, GG.PAL.paper, 0.4, c.t * 12);
 
           // 台座
-          g.block(cx - 250, cy - 18, 500, 120, '#1d1440', { r: 26, lw: 4, gloss: 0.06 });
+          g.block(cx - 200, cy - 10, 400, 96, '#c19a66', { r: 12, lw: 3 });
 
           // メーターの弧
           ctx.save();
           ctx.lineCap = 'round';
-          ctx.strokeStyle = '#0f0a24'; ctx.lineWidth = 42;
+          ctx.strokeStyle = '#ddd5c4'; ctx.lineWidth = 42;
           ctx.beginPath(); ctx.arc(cx, cy, R, A0, A1); ctx.stroke();
-          ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 34;
+          ctx.strokeStyle = 'rgba(64,58,72,0.10)'; ctx.lineWidth = 34;
           ctx.beginPath(); ctx.arc(cx, cy, R, A0, A1); ctx.stroke();
 
           // 目盛り
           for (var t = 0; t <= 20; t++) {
             var a = U.lerp(A0, A1, t / 20);
             var r0 = R + (t % 5 === 0 ? 22 : 15), r1 = R + 26;
-            ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+            ctx.strokeStyle = GG.PAL.ink;
             ctx.lineWidth = t % 5 === 0 ? 4 : 2;
             ctx.beginPath();
             ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
@@ -97,11 +91,11 @@
           var za = U.lerp(A0, A1, U.sat(zoneC - zoneHalf));
           var zb = U.lerp(A0, A1, U.sat(zoneC + zoneHalf));
           var pulse = 1 + 0.08 * Math.sin(c.t * 7);
-          ctx.strokeStyle = '#7bed9f'; ctx.lineWidth = 42 * pulse;
+          ctx.strokeStyle = GG.PAL.wakaba; ctx.lineWidth = 42 * pulse;
           ctx.beginPath(); ctx.arc(cx, cy, R, za, zb); ctx.stroke();
           var pa = U.lerp(A0, A1, U.sat(zoneC - zoneHalf * 0.32));
           var pb = U.lerp(A0, A1, U.sat(zoneC + zoneHalf * 0.32));
-          ctx.strokeStyle = '#ffd93d'; ctx.lineWidth = 42;
+          ctx.strokeStyle = GG.PAL.yamabuki; ctx.lineWidth = 42;
           ctx.beginPath(); ctx.arc(cx, cy, R, pa, pb); ctx.stroke();
           ctx.restore();
 
@@ -114,12 +108,12 @@
             var wob = Math.sin(c.t * 26) * Math.exp(-c.t * 3) * 0.06;
             ctx.rotate(wob);
           }
-          g.polyPath([[-11, 26], [0, -R - 34], [11, 26]]).ink('#ff5e7d', 4);
+          g.polyPath([[-11, 26], [0, -R - 34], [11, 26]]).ink(GG.PAL.shu, 4);
           ctx.restore();
-          g.circlePath(cx, cy, 24).ink('#ffd93d', 4);
-          g.circlePath(cx - 6, cy - 7, 7).fill('rgba(255,255,255,0.7)');
+          g.circlePath(cx, cy, 24).ink(GG.PAL.yamabuki, 4);
+          g.circlePath(cx - 6, cy - 7, 6).fill('rgba(255,255,255,0.65)');
 
-          g.text('みどりで とめろ', c.W / 2, 128, { size: 30, fill: '#fff', lw: 5 });
+          g.text('みどりで とめろ', c.W / 2, 128, { size: 30, fill: GG.PAL.ink });
         }
       };
     }

@@ -1,0 +1,12 @@
+{
+  "name": "micro-mania",
+  "version": "1.0.0",
+  "description": "ミニゲーム18種のノンストップゲーム。ブラウザ単体・依存ゼロ・完全オフライン。",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes http-server . -p 8080 -c-1",
+    "qa": "node tools/qa.js",
+    "sheet": "node tools/sheet.js",
+    "playtest": "node tools/playtest.js"
+  }
+}

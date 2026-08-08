@@ -1,0 +1,4 @@
+node_modules/
+qa-shots/_sheet.html
+.DS_Store
+qa-shots/p-*.png

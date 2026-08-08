@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#150e29">
+<title>MICRO MANIA — ミニゲーム ノンストップ</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #0a0616;
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic",
+                 "Noto Sans JP", IPAPGothic, IPAGothic, system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none; user-select: none;
+    touch-action: none;
+  }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(ellipse at 50% 20%, #2a1a4d 0%, #0a0616 62%),
+      #0a0616;
+  }
+  #stage {
+    position: relative;
+    filter: drop-shadow(0 24px 60px rgba(0, 0, 0, 0.7));
+  }
+  #screen {
+    display: block;
+    border-radius: 14px;
+    background: #150e29;
+    image-rendering: auto;
+  }
+  #boot {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #7d6ea8; font-size: 15px; letter-spacing: 0.14em;
+    transition: opacity 0.35s ease; pointer-events: none;
+  }
+  body.ready #boot { opacity: 0; }
+  @media (max-width: 700px) {
+    #screen { border-radius: 0; }
+  }
+</style>
+</head>
+<body>
+  <div id="boot">LOADING…</div>
+  <div id="stage"><canvas id="screen" width="960" height="540"></canvas></div>
+
+  <!-- コア層（順序に依存: util → registry → 描画/入力/音 → ゲーム） -->
+  <script src="src/core/util.js"></script>
+  <script src="src/core/registry.js"></script>
+  <script src="src/core/canvas.js"></script>
+  <script src="src/core/actors.js"></script>
+  <script src="src/core/input.js"></script>
+  <script src="src/core/audio.js"></script>
+  <script src="src/core/fx.js"></script>
+  <script src="src/core/game.js"></script>
+
+  <!-- ミニゲーム（順不同・互いに独立） -->
+  <script src="src/microgames/dodge.js"></script>
+  <script src="src/microgames/catch.js"></script>
+  <script src="src/microgames/whack.js"></script>
+  <script src="src/microgames/jump.js"></script>
+  <script src="src/microgames/mash.js"></script>
+  <script src="src/microgames/count.js"></script>
+  <script src="src/microgames/stopneedle.js"></script>
+  <script src="src/microgames/shoot.js"></script>
+  <script src="src/microgames/rhythm.js"></script>
+  <script src="src/microgames/balance.js"></script>
+  <script src="src/microgames/grab.js"></script>
+  <script src="src/microgames/stretch.js"></script>
+  <script src="src/microgames/odd.js"></script>
+  <script src="src/microgames/shield.js"></script>
+  <script src="src/microgames/escape.js"></script>
+  <script src="src/microgames/swat.js"></script>
+  <script src="src/microgames/boss_survive.js"></script>
+  <script src="src/microgames/boss_band.js"></script>
+
+  <script src="src/main.js"></script>
+</body>
+</html>

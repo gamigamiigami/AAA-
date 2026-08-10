@@ -6,9 +6,13 @@
  */
 
 import dodge from './dodge/game.js';
+import catchGame from './catch/game.js';
+import swat from './swat/game.js';
+import sort from './sort/game.js';
+import charge from './charge/game.js';
 
 /** @type {import('./types.js').MicrogameDef[]} */
-export const MICROGAMES = [dodge];
+export const MICROGAMES = [dodge, catchGame, swat, sort, charge];
 
 /** @type {import('./types.js').MicrogameDef[]} */
 export const BOSSES = [];

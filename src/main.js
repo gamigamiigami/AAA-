@@ -199,4 +199,8 @@ window.__game = {
   hint() {
     return app.session ? app.session.debugHint() : null;
   },
+  /** Whether the running microgame answers hint() at all — see session.js. */
+  hasHint() {
+    return app.session ? app.session.hasDebugHint() : false;
+  },
 };

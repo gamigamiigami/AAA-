@@ -218,8 +218,9 @@ export default {
         g.ground(cx, cy + 150, 110, 30, 0.24);
         c.translate(cx + shakeX, cy);
         c.scale(squat, 1 / squat);
+        // Arms start outside the body radius, or they vanish inside it.
         for (const sx of [-1, 1]) {
-          g.body((gg) => gg.capsule(sx * 60, 10, sx * (80 + charge * 26), -60 - charge * 60, 24), {
+          g.body((gg) => gg.capsule(sx * 96, 20, sx * (150 + charge * 40), -70 - charge * 70, 26), {
             fill: darken(palette.accent2, 0.2),
             extrude: 0,
             shade: 0.18,
@@ -245,15 +246,28 @@ export default {
 
         /* ------------------------------------------------- hold prompt */
         if (!holding && !released) {
+          // Expanding rings read as "press and keep pressing" far better than a
+          // lone dot, which just looks like another prop lying on the ground.
           const pulse = (Math.sin(beat * Math.PI * 2) + 1) / 2;
+          const px = LAYOUT.cx;
+          const py = 1600;
           c.save();
-          c.globalAlpha = 0.5 + pulse * 0.5;
-          g.body((gg) => gg.circle(LAYOUT.cx, 1620, 54 + pulse * 8), {
-            fill: alpha(PAPER, 0.85),
+          for (let i = 0; i < 2; i++) {
+            const t = (beat * 0.7 + i * 0.5) % 1;
+            c.globalAlpha = (1 - t) * 0.6;
+            c.beginPath();
+            c.arc(px, py, 60 + t * 70, 0, Math.PI * 2);
+            c.lineWidth = 10;
+            c.strokeStyle = PAPER;
+            c.stroke();
+          }
+          c.globalAlpha = 0.85 + pulse * 0.15;
+          g.body((gg) => gg.circle(px, py, 58), {
+            fill: PAPER,
             extrude: 0,
-            shade: 0,
-            gloss: 0.4,
-            lw: 7,
+            shade: 0.1,
+            gloss: 0.45,
+            lw: 8,
           });
           c.restore();
         }

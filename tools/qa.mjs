@@ -268,15 +268,31 @@ async function solve(browser, url) {
       await startPractice(page, gme.id, 1);
       const before = await page.evaluate(() => window.__game.session().score);
 
-      for (let step = 0; step < 60; step++) {
-        const hint = await page.evaluate(() => window.__game.hint());
-        if (hint) await applyHint(page, hint);
-        else await page.mouse.click(Math.random() * profile.width, Math.random() * profile.height);
-        const phase = await page.evaluate(() => window.__game.session()?.phase);
-        if (phase !== 'play') break;
-        await page.waitForTimeout(50);
+      // Drive until the round actually ends, on a wall clock rather than a
+      // fixed step count: a boss runs 16 beats (~8s), so a step-capped loop
+      // gave up before the fight was over and reported it unwinnable.
+      // Hint and phase come back in ONE round trip, because two evaluates plus
+      // a sleep is slower than the judgement window of the rhythm game.
+      const deadline = Date.now() + 25000;
+      for (;;) {
+        const s = await page.evaluate(() => ({
+          hint: window.__game.hint() ?? null,
+          hasHint: window.__game.hasHint(),
+          phase: window.__game.session()?.phase,
+        }));
+        if (s.phase !== 'play') break;
+        if (Date.now() > deadline) break;
+        if (s.hint) {
+          await applyHint(page, s.hint);
+        } else if (!s.hasHint) {
+          // Only games that offer no guidance get monkey input. A game that
+          // said "do nothing right now" means it — in the rhythm game a stray
+          // tap is an instant loss.
+          await page.mouse.click(Math.random() * profile.width, Math.random() * profile.height);
+        }
+        await page.waitForTimeout(16);
       }
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(600);
       const after = await page.evaluate(() => window.__game.session()?.score ?? 0);
       if (after > before) won = true;
     }

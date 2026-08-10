@@ -370,6 +370,16 @@ export function createSession(services, opts) {
       return inst && typeof inst.debugHint === 'function' ? inst.debugHint() : null;
     },
 
+    /**
+     * QA only: does this microgame answer debugHint() at all?
+     * The harness needs to tell "the game says do nothing right now" apart from
+     * "the game has no hint" — in games where a wrong tap loses instantly,
+     * falling back to random input during a deliberate pause is suicide.
+     */
+    hasDebugHint() {
+      return !!(inst && typeof inst.debugHint === 'function');
+    },
+
     dispose() {
       if (inst?.dispose) inst.dispose();
       inst = null;

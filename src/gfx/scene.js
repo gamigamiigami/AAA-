@@ -324,8 +324,10 @@ export function createBackdrop(rng, palette, opts = {}) {
         const span = f.w + 900;
         const x = f.x0 + ((((cl.x + beat * cl.speed - f.x0) % span) + span) % span) - 450;
         c.save();
-        c.globalAlpha = kind === 'forest' ? 0.22 : 0.6;
-        c.fillStyle = kind === 'forest' ? lighten(palette.skyBot, 0.3) : PAPER;
+        // Daylight-white clouds over a night city read as a pasted-in mistake,
+        // so every stage but 'town' tints them toward its own sky.
+        c.globalAlpha = kind === 'town' ? 0.6 : 0.22;
+        c.fillStyle = kind === 'town' ? PAPER : lighten(palette.skyBot, 0.3);
         // One path, one fill: filling each lobe separately would darken every
         // overlap and turn the cloud into a visible row of circles.
         c.beginPath();

@@ -200,22 +200,25 @@ export default {
           const dir = side === 0 ? -1 : 1;
           const pulse = (Math.sin(beat * Math.PI * 2 + side) + 1) / 2;
           c.save();
-          c.globalAlpha = 0.35 + pulse * 0.4;
-          c.translate(LAYOUT.cx + dir * (200 + pulse * 26), ITEM_Y);
+          c.globalAlpha = 0.7 + pulse * 0.3;
+          c.translate(LAYOUT.cx + dir * (210 + pulse * 30), ITEM_Y);
           c.scale(dir, 1);
+          // Solid, outlined arrow: a pale translucent one disappears against
+          // the sky, and this is the cue telling the player the verb is flick.
           g.body(
             (gg) =>
               gg.poly([
-                [0, -34],
+                [-12, -42],
                 [46, 0],
-                [0, 34],
+                [-12, 42],
+                [-2, 0],
               ]),
             {
               fill: PAPER,
-              extrude: 0,
-              shade: 0,
+              extrude: 6,
+              shade: 0.14,
               gloss: 0.4,
-              lw: 6,
+              lw: STROKE.base,
             },
           );
           c.restore();

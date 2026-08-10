@@ -10,12 +10,18 @@ import catchGame from './catch/game.js';
 import swat from './swat/game.js';
 import sort from './sort/game.js';
 import charge from './charge/game.js';
+import laser from './laser/game.js';
+import beat from './beat/game.js';
+import pop from './pop/game.js';
+import guide from './guide/game.js';
+import bossChase from './bossChase/game.js';
+import bossPunch from './bossPunch/game.js';
 
 /** @type {import('./types.js').MicrogameDef[]} */
-export const MICROGAMES = [dodge, catchGame, swat, sort, charge];
+export const MICROGAMES = [dodge, catchGame, swat, sort, charge, laser, beat, pop, guide];
 
 /** @type {import('./types.js').MicrogameDef[]} */
-export const BOSSES = [];
+export const BOSSES = [bossChase, bossPunch];
 
 /**
  * Games available on a stage. Falls back to the whole pool while the roster is

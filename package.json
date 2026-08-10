@@ -1,0 +1,14 @@
+{
+  "name": "microgame-rush",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Touch-first microgame collection. Zero runtime dependencies.",
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/server.mjs src 8080",
+    "typecheck": "tsc --noEmit -p jsconfig.json",
+    "format": "prettier --write \"src/**/*.js\" \"tools/**/*.mjs\"",
+    "bundle": "node tools/bundle.mjs",
+    "qa": "node tools/qa.mjs"
+  }
+}

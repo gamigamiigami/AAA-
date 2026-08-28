@@ -60,17 +60,21 @@ class Player {
       const t1 = (await (await fetch(BASE + '/api/time')).json()).t1;
       await this.hop();
       const t2 = this.localNow();
-      rows.push({ rtt: t2 - t0, offset: t1 - (t0 + t2) / 2 });
+      rows.push({ t0, t1, t2, rtt: t2 - t0 });
       await sleep(5);
     }
-    // 往復が速かった標本ほど推定が正確（往路と復路の非対称が小さい）。
-    // 最小RTT付近だけを採って中央値を取る。
-    rows.sort((a, b) => a.rtt - b.rtt);
-    const best = rows.slice(0, Math.min(4, rows.length));
-    best.sort((a, b) => a.offset - b.offset);
-    this.offset = best[Math.floor(best.length / 2)].offset;
-    this.bound = Math.round(rows[0].rtt / 2);   // 理論上の誤差上限は片道ぶん
-    this.syncErr = this.offset - (-this.skew);   // 理想は -skew。その差が時計合わせの誤差
+    // 区間交差。common.js の estimate() と同じ推定。
+    let lo = -Infinity, hi = Infinity;
+    for (const r of rows) {
+      lo = Math.max(lo, r.t1 - r.t2);
+      hi = Math.min(hi, r.t1 - r.t0);
+    }
+    if (lo <= hi) this.offset = (lo + hi) / 2;
+    else {
+      rows.sort((a, b) => a.rtt - b.rtt);
+      this.offset = rows[0].t1 - (rows[0].t0 + rows[0].t2) / 2;
+    }
+    this.syncErr = this.offset - (-this.skew);
   }
 
   /** 目標時刻に対し、human ms ずれたところで押す。
@@ -88,11 +92,48 @@ class Player {
     // 上のように解析的に決める。残る誤差は時計合わせの精度だけになり、それが測りたいもの。
     while (performance.now() < realPress) await sleep(2);
     await this.hop();                                // 届くまでの時間は判定に無関係
-    await fetch(BASE + '/api/press', {
+    await fetch(BASE + '/api/input', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ id: this.id, at })
     });
+  }
+
+  /* だるまさん。掛け声のたびに「turnAt の margin ms 前」に離す。
+   * margin > 0 なら助かり、margin < 0 なら振り向きに間に合わず捕まる。
+   * 送信は意図的に順不同・ばらばらの遅延で行う。
+   * サーバーは届いた順ではなく時刻で並べ直すので、結果は変わらないはず。 */
+  planDaruma(chants, margin, goalMs) {
+    const evs = [];
+    let held = 0;
+    for (const ch of chants) {
+      const from = ch.start;
+      const to = ch.turnAt - margin;
+      if (to <= from) continue;
+      evs.push({ t: from, down: true }, { t: to, down: false });
+      held += to - from;
+      if (margin < 0) break;             // 捕まるのでここで終わり
+      if (held >= goalMs) break;         // ゴールしたので以降は不要
+    }
+    this.plannedHeld = margin < 0 ? null : Math.min(held, goalMs);
+    // 端末の時計で測った値をサーバー時刻に変換して送る（= 実際の端末と同じ経路）
+    return evs.map(e => ({ t: e.t + this.skew + this.offset, down: e.down }));
+  }
+
+  async sendShuffled(evs) {
+    const order = evs.slice();
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    await Promise.all(order.map(async (e) => {
+      await sleep(Math.random() * this.delay * 2);   // 順不同かつばらばらに届く
+      await fetch(BASE + '/api/input', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: this.id, t: e.t, down: e.down })
+      });
+    }));
   }
 }
 
@@ -119,13 +160,13 @@ class Player {
       + '   合わせ誤差 ' + p.syncErr.toFixed(1).padStart(6) + 'ms');
   }
 
-  await fetch(BASE + '/api/start', { method: 'POST' });
+  await fetch(BASE + '/api/start?game=seino', { method: 'POST' });
 
   let st;
   do { await sleep(20); st = await (await fetch(BASE + '/api/state')).json(); }
-  while (st.phase !== 'countin');
+  while (st.phase !== 'play');
 
-  await Promise.all(players.map(p => p.playRound(st.target)));
+  await Promise.all(players.map(p => p.playRound(st.g.target)));
 
   do { await sleep(50); st = await (await fetch(BASE + '/api/state')).json(); }
   while (st.phase !== 'reveal');
@@ -178,18 +219,62 @@ class Player {
     dy += (ys[i] - my) ** 2;
   }
   const corr = dx && dy ? num / Math.sqrt(dx * dy) : 0;
+  /* 相関だけでは判定できない。判定ズレが 0,0,0,-1,+3 ms のような、
+   * ほぼゼロのデータでも相関は簡単に 0.5 を超えるが、それは丸め誤差を見ているだけ。
+   * 「遅延が 100ms 増えると判定が何 ms ずれるか」という傾きなら大きさを持つ。 */
+  const slope100 = dx ? (num / dx) * 100 : 0;
 
   console.log('\n  最大の判定ズレ  ' + worst.toFixed(1) + 'ms   (許容 ' + TOL + 'ms)');
   console.log('  帯の一致      ' + bandOk + ' / ' + players.length + '人');
-  console.log('  遅延との相関   ' + corr.toFixed(2) + '   (0 に近いほど、回線が結果に漏れていない)');
+  console.log('  遅延の効き方    遅延+100ms あたり ' + slope100.toFixed(2) + 'ms ずれる  (許容 3ms)');
+  console.log('  参考: 相関     ' + corr.toFixed(2) + '  ※判定ズレがほぼ0のときは意味を持たない');
   console.log('\n  片道遅延と時計合わせ誤差の関係（これが本当の限界）');
   for (const p of players) {
     console.log('    片道 ' + String(p.delay).padStart(4) + 'ms  →  合わせ誤差 '
       + Math.abs(p.syncErr).toFixed(1).padStart(5) + 'ms');
   }
 
+  // ---------------------------------------------------------------- だるまさん
+  console.log('\n  だるまさんがころんだ（押下区間の組み直し / 順不同で送信）');
+  console.log('  ' + '-'.repeat(64));
+
+  while ((await (await fetch(BASE + '/api/state')).json()).phase !== 'lobby') {
+    await fetch(BASE + '/api/stop', { method: 'POST' });
+    await sleep(30);
+  }
+  await fetch(BASE + '/api/start?game=daruma', { method: 'POST' });
+  let ds;
+  do { await sleep(20); ds = await (await fetch(BASE + '/api/state')).json(); }
+  while (ds.phase !== 'play');
+
+  const goalMs = ds.g.goal / ds.g.speed * 1000;
+  const margins = [400, 250, 150, 90, -120, 600];   // 5人目だけ捕まる想定
+  await Promise.all(players.map((p, i) =>
+    p.sendShuffled(p.planDaruma(ds.g.chants, margins[i], goalMs))));
+
+  do { await sleep(200); ds = await (await fetch(BASE + '/api/state')).json(); }
+  while (ds.phase !== 'reveal');
+
+  const dById = new Map(ds.last.entries.map(e => [e.id, e]));
+  let darumaOk = true;
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i], e = dById.get(p.id);
+    const wantCaught = margins[i] < 0;
+    const wantDist = p.plannedHeld === null ? null
+      : Math.min(ds.last.goal, Math.round(p.plannedHeld / 1000 * ds.g.speed));
+    const distOk = wantCaught || Math.abs(e.dist - wantDist) <= 2;
+    const caughtOk = e.caught === wantCaught;
+    if (!distOk || !caughtOk) darumaOk = false;
+    console.log('  ' + p.name.padEnd(11) + ('片道' + p.delay + 'ms').padStart(10)
+      + ('  余裕' + margins[i] + 'ms').padStart(13)
+      + '   ' + (e.caught ? 'つかまった' : e.dist + '/' + ds.last.goal + ' すすんだ').padEnd(16)
+      + (caughtOk && distOk ? 'OK' : 'NG'));
+  }
+  console.log('  ' + '-'.repeat(64));
+  console.log('  区間の組み直し: ' + (darumaOk ? '全員一致' : '不一致あり'));
+
   const pass = worst <= TOL && missing === 0
-    && bandOk === players.length && Math.abs(corr) < 0.5;
+    && bandOk === players.length && Math.abs(slope100) < 3 && darumaOk;
 
   console.log('\n  ' + (pass ? 'PASS — 回線の速さは結果に影響していない'
                              : 'FAIL — 遅延が結果に漏れている'));

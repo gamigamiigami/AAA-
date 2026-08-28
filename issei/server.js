@@ -8,7 +8,7 @@
  * つまり低遅延の伝送路そのものが不要になる。
  *
  * 起動:  node issei/server.js
- * 検証:  node issei/test-latency.js   （遅延を注入しても順位が変わらないことを確認）
+ * 検証:  node issei/test-latency.js
  */
 'use strict';
 
@@ -17,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { performance } = require('perf_hooks');
+const G = require('./games.js');
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC = path.join(__dirname, 'public');
@@ -24,29 +25,35 @@ const PUBLIC = path.join(__dirname, 'public');
 /* サーバーの単調時計。全端末はこの時計にオフセットを合わせる。 */
 const now = () => performance.now();
 
-// ---------------------------------------------------------------- 部屋の状態
-
-const BPM = 120;
-const BEAT = 60000 / BPM;          // 1拍 = 500ms
-const COUNT_IN_BEATS = 4;          // 予告の拍数
-const COLLECT_MS = 1500;           // 目標時刻を過ぎてから集計までの猶予
-const REVEAL_MS = 6000;            // 結果を見せている時間
-const SPREAD_OK_MS = 80;           // ばらつきがこの範囲なら全員成功
+const REVEAL_MS = 6500;
 
 const SHAPES = ['circle', 'triangle', 'square', 'star', 'heart',
                 'diamond', 'pentagon', 'hexagon', 'crown', 'moon'];
 // 暗い背景に置くので、そのままの原色ではなく少し明るく振る
 const COLORS = ['#FF3B4E', '#2E8BFF', '#FFD400', '#35D06A'];
 
+/* 乱数は必ずシード付きを通す。同じ種なら同じ試合を再現できる（mulberry32）。 */
+function makeRng(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
 const room = {
   code: makeCode(),
-  players: new Map(),     // id -> {id, name, shape, color, score, streak}
-  phase: 'lobby',         // lobby | countin | reveal
+  players: new Map(),
+  phase: 'lobby',         // lobby | play | reveal
   round: 0,
-  target: 0,              // 押すべき瞬間（サーバー時刻）
-  presses: new Map(),     // id -> サーバー時刻に変換済みの押下時刻
-  last: null,             // 直近の結果
-  timer: null
+  def: null,              // 進行中のミニゲーム定義
+  g: null,                // その回の状態
+  last: null,
+  timer: null,
+  seed: (Math.random() * 1e9) | 0,
+  order: []               // 出題順。ランダムに並べる
 };
 
 function makeCode() {
@@ -57,8 +64,7 @@ function makeCode() {
 }
 
 /* 形が主・色が従。ただし形を一巡してから色を変えると最初の10人が全員同色になり、
- * 少人数のときに色が識別の役に立たない。隣り合う人が形も色も変わるように配る。
- * 10形 × 4色 = 40通りが重複なく出る（gcd の関係で s ごとに4色が全て現れる）。 */
+ * 少人数のとき色が識別の役に立たない。隣り合う人が形も色も変わるように配る。 */
 function assignLook(index) {
   return {
     shape: SHAPES[index % SHAPES.length],
@@ -68,18 +74,15 @@ function assignLook(index) {
 
 // ---------------------------------------------------------------- SSE 配信
 
-const clients = new Set();   // {res, id, lag}
+const clients = new Set();
 
 function send(client, event) {
   const body = `data: ${JSON.stringify(event)}\n\n`;
   const write = () => { try { client.res.write(body); } catch (_) {} };
-  // lag は検証用の人工遅延。本番では常に 0。
-  if (client.lag > 0) setTimeout(write, client.lag); else write();
+  if (client.lag > 0) setTimeout(write, client.lag); else write();   // lag は検証用
 }
 
-function broadcast(event) {
-  for (const c of clients) send(c, event);
-}
+function broadcast(event) { for (const c of clients) send(c, event); }
 
 function roster() {
   return [...room.players.values()].map(p => ({
@@ -93,62 +96,57 @@ function stateEvent() {
     phase: room.phase,
     code: room.code,
     round: room.round,
-    target: room.target,
-    beat: BEAT,
-    countIn: COUNT_IN_BEATS,
+    beat: G.BEAT,
+    game: room.def && {
+      id: room.def.id, verb: room.def.verb, hint: room.def.hint,
+      control: room.def.control, countIn: room.def.countIn || 0
+    },
+    g: room.g,
     players: roster(),
     last: room.last
   };
 }
 
-// ---------------------------------------------------------------- ゲーム進行
+// ---------------------------------------------------------------- 進行
 
-function startRound() {
+function nextDef() {
+  // 並び順はランダム。同系統が続く回も出るが、まずはそのまま回して様子を見る。
+  if (!room.order.length) {
+    room.order = G.ALL.slice();
+    for (let i = room.order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [room.order[i], room.order[j]] = [room.order[j], room.order[i]];
+    }
+  }
+  return room.order.shift();
+}
+
+function startRound(forceId) {
   if (room.players.size === 0) return;
   room.round++;
-  room.phase = 'countin';
-  room.presses.clear();
+  // forceId は検証用。本番は必ずランダム順。
+  room.def = forceId ? G.ALL.find(d => d.id === forceId) || nextDef() : nextDef();
+  room.phase = 'play';
   room.last = null;
-  // 予告の拍数ぶん先に目標を置く。全端末はこの時刻を自分の時計に変換して描く。
-  room.target = now() + COUNT_IN_BEATS * BEAT;
-  broadcast(stateEvent());
 
+  const rng = makeRng(room.seed + room.round * 7919);
+  room.g = Object.assign({ presses: {}, events: {} }, room.def.setup(now(), rng));
+
+  broadcast(stateEvent());
   clearTimeout(room.timer);
-  room.timer = setTimeout(finishRound, COUNT_IN_BEATS * BEAT + COLLECT_MS);
+  room.timer = setTimeout(finishRound, room.g.endsAt - now());
 }
 
 function finishRound() {
-  const entries = [];
-  for (const p of room.players.values()) {
-    const at = room.presses.get(p.id);
-    entries.push({
-      id: p.id, name: p.name, shape: p.shape, color: p.color,
-      error: at === undefined ? null : Math.round(at - room.target)
-    });
+  const players = [...room.players.values()];
+  const result = room.def.judge(room.g, players);
+
+  for (const id of result.winners) {
+    const p = room.players.get(id);
+    if (p) p.score++;
   }
 
-  const hits = entries.filter(e => e.error !== null).map(e => e.error);
-  let spread = null, success = false;
-  if (hits.length >= 2) {
-    const mean = hits.reduce((a, b) => a + b, 0) / hits.length;
-    const variance = hits.reduce((a, b) => a + (b - mean) ** 2, 0) / hits.length;
-    spread = Math.round(Math.sqrt(variance));
-    success = spread <= SPREAD_OK_MS && hits.length === entries.length;
-  } else if (hits.length === 1 && entries.length === 1) {
-    spread = 0;
-    success = Math.abs(hits[0]) <= SPREAD_OK_MS;
-  }
-
-  // 協力ゲームなので、成功なら全員に加点する。
-  if (success) for (const p of room.players.values()) p.score++;
-
-  entries.sort((a, b) => {
-    if (a.error === null) return 1;
-    if (b.error === null) return -1;
-    return Math.abs(a.error) - Math.abs(b.error);
-  });
-
-  room.last = { round: room.round, entries, spread, success, threshold: SPREAD_OK_MS };
+  room.last = Object.assign({ round: room.round, game: room.def.id, verb: room.def.verb }, result);
   room.phase = 'reveal';
   broadcast(stateEvent());
 
@@ -160,6 +158,8 @@ function stopGame() {
   clearTimeout(room.timer);
   room.phase = 'lobby';
   room.last = null;
+  room.def = null;
+  room.g = null;
   broadcast(stateEvent());
 }
 
@@ -188,10 +188,8 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
 
-  // --- 時計合わせ。往復のうち最速のものだけを採用するので何度も叩かれる。
-  if (p === '/api/time') {
-    return json(res, 200, { t1: now() });
-  }
+  // 時計合わせ。往復のうち最速のものだけが使われるので何度も叩かれる。
+  if (p === '/api/time') return json(res, 200, { t1: now() });
 
   if (p === '/api/join' && req.method === 'POST') {
     const body = await readBody(req);
@@ -203,24 +201,27 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { id, name, ...look, code: room.code });
   }
 
-  // --- 押下。中身の at（端末が測った押下時刻をサーバー時計に変換した値）だけを見る。
-  //     このリクエストが何ms遅れて届いたかは一切参照しない。
-  if (p === '/api/press' && req.method === 'POST') {
+  /* 入力。中身のタイムスタンプだけを見る。
+   * このリクエストが何ms遅れて届いたかは一切参照しない。 */
+  if (p === '/api/input' && req.method === 'POST') {
     const body = await readBody(req);
     const pl = room.players.get(body.id);
-    if (!pl) return json(res, 404, { ok: false });
-    if (room.phase === 'countin' && typeof body.at === 'number' && !room.presses.has(pl.id)) {
-      room.presses.set(pl.id, body.at);
-      // 人数だけを配る。誰が・何秒に押したかは開示まで一切出さない。
-      // 出した瞬間に遅延が可視化されて不公平になる。
-      broadcast({ type: 'state', partial: true, pressed: room.presses.size });
+    if (!pl || room.phase !== 'play') return json(res, 200, { ok: false });
+    if (room.def.accept(room.g, pl.id, body)) {
+      // 人数だけを配る。誰が・何秒に押したかは開示まで出さない。
+      const n = room.def.id === 'seino'
+        ? Object.keys(room.g.presses).length
+        : Object.keys(room.g.events).length;
+      broadcast({ type: 'state', partial: true, pressed: n });
     }
     return json(res, 200, { ok: true });
   }
 
   if (p === '/api/state') return json(res, 200, stateEvent());
-
-  if (p === '/api/start' && req.method === 'POST') { startRound(); return json(res, 200, { ok: true }); }
+  if (p === '/api/start' && req.method === 'POST') {
+    startRound(url.searchParams.get('game'));
+    return json(res, 200, { ok: true });
+  }
   if (p === '/api/stop' && req.method === 'POST') { stopGame(); return json(res, 200, { ok: true }); }
 
   if (p === '/api/events') {
@@ -237,8 +238,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // --- 静的ファイル
-  let file = p === '/' ? '/screen.html' : p;
+  const file = p === '/' ? '/screen.html' : p;
   const full = path.join(PUBLIC, path.normalize(file).replace(/^(\.\.[/\\])+/, ''));
   fs.readFile(full, (err, data) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
@@ -249,9 +249,7 @@ const server = http.createServer(async (req, res) => {
 
 function lanAddress() {
   for (const list of Object.values(os.networkInterfaces())) {
-    for (const n of list || []) {
-      if (n.family === 'IPv4' && !n.internal) return n.address;
-    }
+    for (const n of list || []) if (n.family === 'IPv4' && !n.internal) return n.address;
   }
   return 'localhost';
 }
@@ -259,14 +257,11 @@ function lanAddress() {
 if (require.main === module) {
   server.listen(PORT, '0.0.0.0', () => {
     const ip = lanAddress();
-    console.log('');
-    console.log('  一斉 — プロトタイプ');
-    console.log('  ルームコード: ' + room.code);
-    console.log('');
+    console.log('\n  一斉 — プロトタイプ');
+    console.log('  ルームコード: ' + room.code + '\n');
     console.log('  メイン画面 (プロジェクター):  http://localhost:' + PORT + '/screen.html');
-    console.log('  スマホ (同じWi-Fiから):        http://' + ip + ':' + PORT + '/phone.html');
-    console.log('');
+    console.log('  スマホ (同じWi-Fiから):        http://' + ip + ':' + PORT + '/phone.html\n');
   });
 }
 
-module.exports = { server, room, BEAT, COUNT_IN_BEATS, SPREAD_OK_MS };
+module.exports = { server, room };

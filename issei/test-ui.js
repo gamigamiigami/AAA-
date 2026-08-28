@@ -47,33 +47,74 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   await phones[0].screenshot({ path: path.join(OUT, '02-phone-wait.png') });
   await screen.screenshot({ path: path.join(OUT, '03-lobby-joined.png') });
 
-  // 開始
-  await screen.evaluate(() => fetch('/api/start', { method: 'POST' }));
+  // ---- せーの
+  await screen.evaluate(() => fetch('/api/start?game=seino', { method: 'POST' }));
   await sleep(900);
-  await screen.screenshot({ path: path.join(OUT, '04-countin.png') });
-  await phones[0].screenshot({ path: path.join(OUT, '05-phone-press.png') });
+  await screen.screenshot({ path: path.join(OUT, '04-seino-countin.png') });
 
-  // 各自ばらばらのタイミングで押す
   const delays = [980, 1010, 1040, 900, 1120, 1000];
   await Promise.all(phones.map(async (pg, i) => {
     await sleep(delays[i]);
     await pg.click('#btn');
   }));
-
   await sleep(2600);
-  await screen.screenshot({ path: path.join(OUT, '06-reveal.png') });
-  await phones[0].screenshot({ path: path.join(OUT, '07-phone-result.png') });
+  await screen.screenshot({ path: path.join(OUT, '05-seino-reveal.png') });
+  await phones[0].screenshot({ path: path.join(OUT, '06-phone-result.png') });
+
+  const seinoState = await (await fetch(BASE + '/api/state')).json();
+  const seinoAnswered = seinoState.last
+    ? seinoState.last.entries.filter(e => e.error !== null).length : 0;
+
+  // ---- だるまさんがころんだ
+  await fetch(BASE + '/api/stop', { method: 'POST' });
+  await sleep(200);
+  await fetch(BASE + '/api/start?game=daruma', { method: 'POST' });
+  await sleep(120);
+  const dg = (await (await fetch(BASE + '/api/state')).json()).g;
+
+  /* 掛け声の間だけ押しっぱなしにする。各自ばらばらの「離す余裕」を持たせ、
+   * 最後の1人だけ離すのが遅すぎて捕まるようにする。
+   * テストはサーバーと同じプロセスなので performance.now() がそのまま共通時計。 */
+  const margins = [500, 350, 250, 150, 700, -250];
+  const holdRuns = phones.map(async (pg, i) => {
+    await pg.mouse.move(195, 420);
+    for (const ch of dg.chants.slice(0, 5)) {
+      const releaseAt = ch.turnAt - margins[i];
+      if (releaseAt - performance.now() < 120) continue;   // もう間に合わない掛け声は飛ばす
+      const wait = ch.start - performance.now();
+      if (wait > 0) await sleep(wait);
+      await pg.mouse.down();
+      const hold = releaseAt - performance.now();
+      if (hold > 0) await sleep(hold);
+      await pg.mouse.up();
+    }
+  });
+
+  await sleep(1600);
+  await screen.screenshot({ path: path.join(OUT, '07-daruma-play.png') });
+  await Promise.all(holdRuns);
+
+  // 判定は endsAt まで待つ
+  let ds;
+  do { await sleep(300); ds = await (await fetch(BASE + '/api/state')).json(); }
+  while (ds.phase === 'play');
+  await sleep(300);
+  await screen.screenshot({ path: path.join(OUT, '08-daruma-reveal.png') });
 
   const st = await (await fetch(BASE + '/api/state')).json();
-  const answered = st.last ? st.last.entries.filter(e => e.error !== null).length : 0;
+  const dm = st.last && st.last.game === 'daruma' ? st.last : null;
+  const moved = dm ? dm.entries.filter(e => e.dist > 0).length : 0;
+  const caught = dm ? dm.entries.filter(e => e.caught).length : 0;
 
-  console.log('\n  参加人数        ' + st.players.length);
-  console.log('  入力できた人数   ' + answered);
-  console.log('  ばらつき         ' + (st.last ? st.last.spread + 'ms' : '—'));
-  console.log('  エラー           ' + (errors.length ? '\n    ' + errors.join('\n    ') : '(なし)'));
-  console.log('  スクリーンショット ' + OUT);
+  console.log('\n  参加人数              ' + st.players.length);
+  console.log('  せーの: 入力できた人数  ' + seinoAnswered + ' / ' + names.length);
+  console.log('  せーの: ばらつき        ' + (seinoState.last ? seinoState.last.spread + 'ms' : '—'));
+  console.log('  だるま: 前進した人数    ' + moved + ' / ' + names.length);
+  console.log('  だるま: つかまった人数  ' + caught);
+  console.log('  エラー                ' + (errors.length ? '\n    ' + errors.join('\n    ') : '(なし)'));
+  console.log('  スクリーンショット      ' + OUT);
 
-  const pass = errors.length === 0 && answered === names.length;
+  const pass = errors.length === 0 && seinoAnswered === names.length && moved >= 4;
   console.log('\n  ' + (pass ? 'PASS' : 'FAIL') + '\n');
 
   await browser.close();

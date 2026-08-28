@@ -5,8 +5,8 @@
 const GG = {};
 
 // ---------------------------------------------------------------- 時計合わせ
-/* NTP と同じ考え方。往復を何度も測り、いちばん速かった往復ほど
- * 推定が正確なので、上位だけを採って中央値を取る。
+/* 各往復から「offset はこの範囲にいる」という区間を1つ得て、
+ * それを全部重ね合わせて絞り込む（NTP と同じ区間交差の考え方）。
  *
  * これが全体の土台。ここが合っていれば、通信がどれだけ遅くても
  * 「押した瞬間」を全端末で同じ物差しに乗せられる。 */
@@ -25,22 +25,37 @@ GG.clock = {
         t1 = (await (await fetch('/api/time')).json()).t1;
       } catch (_) { continue; }
       const t2 = performance.now();
-      rows.push({ rtt: t2 - t0, offset: t1 - (t0 + t2) / 2 });
+      rows.push({ t0, t1, t2, rtt: t2 - t0 });
       await new Promise(r => setTimeout(r, 30));
     }
     if (!rows.length) return false;
-    this.rows = this.rows.concat(rows).sort((a, b) => a.rtt - b.rtt).slice(0, 60);
-    rows = this.rows;
-    // 往復が速かった標本ほど推定が正確（往路と復路の非対称が小さい）。
-    // 最小RTT付近だけを採って中央値を取る。
-    rows.sort((a, b) => a.rtt - b.rtt);
-    const best = rows.slice(0, Math.min(4, rows.length));
-    best.sort((a, b) => a.offset - b.offset);
-    this.offset = best[Math.floor(best.length / 2)].offset;
-    this.bound = Math.round(rows[0].rtt / 2);   // 理論上の誤差上限は片道ぶん
-    this.rtt = Math.round(rows[0].rtt);
-    this.ready = true;
+    this.rows = this.rows.concat(rows).sort((a, b) => a.rtt - b.rtt).slice(0, 80);
+    this.estimate();
     return true;
+  },
+
+  /* 各標本は offset の取りうる区間を1つ与える。
+   *   t1 = t0 + d1 + offset  (d1 >= 0)  →  offset <= t1 - t0
+   *   t2 = t1 + d2 - offset  (d2 >= 0)  →  offset >= t1 - t2
+   * つまり offset は [t1-t2, t1-t0] の中にいる。
+   * 全標本の区間を重ね合わせると、標本を選ぶ方式より原理的に狭く絞れる。 */
+  estimate() {
+    let lo = -Infinity, hi = Infinity;
+    for (const r of this.rows) {
+      lo = Math.max(lo, r.t1 - r.t2);
+      hi = Math.min(hi, r.t1 - r.t0);
+    }
+    if (lo <= hi) {
+      this.offset = (lo + hi) / 2;
+      this.bound = Math.round((hi - lo) / 2);   // 残っている不確かさ
+    } else {
+      // 時計の進み方の差などで区間が交わらない場合は、最小RTTの標本に頼る
+      const r = this.rows[0];
+      this.offset = r.t1 - (r.t0 + r.t2) / 2;
+      this.bound = Math.round(r.rtt / 2);
+    }
+    this.rtt = Math.round(this.rows[0].rtt);
+    this.ready = true;
   },
 
   /* 遅い回線ほど時計合わせの誤差が大きくなるが、標本は多いほど良くなる。

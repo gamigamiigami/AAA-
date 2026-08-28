@@ -87,6 +87,7 @@ $('#go').onclick = async () => {
   GG.drawShape(c, me.shape, me.color, 20, 20, 17);
 
   await GG.clock.sync();
+  GG.clock.startRefining();
   $('#foot').textContent = 'ズレ補正 ' + Math.round(GG.clock.offset) + 'ms / 往復 ' + GG.clock.rtt + 'ms'
     + (lag ? ' / 人工遅延 ' + lag + 'ms' : '');
   GG.net.listen(me.id, lag);
@@ -98,20 +99,24 @@ GG.net.onState = (s) => {
   const p = state.players.find(x => x.id === (me && me.id));
   if (p) $('#myscore').textContent = p.score + '点';
 
-  if (s.phase === 'countin') {
-    sent = false;
+  if (s.phase === 'play') {
+    sent = false; held = false;
     btn.disabled = false;
     btn.classList.remove('hit');
-    btn.textContent = 'おす';
+    // 使う操作の形をここで見せる。親指を置く位置が確定する。
+    btn.textContent = s.game.control === 'hold' ? 'おしっぱなし' : 'おす';
   } else if (s.phase === 'reveal') {
-    btn.disabled = true;
+    btn.disabled = true; held = false;
     const mine = s.last && s.last.entries.find(e => e.id === (me && me.id));
-    if (!mine || mine.error === null) btn.textContent = '未入力';
-    else btn.textContent = GG.fmt(mine.error);
+    if (!mine) btn.textContent = '—';
+    else if (s.last.game === 'seino') btn.textContent = mine.error === null ? '未入力' : GG.fmt(mine.error);
+    else btn.textContent = mine.caught ? 'つかまった'
+       : mine.finishedAt !== null ? 'ゴール！' : Math.round(mine.dist) + ' すすんだ';
     // 勝ちと負けで振動を変える
-    if (navigator.vibrate) navigator.vibrate(s.last && s.last.success ? [40, 60, 40] : 140);
+    const won = s.last && s.last.winners.indexOf(me && me.id) >= 0;
+    if (navigator.vibrate) navigator.vibrate(won ? [40, 60, 40] : 140);
   } else {
-    btn.disabled = true;
+    btn.disabled = true; held = false;
     btn.textContent = 'まちうけ';
   }
 };
@@ -119,13 +124,49 @@ GG.net.onState = (s) => {
 /* 押した瞬間の記録がすべて。ここで端末の時計を読み、
  * サーバー時刻に変換した値を「中身」として送る。
  * この通信が何ms遅れて届くかは判定に一切影響しない。 */
-function press(ev) {
-  if (sent || !state || state.phase !== 'countin' || !me) return;
+function stampOf(ev) {
   // event.timeStamp はイベントが発生した時刻。JS が処理した時刻ではないので、
   // メインスレッドが詰まっていても押下の瞬間を取り逃さない。
   const local = (ev && typeof ev.timeStamp === 'number' && ev.timeStamp > 0)
     ? ev.timeStamp : performance.now();
-  const at = local + GG.clock.offset;
+  return local + GG.clock.offset;
+}
+
+function post(body) {
+  const fire = () => GG.net.post('/api/input', Object.assign({ id: me.id }, body));
+  if (lag > 0) setTimeout(fire, lag); else fire();   // lag は検証用の人工遅延
+}
+
+let held = false;
+
+/* 押しっぱなし系。押し始めと離した瞬間を、それぞれ時刻付きで送る。
+ * サーバーは届いた順ではなく時刻で並べ直して判定する。 */
+function holdDown(ev) {
+  if (held || !state || state.phase !== 'play' || !me) return;
+  if (state.game.control !== 'hold') return;
+  held = true;
+  const t = stampOf(ev);
+  $('#btn').classList.add('hit');
+  $('#btn').textContent = 'すすんでる';
+  if (navigator.vibrate) navigator.vibrate(14);
+  post({ t, down: true });
+}
+
+function holdUp(ev) {
+  if (!held || !me) return;
+  held = false;
+  const t = stampOf(ev);
+  $('#btn').classList.remove('hit');
+  $('#btn').textContent = 'とまった';
+  post({ t, down: false });
+}
+
+function press(ev) {
+  if (sent || !state || state.phase !== 'play' || !me) return;
+  if (state.game.control !== 'tap') return;
+  // event.timeStamp はイベントが発生した時刻。JS が処理した時刻ではないので、
+  // メインスレッドが詰まっていても押下の瞬間を取り逃さない。
+  const at = stampOf(ev);
   sent = true;
 
   // 手応えは即返す。サーバーの返事を待たない。
@@ -134,12 +175,19 @@ function press(ev) {
   btn.textContent = 'おした';
   if (navigator.vibrate) navigator.vibrate(18);
 
-  const fire = () => GG.net.post('/api/press', { id: me.id, at });
-  if (lag > 0) setTimeout(fire, lag); else fire();
+  post({ at });
 }
 
-$('#btn').addEventListener('pointerdown', press);
-addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); press(e); } });
+const btn = $('#btn');
+btn.addEventListener('pointerdown', (e) => { press(e); holdDown(e); });
+btn.addEventListener('pointerup', holdUp);
+btn.addEventListener('pointercancel', holdUp);
+btn.addEventListener('pointerleave', holdUp);
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || e.repeat) return;
+  e.preventDefault(); press(e); holdDown(e);
+});
+addEventListener('keyup', (e) => { if (e.code === 'Space') holdUp(e); });
 </script>
 </body>
 </html>

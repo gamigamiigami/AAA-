@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>一斉 — メイン画面</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0e1017;
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; }
+  #hint { position: fixed; right: 14px; bottom: 12px; color: #4a5468; font-size: 12px;
+    font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<canvas id="screen" width="1280" height="720"></canvas>
+<div id="hint">SPACE = 開始 / 停止</div>
+
+<script src="common.js"></script>
+<script>
+'use strict';
+const W = 1280, H = 720;
+const cv = document.getElementById('screen');
+const c = cv.getContext('2d');
+
+let state = null;
+let running = false;
+
+// 音は必ずメイン画面から出す。1台のスピーカーから全員に同時に届く、
+// この形式でいちばん速く公平な情報路。スマホからは音を出さない。
+let actx = null;
+const clicked = new Set();
+function click(strong) {
+  if (!actx) return;
+  const t = actx.currentTime;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.frequency.value = strong ? 880 : 440;
+  o.type = strong ? 'square' : 'sine';
+  g.gain.setValueAtTime(strong ? 0.28 : 0.13, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + (strong ? 0.22 : 0.09));
+  o.connect(g); g.connect(actx.destination);
+  o.start(t); o.stop(t + 0.3);
+}
+
+function resize() {
+  const s = Math.min(innerWidth / W, innerHeight / H);
+  cv.style.width = (W * s) + 'px';
+  cv.style.height = (H * s) + 'px';
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  cv.width = W * dpr; cv.height = H * dpr;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', resize); resize();
+
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Space') return;
+  e.preventDefault();
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  actx.resume();
+  running = !running;
+  GG.net.post(running ? '/api/start' : '/api/stop');
+});
+
+GG.net.onState = (s) => {
+  state = s;
+  if (s.phase === 'countin') pressedHint = 0;
+  if (s.phase === 'lobby') { clicked.clear(); running = false; }
+};
+
+(async () => {
+  await GG.clock.sync();
+  GG.net.listen();
+  requestAnimationFrame(frame);
+})();
+
+function frame() {
+  requestAnimationFrame(frame);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = '#0e1017';
+  c.fillRect(0, 0, W, H);
+  if (!state) return text('接続中…', W / 2, H / 2, 30, '#5a6478');
+
+  if (state.phase === 'countin') drawCountIn();
+  else if (state.phase === 'reveal') drawReveal();
+  else drawLobby();
+
+  drawRoster();
+}
+
+function text(s, x, y, size, color, weight, align) {
+  c.font = (weight || 700) + ' ' + size + 'px "Hiragino Maru Gothic ProN", system-ui, sans-serif';
+  c.textAlign = align || 'center';
+  c.textBaseline = 'middle';
+  c.fillStyle = color;
+  c.fillText(s, x, y);
+}
+
+// ---------------------------------------------------------------- ロビー
+function drawLobby() {
+  text('一斉', W / 2, 150, 92, '#fff');
+  text('せーの', W / 2, 232, 34, '#8e97ab');
+  text('ルームコード', W / 2, 330, 18, '#5a6478');
+  c.font = '700 96px ui-monospace, monospace';
+  c.textAlign = 'center'; c.fillStyle = '#FFD400';
+  c.fillText(state.code, W / 2, 400);
+  text(state.players.length + '人 参加中', W / 2, 500, 26, '#8e97ab');
+  text('SPACE で開始', W / 2, 560, 20, '#4a5468', 500);
+}
+
+// ---------------------------------------------------------------- 予告〜プレイ
+function drawCountIn() {
+  const left = GG.clock.until(state.target);   // 目標までの残り ms
+  const beat = state.beat;
+
+  // 拍の頭で音を鳴らす。予告の各拍と、目標の瞬間だけ音を変える。
+  for (let i = 0; i <= state.countIn; i++) {
+    const at = -(state.countIn - i) * beat;    // left がこの値を跨いだ瞬間
+    const key = state.round + ':' + i;
+    if (left <= at && !clicked.has(key)) { clicked.add(key); click(i === state.countIn); }
+  }
+
+  text('せーの！', W / 2, 118, 76, '#fff');
+  text('全員で 同じ 瞬間に おす', W / 2, 186, 22, '#8e97ab', 500);
+
+  // 収縮するリング。中心の的と重なった瞬間が押すべきタイミング。
+  const cx = W / 2, cy = 400, R = 200;
+  c.lineWidth = 5; c.strokeStyle = 'rgba(255,255,255,0.3)';
+  c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
+
+  const total = state.countIn * beat;
+  const k = Math.max(0, Math.min(1.6, left / total));
+  const rr = R * k;
+  const near = Math.abs(left) < 90;
+  c.lineWidth = near ? 12 : 7;
+  c.strokeStyle = near ? '#FFD400' : '#00B4E6';
+  c.beginPath(); c.arc(cx, cy, Math.max(6, rr), 0, Math.PI * 2); c.stroke();
+
+  if (left > 0) {
+    const n = Math.ceil(left / beat);
+    text(String(n), cx, cy, 96, 'rgba(255,255,255,0.9)');
+  } else {
+    text('いま！', cx, cy, 62, '#FFD400');
+  }
+
+  // 入力中は「何人送信済み」だけ。誰が速かったかは絶対に出さない。
+  // 出した瞬間に遅延が可視化されて不公平になる。
+  text('送信済み ' + countPressed() + ' / ' + state.players.length, W / 2, 640, 24, '#8e97ab', 500);
+}
+
+let pressedHint = 0;
+GG.net.onPressed = (n) => { pressedHint = n; };
+function countPressed() { return pressedHint; }
+
+// ---------------------------------------------------------------- 結果
+function drawReveal() {
+  const L = state.last;
+  if (!L) return;
+  pressedHint = 0;
+
+  if (L.success) {
+    text('そろった！', W / 2, 106, 72, '#FFD400');
+    text('全員 +1点', W / 2, 172, 26, '#22B14C', 500);
+  } else {
+    text('ばらけた…', W / 2, 106, 72, '#fff');
+    text('ばらつき ' + (L.spread === null ? '—' : L.spread + 'ms')
+       + '  /  ' + L.threshold + 'ms 以内で成功', W / 2, 172, 24, '#8e97ab', 500);
+  }
+
+  GG.scatter(c, { x: 120, y: 400, w: W - 240, entries: L.entries, range: 300 });
+
+  // 上位3人
+  const top = L.entries.filter(e => e.error !== null).slice(0, 3);
+  let x = W / 2 - (top.length - 1) * 150;
+  for (const e of top) {
+    GG.drawShape(c, e.shape, e.color, x, 560, 22);
+    text(e.name, x, 604, 18, '#c3cbdb', 500);
+    c.font = '500 20px ui-monospace, monospace';
+    c.textAlign = 'center'; c.fillStyle = '#FFD400';
+    c.fillText(GG.fmt(e.error), x, 634);
+    x += 300;
+  }
+}
+
+// ---------------------------------------------------------------- 常時表示
+function drawRoster() {
+  const ps = state.players;
+  if (!ps.length) return;
+  const y = H - 26;
+  let x = 30;
+  c.textBaseline = 'middle';
+  for (const p of ps) {
+    GG.drawShape(c, p.shape, p.color, x, y, 11);
+    c.font = '500 13px system-ui';
+    c.textAlign = 'left'; c.fillStyle = '#7b8698';
+    c.fillText(p.name + ' ' + p.score, x + 17, y);
+    x += 26 + c.measureText(p.name + ' ' + p.score).width + 20;
+    if (x > W - 120) break;
+  }
+}
+
+</script>
+</body>
+</html>

@@ -25,7 +25,8 @@
 
 ```
 issei/
-  server.js           依存ゼロの HTTP サーバー。部屋の状態と判定を持つ
+  server.js           依存ゼロの HTTP サーバー。部屋の状態と進行を持つ
+  games.js            ミニゲームの中身（setup / accept / judge）
   public/
     common.js         時計合わせ・通信・識別・散布軸（両画面が読む）
     screen.html       メイン画面（プロジェクター）
@@ -52,7 +53,7 @@ SSE は HTTP のままなので、プロキシや社内ネットワークも通�
 | `GET /api/time` | 時計合わせ。何度も叩かれる |
 | `GET /api/state` | 現在の状態（デバッグ・テスト用） |
 | `POST /api/join` | 参加。id と見た目が返る |
-| `POST /api/press` | 押下。**中身の `at` だけを見る** |
+| `POST /api/input` | 入力。**中身のタイムスタンプだけを見る** |
 | `POST /api/start` `/api/stop` | 進行制御 |
 
 ---
@@ -112,7 +113,7 @@ const local = ev.timeStamp;           // イベントが発生した時刻。
                                       // JS が処理した時刻ではないので、
                                       // メインスレッドが詰まっても取り逃さない
 const at = local + GG.clock.offset;   // サーバー時計に変換
-post('/api/press', { id, at });       // 届くまでの時間は判定に無関係
+post('/api/input', { id, at });       // 届くまでの時間は判定に無関係
 ```
 
 ```js

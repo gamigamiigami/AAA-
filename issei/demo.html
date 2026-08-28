@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B0E14">
+<meta name="description" content="大画面とスマホで遊ぶ5〜30人のパーティゲーム「一斉」の体験デモ。">
+<title>一斉 体験デモ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&family=Noto+Sans+JP:wght@400;500;700&family=Roboto+Mono:wght@500&display=swap">
+
+</head>
+<body>
+<style>
+  :root {
+    --room:    #0B0E14;
+    --panel:   #10141D;
+    --edge:    #222A38;
+    --ink:     #EDF1F7;
+    --ink-2:   #98A2B3;
+    --ink-3:   #626C7E;
+    --gold:    #FFD400;
+    --hot:     #FF3B4E;
+    --cool:    #2E8BFF;
+    --go:      #35D06A;
+    --f-disp: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", system-ui, sans-serif;
+    --f-body: "Noto Sans JP", "Hiragino Sans", system-ui, sans-serif;
+    --f-mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; background: var(--room); color: var(--ink);
+    font-family: var(--f-body); line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 20px 72px;
+    display: flex; flex-direction: column; gap: 28px; }
+
+  header { display: flex; flex-direction: column; gap: 10px; }
+  .kicker { font-family: var(--f-mono); font-size: 11px; letter-spacing: .2em;
+    color: var(--ink-3); text-transform: uppercase; }
+  h1 { font-family: var(--f-disp); font-weight: 900; margin: 0;
+    font-size: clamp(30px, 5.5vw, 46px); line-height: 1.2; }
+  .lede { margin: 0; color: var(--ink-2); font-size: 15px; max-width: 62ch; }
+  .lede b { color: var(--ink); }
+
+  /* 会場の見立て。上がプロジェクター、下が手元のスマホ。 */
+  .venue { display: grid; gap: 20px; grid-template-columns: 1fr 320px; align-items: start; }
+  @media (max-width: 860px) { .venue { grid-template-columns: 1fr; } }
+
+  .screen-box { border: 1px solid var(--edge); border-radius: 14px; overflow: hidden;
+    background: #000; box-shadow: 0 22px 60px rgba(0,0,0,.6); }
+  .screen-box canvas { display: block; width: 100%; height: auto; }
+  .label { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em;
+    color: var(--ink-3); margin-bottom: 8px; text-transform: uppercase; }
+
+  .phone { border: 1px solid var(--edge); border-radius: 28px; background: var(--panel);
+    padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .phone-top { display: flex; align-items: center; gap: 10px; }
+  .phone-top canvas { width: 34px; height: 34px; }
+  .phone-top .nm { font-family: var(--f-disp); font-weight: 700; font-size: 15px; }
+  .phone-top .sc { margin-left: auto; font-family: var(--f-mono); font-size: 13px; color: var(--ink-2); }
+
+  #btn { border: none; border-radius: 22px; padding: 0; height: 210px; width: 100%;
+    background: var(--hot); color: #fff; font-family: var(--f-disp); font-weight: 900;
+    font-size: 30px; box-shadow: 0 8px 0 #8d0a1c; touch-action: manipulation;
+    transition: transform .05s, box-shadow .05s, background .12s; cursor: pointer; }
+  #btn:active, #btn.hit { transform: translateY(7px); box-shadow: 0 1px 0 #8d0a1c; }
+  #btn.hit { background: var(--gold); color: #141414; }
+  #btn:disabled { background: #1B2231; color: #4C566B; box-shadow: 0 8px 0 #141a25; cursor: default; }
+  #btn:focus-visible { outline: 3px solid var(--cool); outline-offset: 3px; }
+  .foot { font-family: var(--f-mono); font-size: 11px; color: var(--ink-3); text-align: center; }
+
+  .notes { display: grid; gap: 1px; background: var(--edge); border: 1px solid var(--edge);
+    border-radius: 12px; overflow: hidden; }
+  .note { background: var(--panel); padding: 15px 18px; display: grid;
+    grid-template-columns: 22px 1fr; gap: 12px; align-items: start; font-size: 14px; }
+  .note .i { font-family: var(--f-mono); font-size: 11px; color: var(--gold); padding-top: 5px; }
+  .note b { font-family: var(--f-disp); display: block; }
+  .note span { color: var(--ink-2); }
+
+  .caveat { border-left: 3px solid var(--hot); background: var(--panel); padding: 14px 18px;
+    border-radius: 0 10px 10px 0; font-size: 14px; color: var(--ink-2); }
+  .caveat b { color: var(--ink); font-family: var(--f-disp); }
+  code { font-family: var(--f-mono); font-size: .92em; background: #1A2130;
+    padding: 2px 6px; border-radius: 5px; color: var(--ink); }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="kicker">Prototype demo</div>
+    <h1>一斉 体験デモ</h1>
+    <p class="lede">
+      プロジェクター1台と参加者のスマホで遊ぶ、5〜30人のパーティゲーム。
+      本来は全員が別々のスマホから繋ぐが、ここでは<b>1台の中に会場ごと再現</b>している
+      —— 上が大画面、右（下）があなたの手元、他の5人はコンピュータが動かす。
+    </p>
+  </header>
+
+  <div class="venue">
+    <div>
+      <div class="label">大画面 — プロジェクター</div>
+      <div class="screen-box"><canvas id="big" width="1280" height="720"></canvas></div>
+    </div>
+    <div>
+      <div class="label">あなたのスマホ</div>
+      <div class="phone">
+        <div class="phone-top">
+          <canvas id="me" width="68" height="68"></canvas>
+          <span class="nm">あなた</span>
+          <span class="sc" id="sc">0点</span>
+        </div>
+        <button id="btn">はじめる</button>
+        <div class="foot" id="foot">タップ / スペースキー</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><div class="i">01</div><div>
+      <b>目線は大画面、手元は見ない</b>
+      <span>スマホには自分の形と色、そしてボタンしかない。大画面を映すと全員が下を向いて、部屋の熱が死ぬ。</span>
+    </div></div>
+    <div class="note"><div class="i">02</div><div>
+      <b>入力中に出るのは「何人送信済み」だけ</b>
+      <span>誰が速かったかを出した瞬間に回線の差が可視化されて不公平になる。全員の結果は同時にしか開かない。</span>
+    </div></div>
+    <div class="note"><div class="i">03</div><div>
+      <b>判定は「届いた時刻」ではなく「押した時刻」</b>
+      <span>スマホが押下の瞬間を端末内で記録し、その値を送る。回線が 100ms 遅くなっても判定は 0.44ms しか動かないことを実測で確認済み。</span>
+    </div></div>
+    <div class="note"><div class="i">04</div><div>
+      <b>30色は見分けられないので、形が主・色が従</b>
+      <span>10形 × 4色。隣り合う人が形も色も変わるように配る。色覚多様性にも効く。</span>
+    </div></div>
+  </div>
+
+  <div class="caveat">
+    <b>これはデモです。</b>
+    本物は全員が自分のスマホから繋ぐが、それにはホストのPCでサーバーを動かす必要がある
+    （<code>node issei/server.js</code> — 同じWi-Fiに繋ぐだけで、クラウドもアプリのインストールも要らない）。
+    このページは静的なので、他の5人はコンピュータが担当している。
+  </div>
+
+</div>
+
+<script>
+'use strict';
+// =====================================================================
+// 描画ヘルパ
+// =====================================================================
+const TAU = Math.PI * 2;
+const SHAPES = ['circle','triangle','square','star','heart','diamond','pentagon','hexagon','crown','moon'];
+const COLORS = ['#FF3B4E','#2E8BFF','#FFD400','#35D06A'];
+const look = (i) => ({ shape: SHAPES[i % 10], color: COLORS[(i + Math.floor(i / 10)) % 4] });
+
+function drawShape(c, shape, color, x, y, r) {
+  c.save(); c.translate(x, y); c.beginPath();
+  const poly = (n, rot) => { for (let i = 0; i < n; i++) {
+    const a = rot + i / n * TAU, px = Math.cos(a) * r, py = Math.sin(a) * r;
+    i ? c.lineTo(px, py) : c.moveTo(px, py); } };
+  const star = (ri, n) => { for (let i = 0; i < n * 2; i++) {
+    const a = -Math.PI / 2 + i / (n * 2) * TAU, rr = i % 2 ? ri : r;
+    const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
+    i ? c.lineTo(px, py) : c.moveTo(px, py); } };
+  switch (shape) {
+    case 'circle': c.arc(0, 0, r, 0, TAU); break;
+    case 'square': c.rect(-r * .82, -r * .82, r * 1.64, r * 1.64); break;
+    case 'triangle': poly(3, -Math.PI / 2); break;
+    case 'pentagon': poly(5, -Math.PI / 2); break;
+    case 'hexagon': poly(6, -Math.PI / 2); break;
+    case 'diamond': poly(4, -Math.PI / 2); break;
+    case 'star': star(r * .45, 5); break;
+    case 'crown': star(r * .5, 3); break;
+    case 'heart': { const s = r / 16; c.moveTo(0, 12 * s);
+      c.bezierCurveTo(-16 * s, 0, -10 * s, -14 * s, 0, -6 * s);
+      c.bezierCurveTo(10 * s, -14 * s, 16 * s, 0, 0, 12 * s); break; }
+    case 'moon': c.arc(0, 0, r, 0, TAU); c.arc(r * .45, -r * .2, r * .85, 0, TAU, true); break;
+  }
+  c.closePath(); c.fillStyle = color; c.fill(shape === 'moon' ? 'evenodd' : 'nonzero');
+  c.lineWidth = Math.max(2, r * .16); c.strokeStyle = '#141414'; c.stroke();
+  c.restore();
+}
+
+const big = document.getElementById('big');
+const c = big.getContext('2d');
+const W = 1280, H = 720;
+function txt(s, x, y, size, color, weight, align) {
+  c.font = (weight || 700) + ' ' + size + 'px "Zen Maru Gothic", system-ui, sans-serif';
+  c.textAlign = align || 'center'; c.textBaseline = 'middle';
+  c.fillStyle = color; c.fillText(s, x, y);
+}
+
+/* ズレを競う全ゲームで使い回す散布軸。近い点は縦に積んで潰れないようにする。 */
+function scatter(entries, x, y, w, range) {
+  const cx = x + w / 2;
+  const px = (ms) => cx + Math.max(-1, Math.min(1, ms / range)) * (w / 2 - 24);
+  c.strokeStyle = 'rgba(255,255,255,.28)'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y); c.stroke();
+  c.font = '500 13px "Roboto Mono", monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (const ms of [-range, -range / 2, 0, range / 2, range]) {
+    const gx = px(ms), zero = ms === 0;
+    c.strokeStyle = zero ? 'rgba(255,255,255,.75)' : 'rgba(255,255,255,.2)';
+    c.lineWidth = zero ? 3 : 1.5;
+    c.beginPath(); c.moveTo(gx, y - (zero ? 22 : 10)); c.lineTo(gx, y + (zero ? 22 : 10)); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.45)'; c.fillText((ms > 0 ? '+' : '') + ms, gx, y + 38);
+  }
+  c.fillStyle = 'rgba(255,255,255,.4)';
+  c.textAlign = 'left'; c.fillText('はやい', x, y - 46);
+  c.textAlign = 'right'; c.fillText('おそい', x + w, y - 46);
+
+  const placed = [];
+  for (const e of entries.filter(e => e.error !== null).sort((a, b) => a.error - b.error)) {
+    const gx = px(e.error); let row = 0;
+    while (placed.some(q => Math.abs(q.x - gx) < 26 && q.row === row)) row++;
+    placed.push({ x: gx, row, e });
+  }
+  for (const q of placed) {
+    const gy = y - 22 - q.row * 30;
+    if (q.e.you) { c.beginPath(); c.arc(q.x, gy, 22, 0, TAU);
+      c.fillStyle = 'rgba(255,255,255,.22)'; c.fill(); }
+    drawShape(c, q.e.shape, q.e.color, q.x, gy, 12);
+  }
+}
+
+// =====================================================================
+// 音。本物と同じく、音は大画面だけから出す。
+// =====================================================================
+let actx = null;
+function beep(kind) {
+  if (!actx) return;
+  const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+  const S = { tick:[440,'sine',.10,.09], hit:[880,'square',.22,.22],
+              turn:[170,'sawtooth',.26,.34], chant:[330,'triangle',.09,.07],
+              win:[660,'triangle',.2,.5] }[kind];
+  o.frequency.value = S[0]; o.type = S[1];
+  g.gain.setValueAtTime(S[2], t);
+  g.gain.exponentialRampToValueAtTime(.0001, t + S[3]);
+  o.connect(g); g.connect(actx.destination);
+  o.start(t); o.stop(t + S[3] + .05);
+}
+
+// =====================================================================
+// 参加者。あなた + コンピュータ5人。
+// =====================================================================
+const YOU = 0;
+const NAMES = ['あなた', 'たかし', 'ゆい', 'けん', 'まり', 'そう'];
+const players = NAMES.map((name, i) => Object.assign({
+  id: i, name, score: 0, you: i === YOU,
+  sigma: [0, 55, 38, 90, 46, 70][i],       // 腕前のばらつき（ms）
+  bravery: [0, .82, .6, .95, .5, .72][i]   // だるまさんで粘る度合い
+}, look(i)));
+
+{ const mc = document.getElementById('me').getContext('2d');
+  mc.setTransform(2, 0, 0, 2, 0, 0);
+  drawShape(mc, players[YOU].shape, players[YOU].color, 17, 17, 14); }
+
+const btn = document.getElementById('btn');
+const foot = document.getElementById('foot');
+const scEl = document.getElementById('sc');
+const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+
+// =====================================================================
+// 進行
+// =====================================================================
+const BEAT = 500, COUNT_IN = 4;
+let phase = 'idle';      // idle | play | reveal
+let game = null, g = null, last = null, sent = 0;
+const now = () => performance.now();
+
+function setBtn(label, disabled, hit) {
+  btn.textContent = label;
+  btn.disabled = !!disabled;
+  btn.classList.toggle('hit', !!hit);
+}
+
+btn.addEventListener('pointerdown', (e) => onDown(e));
+btn.addEventListener('pointerup', onUp);
+btn.addEventListener('pointercancel', onUp);
+btn.addEventListener('pointerleave', onUp);
+addEventListener('keydown', (e) => { if (e.code === 'Space' && !e.repeat) { e.preventDefault(); onDown(e); } });
+addEventListener('keyup', (e) => { if (e.code === 'Space') onUp(e); });
+
+function onDown(e) {
+  if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); }
+  if (phase === 'idle') return startRound();
+  if (phase !== 'play') return;
+  /* 押した瞬間を端末内で記録する。event.timeStamp はイベントが発生した時刻で、
+   * JS が処理した時刻ではない。本物ではこの値だけをサーバーに送る。 */
+  const t = (e && e.timeStamp > 0) ? e.timeStamp : now();
+  if (game === 'seino') {
+    if (g.press[YOU] !== undefined) return;
+    g.press[YOU] = t; sent++;
+    setBtn('おした', false, true);
+    if (navigator.vibrate) navigator.vibrate(18);
+  } else {
+    if (g.held[YOU]) return;
+    g.held[YOU] = true;
+    (g.spans[YOU] = g.spans[YOU] || []).push([t, null]);
+    setBtn('すすんでる', false, true);
+    if (navigator.vibrate) navigator.vibrate(14);
+  }
+}
+
+function onUp(e) {
+  if (phase !== 'play' || game !== 'daruma' || !g.held[YOU]) return;
+  const t = (e && e.timeStamp > 0) ? e.timeStamp : now();
+  g.held[YOU] = false;
+  const s = g.spans[YOU]; s[s.length - 1][1] = t;
+  setBtn('とまった', false, false);
+}
+
+function startRound() {
+  game = game === 'seino' ? 'daruma' : 'seino';
+  phase = 'play'; last = null; sent = 0;
+
+  if (game === 'seino') {
+    g = { target: now() + COUNT_IN * BEAT, endsAt: now() + COUNT_IN * BEAT + 1200,
+          press: {}, fired: new Set() };
+    // コンピュータ5人はそれぞれの腕前で押す
+    for (const p of players) if (!p.you) {
+      const at = g.target + gauss() * p.sigma;
+      setTimeout(() => { if (phase === 'play' && game === 'seino') { g.press[p.id] = at; sent++; } },
+        Math.max(0, at - now()));
+    }
+    setBtn('おす', false, false);
+    foot.textContent = '大画面のリングが重なった瞬間に押す';
+  } else {
+    const chants = [];
+    let t = now() + 1100;
+    const until = now() + 22000;
+    while (t < until) {
+      const chant = 900 + Math.random() * 2400;
+      const watch = 700 + Math.random() * 800;
+      chants.push({ start: t, turnAt: t + chant, watchUntil: t + chant + watch });
+      t += chant + watch + 250;
+    }
+    g = { chants, endsAt: until + 900, spans: {}, held: {}, fired: new Set(),
+          goal: 240, speed: 30 };
+    for (const p of players) if (!p.you) scheduleBot(p);
+    setBtn('おしっぱなし', false, false);
+    foot.textContent = '掛け声の間だけ押す。振り向く前に離す';
+  }
+  requestAnimationFrame(loop);
+  setTimeout(finish, g.endsAt - now());
+}
+
+/* コンピュータのだるまさん。bravery が高いほど、振り向きギリギリまで粘る。 */
+function scheduleBot(p) {
+  for (const ch of g.chants) {
+    const window_ = ch.turnAt - ch.start;
+    const release = ch.turnAt - (1 - p.bravery) * window_ * 0.9 - 60 + gauss() * 90;
+    setTimeout(() => { if (phase === 'play' && game === 'daruma')
+      (g.spans[p.id] = g.spans[p.id] || []).push([ch.start, Math.max(ch.start + 30, release)]); },
+      Math.max(0, ch.start - now()));
+  }
+}
+
+function finish() {
+  if (phase !== 'play') return;
+  phase = 'reveal';
+  last = game === 'seino' ? judgeSeino() : judgeDaruma();
+  for (const id of last.winners) players[id].score++;
+  scEl.textContent = players[YOU].score + '点';
+  beep(last.winners.includes(YOU) ? 'win' : 'turn');
+  if (navigator.vibrate) navigator.vibrate(last.winners.includes(YOU) ? [40, 60, 40] : 140);
+  setBtn(last.you, true, false);
+  foot.textContent = 'つぎのゲームへ…';
+  setTimeout(() => { phase = 'idle'; startRound(); }, 6000);
+}
+
+function judgeSeino() {
+  const entries = players.map(p => ({
+    id: p.id, name: p.name, shape: p.shape, color: p.color, you: p.you,
+    error: g.press[p.id] === undefined ? null : Math.round(g.press[p.id] - g.target)
+  }));
+  const hits = entries.filter(e => e.error !== null).map(e => e.error);
+  let spread = null, ok = false;
+  if (hits.length >= 2) {
+    const m = hits.reduce((a, b) => a + b, 0) / hits.length;
+    spread = Math.round(Math.sqrt(hits.reduce((a, b) => a + (b - m) ** 2, 0) / hits.length));
+    ok = spread <= 80 && hits.length === entries.length;
+  }
+  entries.sort((a, b) => a.error === null ? 1 : b.error === null ? -1
+    : Math.abs(a.error) - Math.abs(b.error));
+  const mine = entries.find(e => e.you);
+  return { entries, spread, ok, winners: ok ? players.map(p => p.id) : [],
+    you: mine.error === null ? '未入力' : (mine.error > 0 ? '+' : '') + mine.error + 'ms' };
+}
+
+/* 押下の区間を組み直して、監視窓と重なったら脱落。
+ * 本物ではこれをサーバーが時刻から作り直すので、通信の遅延に影響されない。 */
+function judgeDaruma() {
+  const need = g.goal / g.speed * 1000;
+  const entries = players.map(p => {
+    const spans = (g.spans[p.id] || []).map(([a, b]) => [a, b === null ? g.endsAt : b]);
+    let caughtAt = null;
+    for (const ch of g.chants) {
+      if (spans.some(([a, b]) => a < ch.watchUntil && b > ch.turnAt)) { caughtAt = ch.turnAt; break; }
+    }
+    let held = 0, fin = null;
+    for (const [a, b0] of spans) {
+      const b = caughtAt === null ? b0 : Math.min(b0, caughtAt);
+      if (b <= a) continue;
+      if (fin === null && held + (b - a) >= need) fin = a + (need - held);
+      held += b - a;
+    }
+    return { id: p.id, name: p.name, shape: p.shape, color: p.color, you: p.you,
+      dist: Math.min(g.goal, Math.round(held / 1000 * g.speed)),
+      caught: caughtAt !== null, fin: caughtAt !== null ? null : fin };
+  });
+  const done = entries.filter(e => e.fin !== null).sort((a, b) => a.fin - b.fin);
+  const alive = entries.filter(e => !e.caught).sort((a, b) => b.dist - a.dist);
+  const winners = done.length ? [done[0].id] : (alive.length && alive[0].dist > 0 ? [alive[0].id] : []);
+  entries.sort((a, b) => {
+    if ((a.fin === null) !== (b.fin === null)) return a.fin === null ? 1 : -1;
+    if (a.fin !== null) return a.fin - b.fin;
+    if (a.caught !== b.caught) return a.caught ? 1 : -1;
+    return b.dist - a.dist;
+  });
+  const mine = entries.find(e => e.you);
+  return { entries, winners, goal: g.goal,
+    you: mine.caught ? 'つかまった' : mine.fin !== null ? 'ゴール！' : mine.dist + ' すすんだ' };
+}
+
+// =====================================================================
+// 描画ループ
+// =====================================================================
+function loop() {
+  if (phase !== 'idle') requestAnimationFrame(loop);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.fillStyle = '#0B0E14'; c.fillRect(0, 0, W, H);
+  if (phase === 'play') (game === 'seino' ? viewSeino : viewDaruma)();
+  else if (phase === 'reveal') (last.spread !== undefined ? revealSeino : revealDaruma)();
+  roster();
+}
+
+function idleScreen() {
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.fillStyle = '#0B0E14'; c.fillRect(0, 0, W, H);
+  txt('一斉', W / 2, 260, 96, '#fff');
+  txt('ボタンを押すと はじまります', W / 2, 350, 28, '#98A2B3', 500);
+  txt('6人 参加中', W / 2, 420, 22, '#626C7E', 500);
+  roster();
+}
+idleScreen();
+
+function sentLine() {
+  txt('送信済み ' + sent + ' / ' + players.length, W / 2, 672, 22, '#626C7E', 500);
+}
+
+function viewSeino() {
+  const left = g.target - now();
+  for (let i = 0; i <= COUNT_IN; i++) {
+    const at = -(COUNT_IN - i) * BEAT;
+    if (left <= at && !g.fired.has(i)) { g.fired.add(i); beep(i === COUNT_IN ? 'hit' : 'tick'); }
+  }
+  txt('せーの！', W / 2, 112, 74, '#fff');
+  txt('全員で 同じ 瞬間に おす', W / 2, 178, 22, '#98A2B3', 500);
+
+  const cx = W / 2, cy = 400, R = 185;
+  c.lineWidth = 5; c.strokeStyle = 'rgba(255,255,255,.28)';
+  c.beginPath(); c.arc(cx, cy, R, 0, TAU); c.stroke();
+  const k = Math.max(0, Math.min(1.6, left / (COUNT_IN * BEAT)));
+  const near = Math.abs(left) < 90;
+  c.lineWidth = near ? 12 : 7; c.strokeStyle = near ? '#FFD400' : '#2E8BFF';
+  c.beginPath(); c.arc(cx, cy, Math.max(6, R * k), 0, TAU); c.stroke();
+  if (left > 0) txt(String(Math.ceil(left / BEAT)), cx, cy, 92, 'rgba(255,255,255,.9)');
+  else txt('いま！', cx, cy, 60, '#FFD400');
+  sentLine();
+}
+
+function viewDaruma() {
+  const t = now();
+  let cur = null, watching = false;
+  for (const ch of g.chants) {
+    if (t >= ch.start && t < ch.watchUntil) { cur = ch; watching = t >= ch.turnAt; break; }
+    if (t >= ch.turnAt && !g.fired.has('t' + ch.turnAt)) { g.fired.add('t' + ch.turnAt); beep('turn'); }
+    if (t >= ch.start && !g.fired.has('s' + ch.start)) { g.fired.add('s' + ch.start); beep('chant'); }
+  }
+  if (cur) {
+    if (t >= cur.start && !g.fired.has('s' + cur.start)) { g.fired.add('s' + cur.start); beep('chant'); }
+    if (watching && !g.fired.has('t' + cur.turnAt)) { g.fired.add('t' + cur.turnAt); beep('turn'); }
+  }
+
+  if (watching) { c.fillStyle = 'rgba(255,59,78,.16)'; c.fillRect(0, 0, W, H); }
+  txt(watching ? 'ふりむいた！' : 'だるまさんが……', W / 2, 88, 58, watching ? '#FF3B4E' : '#fff');
+  txt('おしてる あいだ すすむ / ふりむいたら はなす', W / 2, 146, 20, '#98A2B3', 500);
+
+  const X0 = 150, X1 = W - 200;
+  c.fillStyle = '#141A26'; c.fillRect(X0 - 20, 210, X1 - X0 + 60, 320);
+  c.strokeStyle = 'rgba(255,255,255,.1)'; c.lineWidth = 2;
+  for (let i = 0; i <= 10; i++) {
+    const x = X0 + (X1 - X0) * i / 10;
+    c.beginPath(); c.moveTo(x, 220); c.lineTo(x, 520); c.stroke();
+  }
+  txt('ゴール', X1 + 30, 192, 18, '#FFD400');
+
+  // 鬼
+  c.save(); c.translate(X1 + 70, 370);
+  c.fillStyle = watching ? '#FF3B4E' : '#4C566B';
+  c.beginPath(); c.arc(0, 0, 44, 0, TAU); c.fill();
+  if (watching) {
+    c.fillStyle = '#fff';
+    c.beginPath(); c.arc(-15, -8, 9, 0, TAU); c.arc(13, -8, 9, 0, TAU); c.fill();
+    c.fillStyle = '#141414';
+    c.beginPath(); c.arc(-15, -8, 4.5, 0, TAU); c.arc(13, -8, 4.5, 0, TAU); c.fill();
+  } else {
+    c.fillStyle = '#333B4C'; c.beginPath(); c.arc(0, 6, 29, 0, TAU); c.fill();
+  }
+  c.restore();
+
+  // 進み具合。表示は遅れてよい（判定は最後に時刻から作り直す）
+  players.forEach((p, i) => {
+    const spans = (g.spans[p.id] || []);
+    let held = 0;
+    for (const [a, b] of spans) held += (b === null ? t : b) - a;
+    const k = Math.min(1, held / 1000 * g.speed / g.goal);
+    const y = 240 + i * 46;
+    drawShape(c, p.shape, p.color, X0 + (X1 - X0) * k, y, p.you ? 17 : 13);
+    if (p.you) { c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 2;
+      c.beginPath(); c.arc(X0 + (X1 - X0) * k, y, 26, 0, TAU); c.stroke(); }
+  });
+
+  if (cur && !watching) {
+    const k = (t - cur.start) / (cur.turnAt - cur.start);
+    c.fillStyle = 'rgba(255,255,255,.1)'; c.fillRect(W / 2 - 250, 578, 500, 12);
+    c.fillStyle = '#FFD400'; c.fillRect(W / 2 - 250, 578, 500 * Math.min(1, k), 12);
+  }
+}
+
+function revealSeino() {
+  const L = last;
+  if (L.ok) { txt('そろった！', W / 2, 100, 68, '#FFD400');
+    txt('全員 +1点', W / 2, 164, 26, '#35D06A', 500); }
+  else { txt('ばらけた…', W / 2, 100, 68, '#fff');
+    txt('ばらつき ' + (L.spread === null ? '—' : L.spread + 'ms') + '  /  80ms 以内で成功',
+        W / 2, 164, 23, '#98A2B3', 500); }
+  scatter(L.entries, 120, 400, W - 240, 300);
+  const top = L.entries.filter(e => e.error !== null).slice(0, 3);
+  let x = W / 2 - (top.length - 1) * 150;
+  for (const e of top) {
+    drawShape(c, e.shape, e.color, x, 552, 22);
+    txt(e.name, x, 596, 18, e.you ? '#fff' : '#98A2B3', 500);
+    c.font = '500 20px "Roboto Mono", monospace'; c.textAlign = 'center';
+    c.fillStyle = '#FFD400'; c.fillText((e.error > 0 ? '+' : '') + e.error + 'ms', x, 626);
+    x += 300;
+  }
+}
+
+function revealDaruma() {
+  const L = last;
+  const w = L.entries.find(e => e.fin !== null);
+  txt(w ? w.name + ' が ゴール！' : 'ぜんいん とどかなかった', W / 2, 96, 58, '#FFD400');
+  const bx = 330, bw = 600;
+  L.entries.forEach((e, i) => {
+    const y = 190 + i * 48;
+    drawShape(c, e.shape, e.color, bx - 42, y, 13);
+    c.font = '500 15px "Noto Sans JP", system-ui'; c.textAlign = 'right'; c.textBaseline = 'middle';
+    c.fillStyle = e.you ? '#fff' : e.caught ? '#626C7E' : '#98A2B3';
+    c.fillText(e.name, bx - 64, y);
+    c.fillStyle = 'rgba(255,255,255,.07)'; c.fillRect(bx, y - 9, bw, 18);
+    c.fillStyle = e.fin !== null ? '#FFD400' : e.caught ? '#3A4356' : e.color;
+    c.fillRect(bx, y - 9, bw * (e.dist / L.goal), 18);
+    c.textAlign = 'left'; c.font = '500 14px "Noto Sans JP", system-ui';
+    c.fillStyle = e.caught ? '#FF3B4E' : '#98A2B3';
+    c.fillText(e.caught ? 'つかまった' : e.fin !== null ? 'ゴール' : '', bx + bw + 14, y);
+  });
+}
+
+function roster() {
+  const y = H - 26; let x = 30;
+  c.textBaseline = 'middle';
+  for (const p of players) {
+    drawShape(c, p.shape, p.color, x, y, 11);
+    c.font = '500 13px "Noto Sans JP", system-ui'; c.textAlign = 'left';
+    c.fillStyle = p.you ? '#EDF1F7' : '#626C7E';
+    const s = p.name + ' ' + p.score;
+    c.fillText(s, x + 17, y);
+    x += 26 + c.measureText(s).width + 20;
+  }
+}
+</script>
+
+</body>
+</html>

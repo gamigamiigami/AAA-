@@ -670,16 +670,16 @@ Art.bodyPath = function (c, kind, x, y, rx, ry) {
 /* 一座の6人。全員が体型・頭部・顔つきの三重で分かれる。
  * 遠目20pxのシルエットだけで判別できることが条件。色は補助でしかない。 */
 const CAST = {
-  circle:   { body: 'egg',    rx: 1.00, ry: 1.00, crest: 'scarf',   eye: 'round',  brow: false },
-  triangle: { body: 'drop',   rx:  .92, ry: 1.10, crest: 'ears',    eye: 'droop',  brow: true  },
-  square:   { body: 'block',  rx: 1.22, ry:  .80, crest: 'brow',    eye: 'narrow', brow: true  },
-  star:     { body: 'spin',   rx:  .80, ry: 1.26, crest: 'tuft',    eye: 'sparkle',brow: false },
-  heart:    { body: 'bell',   rx: 1.14, ry:  .88, crest: 'floppy',  eye: 'round',  brow: false },
-  diamond:  { body: 'tall',   rx:  .70, ry: 1.34, crest: 'horn',    eye: 'sharp',  brow: true  },
-  pentagon: { body: 'pear',   rx: 1.02, ry: 1.00, crest: 'crown',   eye: 'round',  brow: true  },
-  hexagon:  { body: 'gem',    rx: 1.00, ry: 1.04, crest: 'antenna', eye: 'sparkle',brow: false },
-  crown:    { body: 'wide',   rx: 1.30, ry:  .74, crest: 'trio',    eye: 'narrow', brow: true  },
-  moon:     { body: 'peanut', rx:  .86, ry: 1.16, crest: 'hood',    eye: 'droop',  brow: false }
+  circle:   { body: 'egg',    rx: 1.00, ry: 1.00, crest: 'scarf',   eye: 'round',  brow: 'arch' },
+  triangle: { body: 'drop',   rx:  .92, ry: 1.10, crest: 'ears',    eye: 'droop',  brow: 'worry' },
+  square:   { body: 'block',  rx: 1.22, ry:  .80, crest: 'brow',    eye: 'narrow', brow: 'thick' },
+  star:     { body: 'spin',   rx:  .80, ry: 1.26, crest: 'tuft',    eye: 'sparkle',brow: 'arch' },
+  heart:    { body: 'bell',   rx: 1.14, ry:  .88, crest: 'floppy',  eye: 'round',  brow: 'none' },
+  diamond:  { body: 'tall',   rx:  .70, ry: 1.34, crest: 'horn',    eye: 'sharp',  brow: 'slant' },
+  pentagon: { body: 'pear',   rx: 1.02, ry: 1.00, crest: 'crown',   eye: 'round',  brow: 'flat' },
+  hexagon:  { body: 'gem',    rx: 1.00, ry: 1.04, crest: 'antenna', eye: 'sparkle',brow: 'none' },
+  crown:    { body: 'wide',   rx: 1.30, ry:  .74, crest: 'trio',    eye: 'narrow', brow: 'thick' },
+  moon:     { body: 'peanut', rx:  .86, ry: 1.16, crest: 'hood',    eye: 'droop',  brow: 'worry' }
 };
 Art.CAST = CAST;
 
@@ -689,7 +689,7 @@ Art.CAST = CAST;
  * 跳躍は Stage 側の重力つきホップが受け持つ。 */
 Art.POSE = {
   idle:  { arm:  .50, spread:  .02, lean:  0,   tilt:  0,   lift: 0, squash: 1    },
-  ready: { arm:  .62, spread: -.30, lean:  .16, tilt:  .07, lift: 2, squash:  .91 },
+  ready: { arm:  .78, spread: -.38, lean:  .30, tilt:  .13, lift: 9, squash:  .80 },
   cheer: { arm:-1.90, spread:  .30, lean:  0,   tilt: -.06, lift: 0, squash: 1.06 },
   flop:  { arm:  .95, spread:  .02, lean:  .18, tilt:  .2,  lift: 5, squash:  .93 },
   shock: { arm:-1.05, spread:  .55, lean: -.12, tilt: -.03, lift: 0, squash: 1.09 },
@@ -767,10 +767,18 @@ Art.chara = function (c, o) {
         + Math.sin((o.armT || 0) * 1.3 + (o.seed || 0) + sd) * .05;
       // a を仰角に変換する。a が負ほど上、正ほど下。
       const el = -a * .9 - .35;
-      /* 肩は胴の輪郭上に置く。中に置くと腕が顔の上を横切ってしまう。
-       * 腕を上げるほど付け根も上へ移す。 */
+      /* 肩は胴の輪郭のすぐ内側に置く。中に入れすぎると腕が顔を横切り、
+       * 外に出すと腕が胴から切り離されて宙に浮く。
+       * 体型は楕円とは限らない（角のある六角や上の狭い台形もある）ので、
+       * 楕円の式で置くと体型によって外へ飛び出す。実際のパスに当てて、
+       * 内側に入るところまで引き戻す。 */
       const ph = clamp(el * .35 - .18, -.55, .2);
-      const sx = sd * rx * Math.cos(ph) * .93, sy = -ry * Math.sin(ph) * .93;
+      let k2 = 1.0;
+      Art.bodyPath(c, cast.body, 0, 0, rx, ry);
+      while (k2 > .34 &&
+             !c.isPointInPath(sd * rx * Math.cos(ph) * k2, -ry * Math.sin(ph) * k2)) k2 -= .05;
+      k2 = Math.max(.34, k2 - .04);           // 輪郭の内側へもう一歩
+      const sx = sd * rx * Math.cos(ph) * k2, sy = -ry * Math.sin(ph) * k2;
       const ow = 1 + sp;
       const hx = sx + sd * AL * Math.cos(el) * ow;
       const hy = sy - AL * Math.sin(el);
@@ -912,6 +920,17 @@ function crest(c, kind, rx, ry, r, col, line, lw, o) {
 }
 
 /* 顔つきも個体で変える。目の形が4種あるだけで、同じ色でも別人に見える。 */
+/* 眉の素の形。ここがキャラの「顔つき」になる。
+ * i = 眉頭の高さ、o = 眉尻の高さ（どちらも下が正）、w = 太さ。 */
+const BROW_BASE = {
+  none:  null,
+  flat:  { i:  0,   o:  0,   w: .085 },   // まっすぐ＝淡々
+  arch:  { i: .12,  o:-.08,  w: .075 },   // 眉尻が上がる＝快活
+  slant: { i:-.30,  o: .18,  w: .105 },   // 眉間が下がる＝気が強い
+  worry: { i: .28,  o:-.04,  w: .070 },   // 眉頭が上がる＝困り顔
+  thick: { i:-.06,  o:-.06,  w: .115 }    // 太い＝のんき
+};
+
 function face(c, o, cast, rx, ry, r) {
   const f = o.face || 'smile';
   const kind = cast.eye;
@@ -951,15 +970,23 @@ function face(c, o, cast, rx, ry, r) {
     });
   }
 
-  const BROW = { smile: null, joy: [-.34, -.12], flat: [0, 0],
-                 sad: [.32, .24], shock: [-.22, -.32], mad: [-.55, .38] }[f];
-  if (BROW && (cast.brow || f !== 'flat')) {
+  /* 眉。以前は感情がついたときだけ描いていたので、待機中は全員が
+   * 同じ無表情になり、10体の性格が消えていた。眉は常設の個性にする。
+   * 素の角度をキャラごとに持たせ、感情はその上に足す。
+   * 目や口を作り分けるより、眉1本のほうが圧倒的に安く効く。 */
+  const BASE = BROW_BASE[cast.brow] || null;
+  const DELTA = { smile: [0, 0], joy: [-.30, -.10], flat: [0, 0],
+                  sad: [.30, .22], shock: [-.20, -.30], mad: [-.52, .36] }[f] || [0, 0];
+  if (BASE) {
+    const bi = BASE.i + DELTA[0], bo = BASE.o + DELTA[1];
     [-1, 1].forEach(sd => {
       c.beginPath();
-      c.moveTo(sd * (ex - er * .8), ey - er * 1.4 + BROW[0] * er);
-      c.quadraticCurveTo(sd * ex, ey - er * (1.56 + BROW[1] * .6),
-                         sd * (ex + er * .8), ey - er * 1.4 + BROW[1] * er * sd);
-      Art.stroke(c, Art.PAL.ink, r * .085);
+      // 上下のずれは左右で同じにする。sd を掛けると眉が左右非対称になる
+      // 目の上に隙間を空ける。詰めると眉ではなく瞼に見え、全員が眠そうになる
+      c.moveTo(sd * (ex - er * .82), ey - er * 1.78 + bi * er);
+      c.quadraticCurveTo(sd * (ex + er * .05), ey - er * (1.98 + bo * .5),
+                         sd * (ex + er * .84), ey - er * 1.78 + bo * er);
+      Art.stroke(c, Art.PAL.ink, r * BASE.w);
     });
   }
 
@@ -1104,8 +1131,21 @@ Art.lights = function (c, W, t, y) {
   c.restore();
 };
 
-/* 木の舞台。板ごとに幅と明度を変える。等幅に割ると床が図面に見える。 */
-Art.floor = function (c, W, H, y, tint) {
+/* 木の舞台。
+ *
+ * 板は地平線の1点から放射させる。以前は上辺と下辺を別々の比で置いていて、
+ * 板の束が床の地平線とは違う高さで収束していた。同じ画面の中でキャラの
+ * 縮み方が示す地平線と 125px ずれていて、それが「床ではなく斜めの縞模様」
+ * に見える原因だった。地平線は Art.horizon() ひとつから引く。
+ *
+ * 板の幅と明度は板ごとに変える。等幅に割ると床が図面に見える。 */
+/* 地平線。壁の向こうにあって壁に隠れている高さ。
+ * 床の板も、キャラの縮み方も、全部ここから引く。 */
+Art.horizon = function (y) { return y - 100; };
+
+/* 床。消失点と地平線を外から渡せるようにしてある。廊下と舞台では奥の方向が
+ * 違い、床だけ別の点に向かうと、同じ画面に2つのパースが同居する。 */
+Art.floor = function (c, W, H, y, tint, vpx, hzy) {
   const base = tint || Art.PAL.wood;
   Art.bounceColor = base;
   // 影はその床を深く沈めた色にする。床が変われば影の色も変わる。
@@ -1114,22 +1154,32 @@ Art.floor = function (c, W, H, y, tint) {
   const g = c.createLinearGradient(0, y, 0, H);
   g.addColorStop(0, Art.shade(base, -.3));
   g.addColorStop(.32, base);
-  g.addColorStop(1, Art.shade(base, .14));
+  g.addColorStop(1, Art.shade(base, .02));   // 灯りの外は明るくしない
   c.fillStyle = g; c.fillRect(0, y, W, H - y);
 
   c.save(); c.beginPath(); c.rect(0, y, W, H - y); c.clip();
-  const vp = W * Art.VP;   // 中央から外す。完全な左右対称は人が作った絵にならない
+  const vp = vpx === undefined ? W * Art.VP : vpx;   // 既定は中央から少し外す
+  const hz = hzy === undefined ? Art.horizon(y) : hzy;
+  const C = .33 / Math.max(1, H - hz);          // 手前の端で W*.33 ぶんの間隔になる係数
+  // 板の継ぎ目。地平線からの距離に比例して開く＝1点に収束する
+  const edge = [];
+  let u = 0;
+  for (let i = 0; i <= 18; i++) {               // 幅は板ごとに変える。等幅は図面に見える
+    edge.push(u);
+    u += .8 + (hash(i * 57) * .5 + .5) * .45;
+  }
+  const ex = (i, yy) => vp + (edge[Math.abs(i)] * (i < 0 ? -1 : 1)) * W * C * (yy - hz);
   for (let i = -9; i < 9; i++) {
     c.globalAlpha = .05 + (hash(i * 31) * .5 + .5) * .06;
     c.fillStyle = (i % 2) ? '#fff' : '#2A1400';
     c.beginPath();
-    c.moveTo(vp + i * W * .052, y); c.lineTo(vp + (i + 1) * W * .052, y);
-    c.lineTo(vp + (i + 1) * W * .33, H); c.lineTo(vp + i * W * .33, H);
+    c.moveTo(ex(i, y), y); c.lineTo(ex(i + 1, y), y);
+    c.lineTo(ex(i + 1, H), H); c.lineTo(ex(i, H), H);
     c.closePath(); c.fill();
   }
   c.globalAlpha = .2;
   for (let i = -9; i <= 9; i++) {
-    c.beginPath(); c.moveTo(vp + i * W * .052, y); c.lineTo(vp + i * W * .33, H);
+    c.beginPath(); c.moveTo(ex(i, y), y); c.lineTo(ex(i, H), H);
     Art.stroke(c, 'rgba(50,24,0,.7)', 1.3);
   }
   c.globalAlpha = .16;
@@ -1157,8 +1207,9 @@ Art.floor = function (c, W, H, y, tint) {
 
 /* 夜の通路。だるまさん専用の空間。
  * 屋上の舞台を色替えして使い回すと、一目で流用と分かる。
- * ここは光が「奥から」来る。鬼が逆光のシルエットになり、
- * 影が手前へ長く伸びるので、追われている感じが構図から出る。 */
+ * ここは光が「奥から」来る。影は手前へ長く伸びる（Art.longShadow）。
+ * 鬼を逆光のシルエットにするのは未実装 —— いまは他のキャラと同じ描画で、
+ * 正面からの照りとハイライトが乗っている。次に直す。 */
 Art.corridor = function (c, W, H, y, t, danger) {
   const wall = danger ? '#3A1220' : '#1D1436';
   const g = c.createLinearGradient(0, 0, 0, y);
@@ -1166,7 +1217,10 @@ Art.corridor = function (c, W, H, y, t, danger) {
   g.addColorStop(1, wall);
   c.fillStyle = g; c.fillRect(0, 0, W, y);
 
-  const vx = W * .84, vy = y - 26;          // 消失点は右奥（鬼のいる方）
+  /* 消失点はひとつ。右奥、鬼のいる方。側壁も天井灯も床もここへ向ける。
+   * 1つでも別の点を向くと、空間ではなく「奥行きっぽい模様」になる。 */
+  const vx = W * .84, vy = y - 26;
+  Art.corridorVP = vx;
   // 側壁。奥へ収束する帯で通路を作る。
   c.save();
   for (let i = 0; i < 9; i++) {
@@ -1191,10 +1245,12 @@ Art.corridor = function (c, W, H, y, t, danger) {
   c.fillStyle = gg; c.beginPath(); c.arc(vx, vy, W * .5, 0, TAU); c.fill();
   c.restore();
 
-  // 天井の蛍光灯。奥へ小さくなる。
+  /* 天井の蛍光灯。奥へ小さくなる。
+   * 手前側は画面の左端へ寄せる。中央を通すと、明るい棒が見出しの文字を
+   * 横切る。見出しには必ず余白を空ける ―― 文字の上に物を通さない。 */
   for (let i = 0; i < 5; i++) {
     const k = .16 + i * .17;
-    const lx = Art.lerp(W * .1, vx, k), ly = Art.lerp(-10, vy - 40, k);
+    const lx = Art.lerp(-W * .06, vx, k), ly = Art.lerp(-10, vy, k);
     const lw = Art.lerp(190, 24, k);
     c.save();
     c.globalAlpha = .85 - k * .3;
@@ -1306,7 +1362,9 @@ Art.rigPools = function (c, W, H, y) {
     const g = c.createRadialGradient(fx, fy, 0, fx, fy, W * .10);
     const tint = L.warm ? '255,206,140' : '176,190,255';
     // 弱く。5つ重なるので、1つを強くすると床の木の色が飛ぶ
-    g.addColorStop(0, 'rgba(' + tint + ',' + (.034 * L.on).toFixed(3) + ')');
+    // 板の縞は alpha .05〜.11。それを上回らないと、床でいちばん明るい場所が
+    // 「誰にも照らされていない板」になる。灯りは必ず縞より強く。
+    g.addColorStop(0, 'rgba(' + tint + ',' + (.12 * L.on).toFixed(3) + ')');
     g.addColorStop(1, 'rgba(' + tint + ',0)');
     c.fillStyle = g;
     c.beginPath(); c.ellipse(fx, fy, W * .10, (H - y) * .26, 0, 0, TAU); c.fill();

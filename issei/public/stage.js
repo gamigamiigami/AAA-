@@ -38,9 +38,13 @@ const SEATS = [
   { x: 762, row: 1, look: [-.2, -.6], tilt:  .02 },
   { x:1160, row: 1, look: [-.8, -.2], tilt:  .06 }
 ]
-/* 最前列は、足元の名前が参加者一覧の帯にぶつからない高さで止める。
- * 名前が帯に食われると、画面でいちばん大きい1人だけが無名になる。 */
-const ROWS = [ { y: 508, s: .80 }, { y: 566, s: .96 }, { y: 630, s: 1.18 } ];
+/* 立ち位置の列。大きさは手で決めない —— 床と同じ地平線から引く。
+ * 手打ちの表にすると、床の消失点とキャラの縮み方がずれて、後列が
+ * 「遠い」ではなく「小さいスプライト」に見える。実際 125px ずれていた。
+ * 最前列は、足元の名前が参加者一覧の帯にぶつからない高さで止める。 */
+const HZ = Art.horizon(STAGE_Y);
+const rowAt = (y) => ({ y, s: 1.18 * (y - HZ) / (630 - HZ) });
+const ROWS = [rowAt(508), rowAt(566), rowAt(630)];
 
 /* 手前ほど間隔を広く取る＝奥行き。ただし最前列でも参加者一覧の帯に
  * 重ならない位置で止める。足元が帯に食い込むと画面の底が抜けて見える。 */
@@ -66,10 +70,14 @@ Stage.seat = function (players) {
 // ---------------------------------------------------------------- 部品
 function heading(c, text, size, color, y, rot) {
   const w = Art.measure(c, text, size, { face: '"Dela Gothic One", sans-serif' }) + size * .9;
-  c.save(); c.globalAlpha = .38; c.filter = 'blur(16px)';
-  c.fillStyle = '#0A0320';
-  Art.roundRect(c, W / 2 - w / 2, y - size * .78, w, size * 1.56, size * .6);
-  c.fill(); c.restore();
+  // 文字の下を沈める。2度重ねるのは、明るい背景でも1枚では抜けてしまうため
+  c.save(); c.filter = 'blur(18px)'; c.fillStyle = '#0A0320';
+  for (const a of [.34, .30]) {
+    c.globalAlpha = a;
+    Art.roundRect(c, W / 2 - w / 2, y - size * .82, w, size * 1.64, size * .6);
+    c.fill();
+  }
+  c.restore();
   Art.title(c, text, W / 2, y, size, { fill: color, rot: rot || 0 });
 }
 Stage.heading = heading;
@@ -254,31 +262,52 @@ function strip(c, st, entries, x, y, w) {
   const top = y - STRIP_H / 2;
   Art.slab(c, x - 22, top, w + 44, STRIP_H, '#3A2358', { depth: 6, r: 24 });
 
-  // 成功の幅を先に敷く。合格ラインが見えないと、ばらつきの数字を評価できない。
-  c.fillStyle = 'rgba(57,201,106,.16)';
-  c.fillRect(px(-STRIP_OK), y - budget, px(STRIP_OK) - px(-STRIP_OK), budget * 2);
+  /* 合格の幅。紫地に半透明の緑を薄く敷くと、緑ではなく濁った灰色になる。
+   * 「合格ラインの色が灰色」という設計判断はあり得ないので、地の色そのものを
+   * 緑に置き、縁を実線で締める。 */
+  // 角丸の器の中に角の立った矩形を置かない。同じ角の規則に合わせる
+  const okw = px(STRIP_OK) - px(-STRIP_OK);
+  Art.roundRect(c, px(-STRIP_OK), y - budget, okw, budget * 2, 10);
+  c.fillStyle = '#22513A'; c.fill();
+  Art.roundRect(c, px(-STRIP_OK), y - budget, okw, budget * 2, 10);
+  Art.stroke(c, '#39C96A', 2);
+
+  /* 目盛り。範囲を固定しただけでは物差しにならない。刻みが無いと
+   * 「この位置が何msか」を画面から読む手段がない。 */
+  const ly = top + STRIP_H - 16;
+  for (const ms of [-400, -200, 0, 200, 400]) {
+    const tx = px(ms), zero = ms === 0;
+    c.beginPath(); c.moveTo(tx, y - budget - (zero ? 4 : 0));
+    c.lineTo(tx, y + budget + (zero ? 4 : 0));
+    Art.stroke(c, zero ? PAL.focus : 'rgba(255,247,232,.22)', zero ? 4 : 2);
+    Art.label(c, zero ? 'ぴったり' : (ms > 0 ? '+' : '') + (ms / 1000).toFixed(1) + '秒',
+      tx, ly, zero ? 16 : 14,
+      zero ? PAL.focus : 'rgba(255,247,232,.45)', { ow: .34 });
+  }
   c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y);
   Art.stroke(c, 'rgba(255,255,255,.18)', 3);
-  c.beginPath(); c.moveTo(px(0), y - budget - 4); c.lineTo(px(0), y + budget + 4);
-  Art.stroke(c, PAL.focus, 4);
-
-  const ly = top + STRIP_H - 17;
-  Art.label(c, 'ぴったり', px(0), ly, 16, PAL.focus, { ow: .34 });
-  Art.label(c, 'はやい', px(-STRIP_RANGE), ly, 16, 'rgba(255,247,232,.5)', { ow: .34 });
-  Art.label(c, 'おそい', px(STRIP_RANGE), ly, 16, 'rgba(255,247,232,.5)', { ow: .34 });
+  Art.label(c, 'はやい', x + 6, y - budget - 12, 14, 'rgba(255,247,232,.4)',
+    { ow: .34, align: 'left' });
+  Art.label(c, 'おそい', x + w - 6, y - budget - 12, 14, 'rgba(255,247,232,.4)',
+    { ow: .34, align: 'right' });
 
   for (const q of placed) {
     const e = q.e, cy = y - q.lv * rowH;
-    if (q.over) {   // 振り切れた人は端で外を向く三角を添える
+    if (q.over) {
+      /* 振り切れた人。三角だけでは「どれだけ外したか」が消えるので、
+       * 実際の値を横に直接書く。図と数字が食い違う画面は自動生成に見える。 */
       const sd = e.error > 0 ? 1 : -1;
       c.beginPath();
-      c.moveTo(q.x + sd * (R + 16), cy); c.lineTo(q.x + sd * (R + 3), cy - 9);
-      c.lineTo(q.x + sd * (R + 3), cy + 9); c.closePath();
+      c.moveTo(q.x + sd * (R + 15), cy); c.lineTo(q.x + sd * (R + 3), cy - 8);
+      c.lineTo(q.x + sd * (R + 3), cy + 8); c.closePath();
       c.fillStyle = PAL.danger; c.fill(); Art.stroke(c, PAL.ink, 3);
+      Art.num(c, (e.error > 0 ? '+' : '') + (e.error / 1000).toFixed(2) + '秒',
+        q.x + sd * (R + 22), cy, 16, PAL.danger,
+        { align: sd > 0 ? 'left' : 'right', ow: .38 });
     }
     Art.chara(c, { x: q.x, y: cy, r: R, color: e.color, shape: e.shape,
       seed: e.seed, face: Math.abs(e.error) <= STRIP_OK ? 'joy' : 'flat',
-      feet: false, arms: false, sticker: e.you ? PAL.focus : '#3A2358' });
+      feet: false, arms: false, sticker: e.you ? PAL.focus : '#6A5093' });
   }
 }
 
@@ -286,7 +315,8 @@ function strip(c, st, entries, x, y, w) {
 Stage.daruma = function (c, st) {
   const watching = st.watching, cur = st.chant;
   Art.corridor(c, W, H, D_Y, st.tSec, watching);
-  Art.floor(c, W, H, D_Y, watching ? '#6E3038' : '#5C4A72');
+  // 床も廊下と同じ消失点へ。別の点を向くと1画面に2つのパースが同居する
+  Art.floor(c, W, H, D_Y, watching ? '#6E3038' : '#5C4A72', Art.corridorVP);
   if (watching) { c.fillStyle = 'rgba(120,10,26,.16)'; c.fillRect(0, 0, W, H); }
 
   const gx = D_X1 + 96;

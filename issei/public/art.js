@@ -671,25 +671,25 @@ Art.bodyPath = function (c, kind, x, y, rx, ry) {
  * 遠目20pxのシルエットだけで判別できることが条件。色は補助でしかない。 */
 const CAST = {
   circle:   { body: 'egg',    rx: 1.00, ry: 1.00, crest: 'scarf',   eye: 'round',
-              brow: 'arch',  mouth: 'arc' },
+              brow: 'arch',  mouth: 'arc', arm: 'slim' },
   triangle: { body: 'drop',   rx:  .92, ry: 1.10, crest: 'ears',    eye: 'droop',
-              brow: 'worry', mouth: 'small' },
+              brow: 'worry', mouth: 'small', arm: 'long' },
   square:   { body: 'block',  rx: 1.22, ry:  .80, crest: 'brow',    eye: 'slit',
-              brow: 'thick', mouth: 'wide',  cheek: false },
+              brow: 'thick', mouth: 'wide', arm: 'stout',  cheek: false },
   star:     { body: 'spin',   rx:  .80, ry: 1.26, crest: 'tuft',    eye: 'sparkle',
-              brow: 'arch',  mouth: 'arc' },
+              brow: 'arch',  mouth: 'arc', arm: 'long' },
   heart:    { body: 'bell',   rx: 1.14, ry:  .88, crest: 'floppy',  eye: 'tall',
-              brow: 'none',  mouth: 'wave' },
+              brow: 'none',  mouth: 'wave', arm: 'stub' },
   diamond:  { body: 'tall',   rx:  .70, ry: 1.34, crest: 'horn',    eye: 'sharp',
-              brow: 'slant', mouth: 'line',  cheek: false },
+              brow: 'slant', mouth: 'line', arm: 'claw',  cheek: false },
   pentagon: { body: 'pear',   rx: 1.02, ry: 1.00, crest: 'crown',   eye: 'round',
-              brow: 'flat',  mouth: 'wide' },
+              brow: 'flat',  mouth: 'wide', arm: 'slim' },
   hexagon:  { body: 'gem',    rx: 1.00, ry: 1.04, crest: 'antenna', eye: 'dot',
-              brow: 'none',  mouth: 'small' },
+              brow: 'none',  mouth: 'small', arm: 'claw' },
   crown:    { body: 'wide',   rx: 1.30, ry:  .74, crest: 'trio',    eye: 'slit',
-              brow: 'thick', mouth: 'wave',  cheek: false },
+              brow: 'thick', mouth: 'wave', arm: 'stout',  cheek: false },
   moon:     { body: 'peanut', rx:  .86, ry: 1.16, crest: 'hood',    eye: 'tall',
-              brow: 'worry', mouth: 'arc' }
+              brow: 'worry', mouth: 'arc', arm: 'stub' }
 };
 Art.CAST = CAST;
 
@@ -769,11 +769,12 @@ Art.chara = function (c, o) {
   if (o.arms !== false) {
     const swing = o.walk ? Math.sin(o.walk + Math.PI) * .5 : 0;
     const sp = (P.spread || 0);
+    const A = ARM[cast.arm] || ARM.slim;
     /* 腕の長さ。上げるポーズほど伸ばす。バンザイで手が頭より下だと
      * 「上げた」に見えないし、極端な姿勢での伸びはアニメーションの基本。 */
-    const AL = r * .70 + Math.max(0, -(P.arm || 0)) * r * .23;
+    const AL = r * A.len + Math.max(0, -(P.arm || 0)) * r * .23;
     [-1, 1].forEach(sd => {
-      const a = (P.arm || 0) + swing * sd
+      const a = (P.arm || 0) + A.bias + swing * sd
         + Math.sin((o.armT || 0) * 1.3 + (o.seed || 0) + sd) * .05;
       // a を仰角に変換する。a が負ほど上、正ほど下。
       const el = -a * .9 - .35;
@@ -782,11 +783,17 @@ Art.chara = function (c, o) {
        * 体型は楕円とは限らない（角のある六角や上の狭い台形もある）ので、
        * 楕円の式で置くと体型によって外へ飛び出す。実際のパスに当てて、
        * 内側に入るところまで引き戻す。 */
-      const ph = clamp(el * .35 - .18, -.55, .2);
+      const ph = clamp(el * .35 - .18 + A.root, -.55, .28);
       let k2 = 1.0;
       Art.bodyPath(c, cast.body, 0, 0, rx, ry);
-      while (k2 > .34 &&
-             !c.isPointInPath(sd * rx * Math.cos(ph) * k2, -ry * Math.sin(ph) * k2)) k2 -= .05;
+      /* isPointInPath が受け取る座標は「変換の影響を受けないキャンバス座標」で、
+       * ローカル座標をそのまま渡すと常に外と判定される。行列を自分で掛ける。
+       * ここを間違えると探索が毎回下限まで落ち、肩が胴の奥に埋まって
+       * 腕が顔の下から生えているように見える。 */
+      const M = c.getTransform();
+      const hit = (lx2, ly2) => c.isPointInPath(
+        M.a * lx2 + M.c * ly2 + M.e, M.b * lx2 + M.d * ly2 + M.f);
+      while (k2 > .34 && !hit(sd * rx * Math.cos(ph) * k2, -ry * Math.sin(ph) * k2)) k2 -= .05;
       k2 = Math.max(.34, k2 - .04);           // 輪郭の内側へもう一歩
       const sx = sd * rx * Math.cos(ph) * k2, sy = -ry * Math.sin(ph) * k2;
       const ow = 1 + sp;
@@ -798,12 +805,25 @@ Art.chara = function (c, o) {
       c.lineCap = 'round';
       /* 腕は胴より暗く、手先は明るく。同色同幅だと、上げた腕が
        * 頭の飾り（耳・角）と見分けられず、突起が4本あるように見える。 */
-      draw(); Art.stroke(c, line, r * .27);
-      draw(); Art.stroke(c, Art.shade(col, -.24), r * .145);
-      // 手先。丸を置くと腕が「終わって」見える
-      c.beginPath(); c.arc(hx, hy, r * .135, 0, TAU);
-      c.fillStyle = Art.shade(col, .12); c.fill();
-      Art.stroke(c, line, r * .075);
+      draw(); Art.stroke(c, line, r * (A.w + .125));
+      draw(); Art.stroke(c, Art.shade(col, -.24), r * A.w);
+      // 手先。丸を置くと腕が「終わって」見える。'none' は先細りで終える
+      if (A.hand === 'split') {          // 二股。つまむ手
+        const ang = Math.atan2(hy - my, hx - mx);
+        [-.55, .55].forEach(t2 => {
+          const px2 = hx + Math.cos(ang + t2) * r * .09;
+          const py2 = hy + Math.sin(ang + t2) * r * .09;
+          c.beginPath(); c.arc(px2, py2, r * A.handR * .72, 0, TAU);
+          c.fillStyle = Art.shade(col, .12); c.fill();
+          Art.stroke(c, line, r * .07);
+        });
+      } else if (A.hand !== 'none') {
+        const rr2 = r * A.handR * (A.hand === 'mitt' ? 1 : 1);
+        c.beginPath();
+        c.ellipse(hx, hy, rr2, rr2 * (A.hand === 'mitt' ? .82 : 1), 0, 0, TAU);
+        c.fillStyle = Art.shade(col, .12); c.fill();
+        Art.stroke(c, line, r * .075);
+      }
     });
   }
 
@@ -932,6 +952,17 @@ function crest(c, kind, rx, ry, r, col, line, lw, o) {
 }
 
 /* 顔つきも個体で変える。目の形が4種あるだけで、同じ色でも別人に見える。 */
+/* 腕の型。体型10種・顔10種に対して腕が1種だと、そこだけ量産品に見える。
+ * 長さ・太さ・付け根の高さ・手先の形を体型に合わせて変える。
+ * ずんぐりした体に細長い腕は付かないし、背の高い体に短い腕も付かない。 */
+const ARM = {
+  slim:  { len:  .74, w: .115, handR: .118, hand: 'ball',  root:  0,   bias:  0   },
+  long:  { len:  .98, w: .098, handR: .105, hand: 'ball',  root: -.06, bias: -.10 },
+  stout: { len:  .56, w: .195, handR: .170, hand: 'mitt',  root:  .10, bias:  .12 },
+  claw:  { len:  .72, w: .120, handR: .112, hand: 'split', root:  0,   bias: -.05 },
+  stub:  { len:  .56, w: .200, handR: 0,    hand: 'none',  root:  .14, bias:  .14 }
+};
+
 /* 目の型。以前は間隔と半径をわずかに変えるだけで、表示サイズでは
  * 全員が同じ白丸2つだった。体型を10種に分けたのに顔が1種では、
  * 「卵」問題が胴から顔へ移動しただけになる。

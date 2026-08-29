@@ -70,7 +70,16 @@ Art.PAL = {
 Art.CAST_COLORS = ['#FF4D5E', '#3E8CFF', '#39C96A', '#A96BEE', '#FF8A2B', '#2FC6C0',
                    '#F45BA0', '#7FD13B', '#5B6BFF', '#FF6B6B'];
 
-function rgb(hex) { const n = parseInt(hex.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+function rgb(hex) {
+  // rgb()/rgba() で渡されても壊れないようにする。
+  // 16進前提のまま rgba を渡すと NaN になり、文字が真っ黒に潰れる事故が起きる。
+  if (hex[0] !== '#') {
+    const m = hex.match(/[\d.]+/g);
+    return m ? [+m[0], +m[1], +m[2]] : [255, 255, 255];
+  }
+  const n = parseInt(hex.slice(1), 16);
+  return [n >> 16, (n >> 8) & 255, n & 255];
+}
 Art.shade = function (hex, k) {
   let [r, g, b] = rgb(hex);
   if (k > 0) { r += (255 - r) * k; g += (255 - g) * k; b += (255 - b) * k; }

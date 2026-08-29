@@ -393,7 +393,6 @@ function viewSeino() {
 
 function revealSeino() {
   const L = last;
-  Art.backdrop(c, W, H, STAGE_Y, tSec);
   Art.lights(c, W, tSec, -34);
   Art.floor(c, W, H, STAGE_Y);
 
@@ -401,7 +400,7 @@ function revealSeino() {
   c.save();
   c.translate(W / 2, 108); c.scale(pop, pop); c.translate(-W / 2, -108);
   heading(L.ok ? 'そろった！' : 'ばらけた…', 82,
-    L.ok ? PAL.cream : 'rgba(255,247,232,.9)', 108, L.ok ? -.02 : .015);
+    L.ok ? PAL.gold : PAL.cream, 108, L.ok ? -.02 : .015);
   c.restore();
 
   // 大きい数字ひとつ。表とグラフではなく、これとキャラの芝居で見せる。
@@ -442,11 +441,17 @@ function strip(entries, x, y, w) {
 }
 
 // ---------------------------------------------------------------- だるまさん
-const D_Y = 372, D_X0 = 176, D_X1 = W - 268;
-const LANES = [0, 1, 2, 3, 4, 5].map(i => {
-  const d = i / 5;
-  return { y: D_Y + 40 + d * 232, scale: .72 + d * .5 };
-});
+const D_Y = 356, D_X0 = 150, D_X1 = W - 330;
+/* レーンごとに奥行きと、横のずれ量を持たせる。
+ * 進行度だけで x を決めると、同じくらい進んだ者が縦一列に並んでしまう。 */
+const LANES = [
+  { y: D_Y + 34,  scale: .70, dx: -34 },
+  { y: D_Y + 84,  scale: .80, dx:  26 },
+  { y: D_Y + 134, scale: .90, dx: -16 },
+  { y: D_Y + 190, scale: 1.0, dx:  38 },
+  { y: D_Y + 250, scale: 1.1, dx: -28 },
+  { y: D_Y + 316, scale: 1.24, dx: 12 }
+];
 
 function viewDaruma() {
   const t = now();
@@ -460,27 +465,33 @@ function viewDaruma() {
   }
 
   Art.backdrop(c, W, H, D_Y, tSec);
-  Art.lights(c, W, tSec, -34);
+  Art.lights(c, W, tSec, -46);
   /* 危険時は床を暗く濁った赤にする。鮮やかな赤にすると、
    * 背景が画面で最も強い色になって主役（鬼）が沈む。 */
   Art.floor(c, W, H, D_Y, watching ? '#7A3038' : PAL.wood);
   if (watching) { c.fillStyle = 'rgba(120,10,26,.2)'; c.fillRect(0, 0, W, H); }
 
   // ゴールの旗。支柱を床まで届かせ、接地影を落とす。
-  const gx = D_X1 + 26;
+  const gx = D_X1 + 96;
   Art.contact(c, gx, D_Y + 214, 30, .4);
   c.beginPath(); c.moveTo(gx, D_Y + 214); c.lineTo(gx, D_Y - 44);
   Art.stroke(c, '#2A1F3E', 8);
   c.beginPath(); c.moveTo(gx, D_Y + 214); c.lineTo(gx, D_Y - 44);
   Art.stroke(c, '#7D6A9E', 4);
-  Art.vinyl(c, () => { c.beginPath();
+  const flag = () => { c.beginPath();
     c.moveTo(gx, D_Y - 44);
-    c.quadraticCurveTo(gx + 44, D_Y - 30 + Math.sin(tSec * 4) * 7, gx + 84, D_Y - 44);
-    c.lineTo(gx + 84, D_Y + 8);
-    c.quadraticCurveTo(gx + 44, D_Y + 22 + Math.sin(tSec * 4) * 7, gx, D_Y + 8);
-    c.closePath(); },
-    { x: gx + 42, y: D_Y - 18, rx: 42, ry: 26, color: PAL.cream, lw: 4, spec: false });
-  Art.label(c, 'ゴール', gx + 42, D_Y - 66, 18, PAL.cream, { ow: .32 });
+    c.quadraticCurveTo(gx + 44, D_Y - 30 + Math.sin(tSec * 4) * 7, gx + 86, D_Y - 44);
+    c.lineTo(gx + 86, D_Y + 10);
+    c.quadraticCurveTo(gx + 44, D_Y + 24 + Math.sin(tSec * 4) * 7, gx, D_Y + 10);
+    c.closePath(); };
+  flag(); c.fillStyle = '#F2E7D2'; c.fill();
+  c.save(); flag(); c.clip();          // 市松。白い布より「ゴール」だと形で分かる
+  c.fillStyle = '#2A2036';
+  for (let iy = 0; iy < 4; iy++) for (let ix = 0; ix < 6; ix++)
+    if ((ix + iy) % 2 === 0) c.fillRect(gx + ix * 15, D_Y - 46 + iy * 16, 15, 16);
+  c.restore();
+  flag(); Art.stroke(c, PAL.ink, 4);
+  Art.label(c, 'ゴール', gx + 43, D_Y - 68, 18, PAL.cream, { ow: .32 });
 
   /* 鬼。床の補色側（暗い紫）に置く。危険色の床と同じ色にしない。
    * 目だけを強く光らせて、振り向いた瞬間に視線が集まるようにする。 */
@@ -509,8 +520,7 @@ function viewDaruma() {
     let held = 0, moving = false;
     for (const [a, b] of spans) { held += (b === null ? t : b) - a; if (b === null) moving = true; }
     const k = Math.min(1, held / 1000 * g.speed / g.goal);
-    const jitter = Math.sin(p.seed) * 16;
-    const x = D_X0 + (D_X1 - D_X0) * k + jitter;
+    const x = D_X0 + (D_X1 - D_X0) * k + L.dx;
     const r = (p.you ? 34 : 29) * L.scale;
     // 振り向かれた瞬間、動いていた者は体が流れて止まる
     Art.chara(c, { x, y: L.y - r, r, color: p.color, shape: p.shape, seed: p.seed,
@@ -531,21 +541,20 @@ function viewDaruma() {
     }
   }
 
-  heading(watching ? 'ふりむいた！' : 'だるまさんが……', watching ? 76 : 58,
-    watching ? PAL.danger : PAL.cream, 78, watching ? Math.sin(tSec * 30) * .035 : -.01);
+  heading(watching ? 'ふりむいた！' : 'だるまさんが……', watching ? 76 : 56,
+    watching ? PAL.danger : PAL.cream, 74, watching ? Math.sin(tSec * 30) * .035 : -.01);
 
   // 掛け声の進み。舞台の外（下の余白）に置き、キャラと重ねない。
   if (cur && !watching) {
     const k = (t - cur.start) / (cur.turnAt - cur.start);
-    Art.slab(c, W / 2 - 230, 662, 460, 32, '#3A2358', { depth: 5, r: 16 });
-    Art.roundRect(c, W / 2 - 222, 668, Math.max(8, 444 * Math.min(1, k)), 18, 9);
+    Art.slab(c, 30, 664, 640, 30, '#3A2358', { depth: 5, r: 15, shadow: false });
+    Art.roundRect(c, 37, 669, Math.max(8, 626 * Math.min(1, k)), 18, 9);
     c.fillStyle = k > .82 ? PAL.danger : PAL.focus; c.fill();
   }
 }
 
 function revealDaruma() {
   const L = last;
-  Art.backdrop(c, W, H, STAGE_Y, tSec);
   Art.lights(c, W, tSec, -34);
   Art.floor(c, W, H, STAGE_Y);
 

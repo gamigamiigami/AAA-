@@ -1246,6 +1246,13 @@ Art.floor = function (c, W, H, y, tint, vpx, hzy) {
   g.addColorStop(1, Art.shade(base, .02));   // 灯りの外は明るくしない
   c.fillStyle = g; c.fillRect(0, y, W, H - y);
 
+  /* 空気遠近。床の暖色と上半分の紫紺の間に中間調が無く、1枚の絵が
+   * 上下2枚に割れて見えていた。奥ほど空気の色（紫）に寄せる。 */
+  const air = c.createLinearGradient(0, y, 0, y + (H - y) * .55);
+  air.addColorStop(0, 'rgba(58,38,92,.42)');
+  air.addColorStop(1, 'rgba(58,38,92,0)');
+  c.fillStyle = air; c.fillRect(0, y, W, (H - y) * .55);
+
   c.save(); c.beginPath(); c.rect(0, y, W, H - y); c.clip();
   const vp = vpx === undefined ? W * Art.VP : vpx;   // 既定は中央から少し外す
   const hz = hzy === undefined ? Art.horizon(y) : hzy;
@@ -1444,9 +1451,11 @@ Art.oni = function (c, o) {
       c.fillStyle = q; c.beginPath(); c.arc(0, 0, o.r * .5, 0, TAU); c.fill();
       c.restore();
     } else {
+      /* 振り向いていないときの目は、ほとんど見せない。ここで光らせると
+       * 振り向いた瞬間の破壊力を先に食ってしまう。 */
       c.beginPath();
       c.moveTo(-o.r * .19, 0); c.lineTo(o.r * .19, -o.r * .03);
-      Art.stroke(c, 'rgba(255,150,130,.6)', o.r * .05);
+      Art.stroke(c, 'rgba(210,150,140,.22)', o.r * .04);
     }
     c.restore();
   });
@@ -1480,22 +1489,39 @@ Art.backdrop = function (c, W, H, y, t) {
    * 結果パネルの裏に隠れて両端だけが切り株のように残る。
    * 上端に置けば、ビームが全部の高さを縦に貫いて空間が縦に伸びる。 */
   const ty = 20;
-  // トラス
-  c.globalAlpha = .55;
-  Art.roundRect(c, 40, ty, W - 80, 16, 4);
-  c.fillStyle = '#3A2D52'; c.fill(); Art.stroke(c, '#221A36', 2);
+  /* トラス。平らな帯にジグザグ模様を描くだけだと、舞台で唯一の
+   * 「奥行きの無い物」になる。上下2本の弦材と、それをつなぐ斜材で組む。
+   * 斜材は必ず弦の上下に取り付く（宙で終わる線は構造に見えない）。 */
+  const TX0 = 30, TX1 = W - 30, TT = ty + 3, TB = ty + 21;
+  c.globalAlpha = .62;
+  // 斜材（奥）
   c.beginPath();
-  for (let x = 46; x < W - 46; x += 26) {
-    c.moveTo(x, ty + 15); c.lineTo(x + 13, ty + 1); c.lineTo(x + 26, ty + 15);
+  for (let x = TX0 + 8; x < TX1 - 8; x += 30) {
+    c.moveTo(x, TB); c.lineTo(x + 15, TT); c.lineTo(x + 30, TB);
   }
-  Art.stroke(c, '#4C3D6B', 2);
+  Art.stroke(c, '#3B2E58', 3.2);
+  // 弦材。上は光を受け、下は影
+  for (const [yy, top] of [[TB, false], [TT, true]]) {
+    Art.roundRect(c, TX0, yy - 5, TX1 - TX0, 10, 5);
+    const tg = c.createLinearGradient(0, yy - 5, 0, yy + 5);
+    tg.addColorStop(0, top ? '#6B588F' : '#3E3159');
+    tg.addColorStop(.45, top ? '#4B3B70' : '#2E2444');
+    tg.addColorStop(1, '#241B3A');
+    c.fillStyle = tg; c.fill();
+    Art.stroke(c, '#1D1530', 2);
+  }
   c.globalAlpha = 1;
 
   const lamps = Art.RIG.map((r, i) => {
     const x = W * r.x;
     const on = .5 + Math.abs(Math.sin(t * 1.1 + i * 1.4)) * .5;
-    // 吊り棒と器具
-    c.beginPath(); c.moveTo(x, ty + 14); c.lineTo(x, ty + 30);
+    // ヨーク。器具は棒1本ではなく、トラスを挟むコの字の金具で吊る
+    c.beginPath(); c.moveTo(x, ty + 2); c.lineTo(x, ty + 26);
+    Art.stroke(c, '#241B3A', 5);
+    c.beginPath();
+    c.moveTo(x - 11, ty + 24); c.lineTo(x - 11, ty + 36);
+    c.moveTo(x + 11, ty + 24); c.lineTo(x + 11, ty + 36);
+    c.moveTo(x - 11, ty + 26); c.lineTo(x + 11, ty + 26);
     Art.stroke(c, '#2A2140', 4);
     c.save(); c.translate(x, ty + 38); c.rotate(r.aim * .5);
     Art.roundRect(c, -13, -10, 26, 20, 5);

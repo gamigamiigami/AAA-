@@ -411,6 +411,21 @@ Stage.daruma = function (c, st) {
      * 左上前からの照りを保ったままだった。同じ空間に光源が2つある状態。
      * 鬼で正しく描けているのだから、走者にも同じ規則を通す。 */
     backlight(c, x, L.y - r, r, p, watching);
+    /* 自機は最奥のとき最小・最も低コントラストになり、▽が無いと見つからない。
+     * 遠近は崩さず、足元の光だまりと縁光で拾わせる。大きさ以外の手段で示す。 */
+    if (p.you) {
+      c.save(); c.globalCompositeOperation = 'lighter';
+      const pg = c.createRadialGradient(x, L.y, 0, x, L.y, r * 2.4);
+      pg.addColorStop(0, 'rgba(255,214,150,.34)');
+      pg.addColorStop(1, 'rgba(255,214,150,0)');
+      c.fillStyle = pg;
+      c.beginPath(); c.ellipse(x, L.y, r * 2.4, r * .8, 0, 0, Art.TAU); c.fill();
+      c.restore();
+      c.save();
+      Art.bodyPath(c, (Art.CAST[p.shape] || Art.CAST.circle).body, x, L.y - r, r, r);
+      Art.stroke(c, 'rgba(255,220,170,.55)', Math.max(1.6, r * .09));
+      c.restore();
+    }
     if (p.you) marker(c, x, L.y - r * 2 - 36 + Math.sin(st.tSec * 4) * 4);
   });
 
@@ -418,10 +433,26 @@ Stage.daruma = function (c, st) {
     watching ? '#FFD24A' : '#E8DCFF', 74,
     watching ? Math.sin(st.tSec * 30) * .035 : -.01);
 
+  /* 掛け声メーター。前は純白のカプセルで、目盛りもラベルも無く、
+   * 画面でいちばん明るいのにいちばん意味が分からない要素だった。
+   * しかも参加者一覧の棚の裏に潜り込んで消えていた。
+   * 舞台のUIと同じ様式（板・深さ・縁の照り）に揃え、終わりの手前を
+   * 赤帯にして「そろそろ振り向く」を色で予告する。 */
   if (cur && !watching) {
-    Art.slab(c, 30, 664, 640, 30, '#3A2358', { depth: 5, r: 15, shadow: false });
-    Art.roundRect(c, 37, 669, Math.max(8, 626 * Math.min(1, cur)), 18, 9);
-    c.fillStyle = cur > .82 ? PAL.danger : PAL.focus; c.fill();
+    const bx = 36, by = 596, bw = 400, bh = 26;
+    Art.label(c, 'ふりむくまで', bx, by - 12, 17, 'rgba(255,247,232,.6)',
+      { ow: .34, align: 'left' });
+    Art.slab(c, bx, by, bw, bh, '#2A1B44', { depth: 4, r: 13, shadow: false, lw: 2.5 });
+    // 危険帯。ここに入ったら止まる合図
+    Art.roundRect(c, bx + bw * .82 - 4, by + 5, bw * .18 - 3, bh - 10, 6);
+    c.fillStyle = 'rgba(255,71,87,.28)'; c.fill();
+    const k2 = Math.min(1, cur);
+    Art.roundRect(c, bx + 5, by + 5, Math.max(10, (bw - 10) * k2), bh - 10, 6);
+    c.fillStyle = k2 > .82 ? PAL.danger : PAL.gold; c.fill();
+    // 先端の光。どこまで来たかを一点で読ませる
+    const hx2 = bx + 5 + Math.max(10, (bw - 10) * k2);
+    c.beginPath(); c.arc(hx2, by + bh / 2, 6, 0, Art.TAU);
+    c.fillStyle = '#fff'; c.fill(); Art.stroke(c, PAL.ink, 2.5);
   }
 };
 

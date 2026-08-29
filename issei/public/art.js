@@ -147,6 +147,9 @@ Art.stroke = function (c, color, lw) {
  * 「なぜここが明るいのか」に答えがある画面は、それだけで作り物に見えなくなる。 */
 Art.LIGHT = { x: -.42, y: -.86, sx: .34, sy: .16 };   // sx,sy = 影のずれ方向
 Art.bounceColor = Art.PAL.wood;
+/* 影の色は床ごとに変える。固定の暗色にすると、赤い床では影が床に溶けて
+ * キャラが宙に貼られたステッカーになる。床を敷くときに必ず更新する。 */
+Art.shadowColor = '8,3,22';
 Art.vinyl = function (c, path, o) {
   const col = o.color, x = o.x, y = o.y, rx = o.rx, ry = o.ry;
   c.save();
@@ -200,13 +203,18 @@ Art.contact = function (c, x, y, rx, strength, depth) {
   const k = .62 + d * .38;
   const st = (strength === undefined ? .55 : strength) * (.55 + d * .45);
   const ox = x + rx * Art.LIGHT.sx * .5, oy = y + rx * Art.LIGHT.sy * .18;
+  const S = Art.shadowColor;
   c.save();
   const g = c.createRadialGradient(ox, oy, 0, ox, oy, rx * k);
-  g.addColorStop(0, 'rgba(8,3,22,' + st + ')');
-  g.addColorStop(.5, 'rgba(8,3,22,' + st * .5 + ')');
-  g.addColorStop(1, 'rgba(8,3,22,0)');
+  g.addColorStop(0, 'rgba(' + S + ',' + st + ')');
+  g.addColorStop(.5, 'rgba(' + S + ',' + st * .5 + ')');
+  g.addColorStop(1, 'rgba(' + S + ',0)');
   c.fillStyle = g;
   c.beginPath(); c.ellipse(ox, oy, rx * k, rx * k * .3, 0, 0, TAU); c.fill();
+  // 接地点の芯。これが無いと、ぼけた影だけでは床に着いて見えない。
+  c.globalAlpha = st * .9;
+  c.fillStyle = 'rgb(' + S + ')';
+  c.beginPath(); c.ellipse(ox, oy, rx * k * .42, rx * k * .13, 0, 0, TAU); c.fill();
   c.restore();
 };
 
@@ -361,6 +369,85 @@ Art.logo = function (c, x, y, size, opt) {
 
   Art.title(c, '斉', w * .34, 0, size, { fill: gold, extrude: size * .1 });
   c.restore();
+};
+
+/* ミニゲーム名。ロゴと同じ立体構造で、色相だけ変える。
+ * グローだけ・フチだけ、と系統がばらけると別ゲームの素材に見える。 */
+Art.gameTitle = function (c, text, x, y, size, hue, opt) {
+  opt = opt || {};
+  Art.title(c, text, x, y, size,
+    { fill: hue, rot: opt.rot || 0, extrude: size * .095 });
+};
+
+/* 命令カード。ワリオ系の核。文字を出すのではなく「札」を叩きつける。
+ * 傾き・厚み・落ち影・画面外へのはみ出しが無いと札に見えない。 */
+Art.card = function (c, W, H, text, hue, prog, opt) {
+  opt = opt || {};
+  const t = prog;
+  let sc, rot, alpha = 1;
+  if (t < .15)      { const k = t / .15; sc = 1.55 - .4 * Art.ease.outCubic(k); rot = -.19 + .05 * k; }
+  else if (t < .38) { const k = (t - .15) / .23;
+                      sc = Art.lerp(1.18, 1, Art.ease.outBack(k, 3.6));
+                      rot = Art.lerp(-.14, -.045, Art.ease.outCubic(k)); }
+  else if (t < .8)  { sc = 1 + Math.sin((t - .38) * 30) * .009; rot = -.045; }
+  else              { const k = (t - .8) / .2;
+                      sc = 1 + Art.ease.inCubic(k) * .55; rot = -.045 + k * .12;
+                      alpha = 1 - Art.ease.inCubic(k); }
+
+  const cw = W * 1.06, ch = 236, depth = 17;   // 画面外へはみ出させる
+  c.save();
+  c.globalAlpha = alpha * .74; c.fillStyle = '#08021C'; c.fillRect(0, 0, W, H);
+  c.globalAlpha = alpha;
+  c.translate(W / 2, H * .44); c.rotate(rot); c.scale(sc, sc);
+
+  // 集中線は叩きつけの間だけ
+  const conc = t < .4 ? 1 : Math.max(0, 1 - (t - .4) * 5);
+  if (conc > .02) {
+    c.save(); c.globalAlpha = alpha * conc * .28;
+    for (let i = 0; i < 26; i++) {
+      const a = i / 26 * TAU + (opt.t || 0) * .5;
+      const r0 = 260 + hash(i * 7) * 70;
+      c.beginPath(); c.moveTo(Math.cos(a) * r0, Math.sin(a) * r0 * .6);
+      c.lineTo(Math.cos(a) * 1100, Math.sin(a) * 700);
+      Art.stroke(c, Art.PAL.cream, 2 + hash(i * 13) * 5);
+    }
+    c.restore();
+  }
+
+  // 落ち影 → 厚みの側面 → 天面。札は必ず画面の外へはみ出させる。
+  c.save(); c.globalAlpha = alpha * .5; c.filter = 'blur(14px)';
+  c.fillStyle = '#000';
+  Art.roundRect(c, -cw / 2 + 10, -ch / 2 + depth + 16, cw, ch, 18); c.fill();
+  c.restore();
+  Art.roundRect(c, -cw / 2, -ch / 2 + depth, cw, ch, 18);
+  c.fillStyle = Art.shade(hue, -.55); c.fill();
+  Art.roundRect(c, -cw / 2, -ch / 2, cw, ch, 18);
+  const g = c.createLinearGradient(0, -ch / 2, 0, ch / 2);
+  g.addColorStop(0, Art.shade(hue, .3));
+  g.addColorStop(.5, hue);
+  g.addColorStop(1, Art.shade(hue, -.24));
+  c.fillStyle = g; c.fill();
+  Art.stroke(c, Art.PAL.ink, 7);
+  // 地の斜め縞。ベタ1色だと札が紙に見えず、ただの矩形になる。
+  c.save();
+  Art.roundRect(c, -cw / 2, -ch / 2, cw, ch, 18); c.clip();
+  c.globalAlpha = .1; c.fillStyle = '#fff';
+  for (let x = -cw; x < cw; x += 46) {
+    c.beginPath();
+    c.moveTo(x, -ch); c.lineTo(x + 22, -ch);
+    c.lineTo(x + 22 + ch * .5, ch); c.lineTo(x + ch * .5, ch);
+    c.closePath(); c.fill();
+  }
+  c.restore();
+  // 内枠。札らしさはここで出る。
+  Art.roundRect(c, -cw / 2 + 18, -ch / 2 + 16, cw - 36, ch - 32, 10);
+  Art.stroke(c, 'rgba(255,255,255,.55)', 3.5);
+  Art.roundRect(c, -cw / 2 + 24, -ch / 2 + 22, cw - 48, ch - 44, 7);
+  Art.stroke(c, 'rgba(0,0,0,.2)', 2);
+
+  Art.title(c, text, 0, 4, 118, { fill: Art.PAL.cream, extrude: 11 });
+  c.restore();
+  return { alpha, sc };
 };
 
 Art.label = function (c, text, x, y, size, color, opt) {
@@ -806,6 +893,9 @@ Art.lights = function (c, W, t, y) {
 Art.floor = function (c, W, H, y, tint) {
   const base = tint || Art.PAL.wood;
   Art.bounceColor = base;
+  // 影はその床を深く沈めた色にする。床が変われば影の色も変わる。
+  const sc = rgb(Art.shade(base, -.82));
+  Art.shadowColor = (sc[0] | 0) + ',' + (sc[1] | 0) + ',' + (sc[2] | 0);
   const g = c.createLinearGradient(0, y, 0, H);
   g.addColorStop(0, Art.shade(base, -.3));
   g.addColorStop(.32, base);
@@ -847,6 +937,80 @@ Art.floor = function (c, W, H, y, tint) {
     { depth: 0, r: 3, shadow: false, lw: 2.5 });
   c.beginPath(); c.moveTo(0, y + 1.5); c.lineTo(W, y + 1.5);
   Art.stroke(c, 'rgba(255,214,150,.42)', 2.4);
+  c.restore();
+};
+
+/* 夜の通路。だるまさん専用の空間。
+ * 屋上の舞台を色替えして使い回すと、一目で流用と分かる。
+ * ここは光が「奥から」来る。鬼が逆光のシルエットになり、
+ * 影が手前へ長く伸びるので、追われている感じが構図から出る。 */
+Art.corridor = function (c, W, H, y, t, danger) {
+  const wall = danger ? '#3A1220' : '#1D1436';
+  const g = c.createLinearGradient(0, 0, 0, y);
+  g.addColorStop(0, Art.shade(wall, -.3));
+  g.addColorStop(1, wall);
+  c.fillStyle = g; c.fillRect(0, 0, W, y);
+
+  const vx = W * .84, vy = y - 26;          // 消失点は右奥（鬼のいる方）
+  // 側壁。奥へ収束する帯で通路を作る。
+  c.save();
+  for (let i = 0; i < 9; i++) {
+    const k = i / 9;
+    c.globalAlpha = .1 + k * .12;
+    c.fillStyle = i % 2 ? '#000' : '#fff';
+    const x0 = Art.lerp(-W * .3, vx, k), x1 = Art.lerp(-W * .3, vx, k + .11);
+    c.beginPath();
+    c.moveTo(x0, Art.lerp(-60, vy, k));   c.lineTo(x1, Art.lerp(-60, vy, k + .11));
+    c.lineTo(x1, Art.lerp(H, vy, k + .11)); c.lineTo(x0, Art.lerp(H, vy, k));
+    c.closePath(); c.fill();
+  }
+  c.restore();
+
+  // 奥の出口。ここが光源。
+  c.save(); c.globalCompositeOperation = 'lighter';
+  const gg = c.createRadialGradient(vx, vy, 0, vx, vy, W * .5);
+  const warm = danger ? 'rgba(255,90,90,' : 'rgba(255,214,160,';
+  gg.addColorStop(0, warm + '.55)');
+  gg.addColorStop(.35, warm + '.16)');
+  gg.addColorStop(1, warm + '0)');
+  c.fillStyle = gg; c.beginPath(); c.arc(vx, vy, W * .5, 0, TAU); c.fill();
+  c.restore();
+
+  // 天井の蛍光灯。奥へ小さくなる。
+  for (let i = 0; i < 5; i++) {
+    const k = .16 + i * .17;
+    const lx = Art.lerp(W * .1, vx, k), ly = Art.lerp(-10, vy - 40, k);
+    const lw = Art.lerp(190, 24, k);
+    c.save();
+    c.globalAlpha = .85 - k * .3;
+    Art.roundRect(c, lx - lw / 2, ly, lw, Math.max(4, 16 * (1 - k)), 4);
+    c.fillStyle = danger ? '#FFB9B9' : '#FFF0CE'; c.fill();
+    c.globalCompositeOperation = 'lighter'; c.globalAlpha = .3;
+    const q = c.createRadialGradient(lx, ly, 0, lx, ly, lw * .8);
+    q.addColorStop(0, danger ? 'rgba(255,120,120,.6)' : 'rgba(255,224,170,.6)');
+    q.addColorStop(1, 'rgba(255,224,170,0)');
+    c.fillStyle = q; c.beginPath(); c.arc(lx, ly, lw * .8, 0, TAU); c.fill();
+    c.restore();
+  }
+
+  // 壁と床の取り合い
+  const ao = c.createLinearGradient(0, y - 40, 0, y + 2);
+  ao.addColorStop(0, 'rgba(4,1,12,0)'); ao.addColorStop(1, 'rgba(4,1,12,.7)');
+  c.fillStyle = ao; c.fillRect(0, y - 40, W, 42);
+};
+
+/* 逆光の長い影。奥から光が来る空間で、手前に伸ばす。 */
+Art.longShadow = function (c, x, y, rx, len, strength) {
+  c.save();
+  const g = c.createLinearGradient(x, y, x - len * .5, y + len);
+  g.addColorStop(0, 'rgba(6,2,16,' + (strength || .5) + ')');
+  g.addColorStop(1, 'rgba(6,2,16,0)');
+  c.fillStyle = g;
+  c.beginPath();
+  c.moveTo(x - rx, y); c.lineTo(x + rx, y);
+  c.lineTo(x - len * .3 + rx * 1.8, y + len);
+  c.lineTo(x - len * .3 - rx * 1.8, y + len);
+  c.closePath(); c.fill();
   c.restore();
 };
 

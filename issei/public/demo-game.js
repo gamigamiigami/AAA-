@@ -251,7 +251,7 @@ function loop(nowMs) {
   if (shake > 0) c.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
 
   Art.stage(c, W, H, tSec);
-  Art.garland(c, W, tSec, -14);
+  Art.garland(c, W, tSec, -46);
   if (phase === 'play') (game === 'seino' ? viewSeino : viewDaruma)();
   else if (phase === 'reveal') (last.spread !== undefined ? revealSeino : revealDaruma)();
   else viewIdle();
@@ -363,7 +363,7 @@ function revealSeino() {
     Art.label(c, 'ばらつき ' + (L.spread === null ? '—' : L.spread + 'ms') + '　/　80ms いないで せいこう',
       W / 2, 148, 21, '#C6A9E0', { ow: .24 });
   }
-  scatter(L.entries, 150, 300, W - 300, 300);
+  scatter(L.entries, 150, 392, W - 300, 300);
   podium(L.entries.filter(e => e.error !== null).slice(0, 3),
     e => (e.error > 0 ? '+' : '') + e.error + 'ms');
 }
@@ -373,7 +373,11 @@ function scatter(entries, x, y, w, range) {
   const cx = x + w / 2;
   const px = ms => cx + Art.clamp(ms / range, -1, 1) * (w / 2 - 30);
 
-  Art.slab(c, x - 26, y - 92, w + 52, 150, '#4A2270', { depth: 8, r: 20, seed: 33, gloss: false });
+  // 縦に積んだぶんだけ枠を伸ばす。足りないと点が枠を突き抜けて見出しに被る。
+  const rows = Math.max(1, Math.ceil(entries.filter(e => e.error !== null).length / 3));
+  const top = y - 44 - rows * 42 - 26;
+  Art.slab(c, x - 26, top, w + 52, (y + 62) - top, '#4A2270',
+    { depth: 8, r: 20, seed: 33, gloss: false });
 
   c.save();
   c.strokeStyle = 'rgba(255,255,255,.3)'; c.lineWidth = 3; c.lineCap = 'round';
@@ -386,8 +390,8 @@ function scatter(entries, x, y, w, range) {
     Art.label(c, (ms > 0 ? '+' : '') + ms, gx, y + 34, 15, '#C6A9E0', { ow: .3, weight: 700 });
   }
   c.restore();
-  Art.label(c, 'はやい', x + 6, y - 62, 15, '#8E6BB0', { align: 'left', ow: .3 });
-  Art.label(c, 'おそい', x + w - 6, y - 62, 15, '#8E6BB0', { align: 'right', ow: .3 });
+  Art.label(c, 'はやい', x + 6, top + 20, 15, '#8E6BB0', { align: 'left', ow: .3 });
+  Art.label(c, 'おそい', x + w - 6, top + 20, 15, '#8E6BB0', { align: 'right', ow: .3 });
 
   const placed = [];
   for (const e of entries.filter(e => e.error !== null).sort((a, b) => a.error - b.error)) {
@@ -411,19 +415,22 @@ function scatter(entries, x, y, w, range) {
 }
 
 function podium(top, label) {
-  const hs = [104, 74, 58], order = [1, 0, 2];
+  const hs = [96, 68, 52], order = [1, 0, 2];
   const bx = W / 2 - 190;
   order.forEach((rank, slot) => {
     const e = top[rank]; if (!e) return;
-    const x = bx + slot * 190, hgt = hs[rank], baseY = 660;
+    const x = bx + slot * 190, hgt = hs[rank], baseY = 626;
     Art.slab(c, x - 74, baseY - hgt, 148, hgt, rank === 0 ? PAL.yellow : '#6A3A9C',
       { depth: 9, r: 12, seed: 40 + rank });
     Art.chara(c, { x, y: baseY - hgt - 40, r: 33, color: e.color, shape: e.shape,
       seed: e.seed, face: 'joy', bob: -Math.abs(Math.sin(tSec * 5 + rank)) * 5,
       shadowY: baseY - hgt - 4 });
-    Art.label(c, e.name, x, baseY - hgt + 26, 19, rank === 0 ? '#3A2400' : PAL.cream, { ow: .26 });
-    Art.label(c, label(e), x, baseY - hgt + 52, 17,
-      rank === 0 ? '#5A3A00' : '#D9BCF0', { ow: .24 });
+    // 順位の数字を台の面に大きく置く
+    Art.title(c, String(rank + 1), x, baseY - hgt + 34, 40,
+      { fill: rank === 0 ? '#FFF6E3' : '#D9BCF0' });
+    // 名前と記録は台の下。台の上に載せると潰れて読めない。
+    Art.label(c, e.name, x, baseY + 22, 21, PAL.cream, { ow: .3 });
+    Art.label(c, label(e), x, baseY + 46, 18, PAL.yellow, { ow: .3 });
   });
 }
 

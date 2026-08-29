@@ -1272,6 +1272,27 @@ Art.floor = function (c, W, H, y, tint, vpx, hzy) {
     Art.stroke(c, 'rgba(50,24,0,.8)', 1.3);
     yy += 15 + k * 12; k++;
   }
+
+  /* 節。木目の線だけだと、板ではなく縞になる。板1枚に1〜2個、
+   * 位置は種で固定して毎フレーム動かない。奥ほど小さく、薄く。 */
+  for (let i = -9; i < 9; i++) {
+    const n = (hash(i * 91) * .5 + .5) > .45 ? 2 : 1;
+    for (let j = 0; j < n; j++) {
+      const t = .18 + (hash(i * 13 + j * 71) * .5 + .5) * .78;   // 板に沿った位置
+      const ky = y + (H - y) * t;
+      const half = (ex(i + 1, ky) - ex(i, ky)) / 2;
+      const kx = ex(i, ky) + half * (1 + hash(i * 29 + j * 7) * .5);
+      // 節は板幅の1割まで。大きくすると木目ではなく染みに見える
+      const rr = Math.abs(half) * (.065 + (hash(i * 53 + j) * .5 + .5) * .045);
+      if (rr < 1.1) continue;
+      c.globalAlpha = .26;
+      c.beginPath(); c.ellipse(kx, ky, rr, rr * .60, .3, 0, TAU);
+      c.fillStyle = '#3A1C08'; c.fill();
+      c.globalAlpha = .13;   // 節のまわりに木目が寄る
+      c.beginPath(); c.ellipse(kx, ky, rr * 1.9, rr * 1.05, .3, 0, TAU);
+      Art.stroke(c, 'rgba(64,32,10,.9)', Math.max(.7, rr * .2));
+    }
+  }
   c.restore();
 
   /* 壁と床の取り合い。ここを1本の線で済ませると、画面で最も
@@ -1290,9 +1311,8 @@ Art.floor = function (c, W, H, y, tint, vpx, hzy) {
 
 /* 夜の通路。だるまさん専用の空間。
  * 屋上の舞台を色替えして使い回すと、一目で流用と分かる。
- * ここは光が「奥から」来る。影は手前へ長く伸びる（Art.longShadow）。
- * 鬼を逆光のシルエットにするのは未実装 —— いまは他のキャラと同じ描画で、
- * 正面からの照りとハイライトが乗っている。次に直す。 */
+ * ここは光が「奥から」来る。影は手前へ長く伸び（Art.longShadow）、
+ * 鬼は逆光のシルエットになる（Art.oni）。 */
 Art.corridor = function (c, W, H, y, t, danger) {
   const wall = danger ? '#3A1220' : '#1D1436';
   const g = c.createLinearGradient(0, 0, 0, y);
@@ -1303,7 +1323,7 @@ Art.corridor = function (c, W, H, y, t, danger) {
   /* 消失点はひとつ。右奥、鬼のいる方。側壁も天井灯も床もここへ向ける。
    * 1つでも別の点を向くと、空間ではなく「奥行きっぽい模様」になる。 */
   const vx = W * .84, vy = y - 26;
-  Art.corridorVP = vx;
+  Art.corridorVP = vx; Art.corridorHZ = vy;
   // 側壁。奥へ収束する帯で通路を作る。
   c.save();
   for (let i = 0; i < 9; i++) {

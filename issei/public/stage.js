@@ -43,8 +43,8 @@ const SEATS = [
  * 「遠い」ではなく「小さいスプライト」に見える。実際 125px ずれていた。
  * 最前列は、足元の名前が参加者一覧の帯にぶつからない高さで止める。 */
 const HZ = Art.horizon(STAGE_Y);
-const rowAt = (y) => ({ y, s: 1.18 * (y - HZ) / (630 - HZ) });
-const ROWS = [rowAt(508), rowAt(566), rowAt(630)];
+const rowAt = (y) => ({ y, s: 1.18 * (y - HZ) / (620 - HZ) });
+const ROWS = [rowAt(504), rowAt(560), rowAt(620)];
 
 /* 走者のレーン。大きさは手で決めない —— 廊下と同じ地平線から引く。
  * 手打ちにすると、壁は奥へ収束しているのに走者だけ縮まず、
@@ -284,7 +284,9 @@ function strip(c, st, entries, x, y, w) {
     c.beginPath(); c.moveTo(tx, y - budget - (zero ? 4 : 0));
     c.lineTo(tx, y + budget + (zero ? 4 : 0));
     Art.stroke(c, zero ? PAL.focus : 'rgba(255,247,232,.22)', zero ? 4 : 2);
-    Art.label(c, zero ? 'ぴったり' : (ms > 0 ? '+' : '') + (ms / 1000).toFixed(1) + '秒',
+    // 単位は ms に統一する。同じ画面に ms と 秒 が混ざると、自分の値が
+    // 帯のどこに当たるかを客に暗算させることになる。
+    Art.label(c, zero ? 'ぴったり' : (ms > 0 ? '+' : '') + ms + 'ms',
       tx, ly, zero ? 16 : 14,
       zero ? PAL.focus : 'rgba(255,247,232,.45)', { ow: .34 });
   }
@@ -305,7 +307,7 @@ function strip(c, st, entries, x, y, w) {
       c.moveTo(q.x + sd * (R + 15), cy); c.lineTo(q.x + sd * (R + 3), cy - 8);
       c.lineTo(q.x + sd * (R + 3), cy + 8); c.closePath();
       c.fillStyle = PAL.danger; c.fill(); Art.stroke(c, PAL.ink, 3);
-      Art.num(c, (e.error > 0 ? '+' : '') + (e.error / 1000).toFixed(2) + '秒',
+      Art.num(c, (e.error > 0 ? '+' : '') + e.error + 'ms',
         q.x + sd * (R + 22), cy, 16, PAL.danger,
         { align: sd > 0 ? 'left' : 'right', ow: .38 });
     }
@@ -319,8 +321,11 @@ function strip(c, st, entries, x, y, w) {
 Stage.daruma = function (c, st) {
   const watching = st.watching, cur = st.chant;
   Art.corridor(c, W, H, D_Y, st.tSec, watching);
-  // 床も廊下と同じ消失点へ。別の点を向くと1画面に2つのパースが同居する
-  Art.floor(c, W, H, D_Y, watching ? '#6E3038' : '#5C4A72', Art.corridorVP);
+  /* 床は廊下と同じ消失点「かつ同じ地平線」から引く。x だけ合わせて y を
+   * 既定のまま（壁より74px上）にしていたので、壁は奥へ収束しているのに
+   * 床の縞だけがほぼ平行に流れ、画面最大面積がパース違反になっていた。 */
+  Art.floor(c, W, H, D_Y, watching ? '#6E3038' : '#5C4A72',
+            Art.corridorVP, Art.corridorHZ);
   if (watching) { c.fillStyle = 'rgba(120,10,26,.16)'; c.fillRect(0, 0, W, H); }
 
   const gx = D_X1 + 96;
@@ -436,8 +441,12 @@ function podium(c, st, top, label) {
 Stage.roster = function (c, st) {
   /* 並び順は舞台の左→右に合わせる。点数順にすると、覚えたアイコンの位置が
    * 毎ラウンド動いて、目で照合できなくなる。この画面の仕事は順位ではなく
-   * 「どれが自分か」なので、位置は動かさない。
-   * 首位は並べ替えではなく印で示す。 */
+   * 「どれが自分か」なので、位置は動かさない。首位は印で示す。
+   *
+   * 置き場所は画面の最下端いっぱい。前は右下に浮いた角丸の板で、舞台の
+   * 絵を切り、名前や耳が板の縁で欠けていた。空間に属さないUIが空間の中に
+   * 浮いていると、絵が「背景＋貼ったUI」に分解して見える。
+   * 下端に接した棚にすれば、それは額縁の一部になる。 */
   let show = st.players.slice();
   if (st.players.length > 8) {
     const top = st.players.slice().sort((a, b) => b.score - a.score).slice(0, 5);
@@ -447,21 +456,30 @@ Stage.roster = function (c, st) {
   }
   show.sort((a, b) => (a.spot ? a.spot.x : 0) - (b.spot ? b.spot.x : 0));
   const best = Math.max(0, ...st.players.map(p => p.score));
-  const cw = 96, pad = 14;
-  const total = show.length * cw + pad * 2;
-  const rx0 = W - 18 - total;
-  Art.slab(c, rx0, H - 62, total, 50, '#2A1B44', { depth: 4, r: 25, shadow: false, lw: 2.5 });
+
+  const BH = 48, by = H - BH;
+  c.save();
+  const g = c.createLinearGradient(0, by, 0, H);
+  g.addColorStop(0, '#241338'); g.addColorStop(1, '#160A26');
+  c.fillStyle = g; c.fillRect(0, by, W, BH);
+  c.beginPath(); c.moveTo(0, by + 1.5); c.lineTo(W, by + 1.5);
+  Art.stroke(c, 'rgba(255,214,150,.30)', 3);
+
+  // 棚の中だけに描く。頭の飾りが縁で切れるのを防ぐ
+  c.beginPath(); c.rect(0, by, W, BH); c.clip();
+  const cw = Math.min(150, (W - 40) / show.length);
+  const x0 = W / 2 - (show.length * cw) / 2;
   show.forEach((p, i) => {
-    const x = rx0 + pad + cw * i + cw / 2 - 16;
-    Art.chara(c, { x, y: H - 38, r: 15, color: p.color, shape: p.shape, seed: p.seed,
+    const x = x0 + cw * i + 22;
+    Art.chara(c, { x, y: H - 21, r: 15, color: p.color, shape: p.shape, seed: p.seed,
       face: p.face, blink: p.blink > 0, feet: false, arms: false });
-    Art.label(c, p.name, x + 21, H - 46, 16,
+    const nm = Art.measure(c, p.name, 17);
+    Art.label(c, p.name, x + 23, H - 26, 17,
       p.you ? PAL.cream : 'rgba(255,247,232,.72)', { ow: .34, align: 'left' });
-    Art.num(c, String(p.score), x + 21, H - 26, 18,
-      p.you ? PAL.focus : 'rgba(255,247,232,.45)', { ow: .34, align: 'left' });
-    // 首位の印。並べ替える代わりにこれで示す
+    Art.num(c, String(p.score), x + 23 + nm + 9, H - 25, 19,
+      p.you ? PAL.focus : 'rgba(255,247,232,.5)', { ow: .34, align: 'left' });
     if (best > 0 && p.score === best) {
-      c.save(); c.translate(x - 13, H - 54); c.scale(.7, .7);
+      c.save(); c.translate(x, H - 40); c.scale(.56, .56);
       c.beginPath();
       c.moveTo(-11, 6); c.lineTo(-11, -6); c.lineTo(-5, -1); c.lineTo(0, -9);
       c.lineTo(5, -1); c.lineTo(11, -6); c.lineTo(11, 6); c.closePath();
@@ -469,6 +487,7 @@ Stage.roster = function (c, st) {
       c.restore();
     }
   });
+  c.restore();
 };
 
 /* 参加者1人ぶんのモーション更新。デモも本番も同じ動きにする。

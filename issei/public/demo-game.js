@@ -29,6 +29,7 @@ const players = CAST_DEF.map((d, i) => Object.assign({}, d, {
 }));
 const YOU = players[0];
 const cueFired = new Set();   // 同じ合図で二度鳴らさない
+const resEl = $('#res'), resWord = $('#resword'), resSub = $('#ressub'), resFace = $('#resface');
 const order = S.seat(players);
 
 { const mc = $('#me').getContext('2d');
@@ -56,6 +57,29 @@ const HOLD_CARD = new URLSearchParams(location.search).get('card') === '1';
 function setBtn(label, disabled, hit) {
   btn.textContent = label; btn.disabled = !!disabled;
   btn.classList.toggle('hit', !!hit);
+  btn.hidden = false; resEl.hidden = true;
+}
+
+/* 手元の結果。数字だけを出すと、直前まで真っ赤な巨大ボタンだった場所が
+ * 無反応の灰色の箱に化けて、その瞬間に熱が落ちる。
+ * 自分の分身が結果の顔をして、一言を言う。ミリ秒は添え物。 */
+function showResult(word, sub, tone, face) {
+  btn.hidden = true; resEl.hidden = false;
+  const T = { good: ['#2E7A4E', '#1C5334', '#B6FFD2'],
+              near: ['#7A5A1E', '#523A10', '#FFE9A8'],
+              bad:  ['#7A2436', '#511525', '#FFC2CE'] }[tone];
+  resEl.style.setProperty('--res-a', T[0]);
+  resEl.style.setProperty('--res-b', T[1]);
+  resEl.style.setProperty('--res-ink', T[2]);
+  resWord.textContent = word; resSub.textContent = sub;
+  resEl.style.animation = 'none'; void resEl.offsetWidth; resEl.style.animation = '';
+  const fc = resFace.getContext('2d');
+  fc.setTransform(2, 0, 0, 2, 0, 0);
+  fc.clearRect(0, 0, 66, 66);
+  Art.bounceColor = PAL.wood; Art.shadowColor = '8,3,22';
+  Art.chara(fc, { x: 33, y: 34, r: 24, color: YOU.color, shape: YOU.shape,
+    seed: YOU.seed, face, armT: 0, feet: false,
+    pose: Art.POSE[face === 'joy' ? 'cheer' : face === 'sad' ? 'flop' : 'idle'] });
 }
 
 btn.addEventListener('pointerdown', onDown);
@@ -181,7 +205,27 @@ function finish() {
     flash = .45;
   } else shake = 12;
 
-  setBtn(st.last.you, true, false);
+  {
+    const e = st.last.entries.find(x => x.id === 0);
+    if (game === 'seino') {
+      if (!e || e.error === null || e.error === undefined) {
+        showResult('おしてない！', 'つぎは いっしょに', 'bad', 'sad');
+      } else {
+        const ms = e.error, a = Math.abs(ms);
+        const sub = (ms > 0 ? '+' : '') + ms + 'ms';
+        if (a <= 80)       showResult('ぴったり！', sub, 'good', 'joy');
+        else if (a <= 200) showResult('おしい！',   sub, 'near', 'flat');
+        else               showResult(ms < 0 ? 'はやすぎ' : 'おそすぎ', sub, 'bad', 'sad');
+      }
+    } else {
+      if (e && e.fin !== null && e.fin !== undefined)
+        showResult('ゴール！', 'いちばんのり', 'good', 'joy');
+      else if (e && e.caught)
+        showResult('つかまった', 'うごきすぎ', 'bad', 'sad');
+      else
+        showResult('とどかず', (e ? Math.round(e.dist) : 0) + ' / ' + g.goal, 'near', 'flat');
+    }
+  }
   foot.textContent = 'つぎのゲームへ…';
   setTimeout(() => { phase = 'idle'; startRound(); }, 6400);
 }

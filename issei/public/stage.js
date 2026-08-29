@@ -237,9 +237,18 @@ const STRIP_H = 162;          // 帯の高さは固定。人数で伸びると�
 function strip(c, st, entries, x, y, w) {
   const hits = entries.filter(e => e.error !== null && e.error !== undefined);
   if (!hits.length) return;
+  /* 軸の中心は「目標の瞬間」ではなく「みんなの真ん中」に置く。
+   *
+   * 判定しているのは、目標からのズレではなく、ばらつき（互いにどれだけ
+   * 揃ったか）。全員が仲良く600ms遅れた回は「そろった！」で成功なのに、
+   * 目標を中心にすると6人全員が帯の外に張り付き、見出しと絵が正反対の
+   * ことを言う画面になる。実際そうなっていた。
+   * 判定している量を、そのまま絵にする。 */
+  const mean = hits.reduce((a2, b2) => a2 + b2.error, 0) / hits.length;
   const half = w / 2 - 30;
   const px = ms => x + w / 2 + Art.clamp(ms / STRIP_RANGE, -1, 1) * half;
-  const sorted = hits.slice().sort((a2, b2) => a2.error - b2.error);
+  const dev = e => e.error - mean;
+  const sorted = hits.slice().sort((a2, b2) => dev(a2) - dev(b2));
 
   /* 重なった人は軸の上下へ交互に逃がす。上へ積むだけだと塔になり、
    * 「上にいるほど何かが上」という無い意味を読ませてしまう。
@@ -252,7 +261,7 @@ function strip(c, st, entries, x, y, w) {
   const LEVEL = [0, -1, 1, -2, 2];
   const placed = [];
   for (const e of sorted) {
-    const ex = px(e.error);
+    const ex = px(dev(e));
     let best = null;
     outer:
     for (const lv of LEVEL) for (const nu of NUDGE) {
@@ -262,7 +271,7 @@ function strip(c, st, entries, x, y, w) {
       }
     }
     if (!best) best = { lv: 0, x: ex };
-    placed.push({ e, x: best.x, lv: best.lv, over: Math.abs(e.error) > STRIP_RANGE });
+    placed.push({ e, x: best.x, lv: best.lv, over: Math.abs(dev(e)) > STRIP_RANGE });
   }
 
   const top = y - STRIP_H / 2;
@@ -296,7 +305,7 @@ function strip(c, st, entries, x, y, w) {
     Art.stroke(c, zero ? 'rgba(255,197,49,.75)' : 'rgba(255,247,232,.18)', zero ? 2.5 : 2);
     // 単位は ms に統一する。同じ画面に ms と 秒 が混ざると、自分の値が
     // 帯のどこに当たるかを客に暗算させることになる。
-    Art.label(c, zero ? 'ぴったり' : (ms > 0 ? '+' : '') + ms + 'ms',
+    Art.label(c, zero ? 'みんなの まんなか' : (ms > 0 ? '+' : '') + ms + 'ms',
       tx, ly, zero ? 16 : 14,
       zero ? PAL.focus : 'rgba(255,247,232,.45)', { ow: .34 });
   }
@@ -306,6 +315,13 @@ function strip(c, st, entries, x, y, w) {
     { ow: .34, align: 'left' });
   Art.label(c, 'おそい', x + w - 26, y - budget - 13, 14, 'rgba(255,247,232,.38)',
     { ow: .34, align: 'right' });
+  /* 集団ごと目標からずれていた分は、判定には効かないが面白い情報なので
+   * 軸とは別に一行で言う。軸に混ぜると、判定している量が読めなくなる。 */
+  if (Math.abs(mean) >= 60) {
+    Art.label(c, 'ぜんいん ' + Math.abs(Math.round(mean)) + 'ms ' +
+      (mean > 0 ? 'おそかった' : 'はやかった'),
+      x + w / 2, top + STRIP_H + 16, 18, 'rgba(255,247,232,.55)', { ow: .32 });
+  }
 
   for (const q of placed) {
     const e = q.e, cy = y - q.lv * rowH;
@@ -314,12 +330,12 @@ function strip(c, st, entries, x, y, w) {
        * 実際の値を横に直接書く。図と数字が食い違う画面は自動生成に見える。 */
       /* 振り切れた人。矢印も値も帯の内側に置く。外に出すと、
        * 主役が絵の外へ追い出されたように見える。 */
-      const sd = e.error > 0 ? 1 : -1;
+      const sd = dev(e) > 0 ? 1 : -1;
       c.beginPath();
       c.moveTo(q.x + sd * (R + 13), cy); c.lineTo(q.x + sd * (R + 2), cy - 7);
       c.lineTo(q.x + sd * (R + 2), cy + 7); c.closePath();
       c.fillStyle = PAL.danger; c.fill(); Art.stroke(c, PAL.ink, 3);
-      Art.num(c, (e.error > 0 ? '+' : '') + e.error + 'ms',
+      Art.num(c, (dev(e) > 0 ? '+' : '') + Math.round(dev(e)) + 'ms',
         q.x - sd * (R + 6), cy - R - 4, 16, PAL.danger,
         { align: sd > 0 ? 'right' : 'left', ow: .38 });
     }

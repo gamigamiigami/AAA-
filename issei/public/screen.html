@@ -104,7 +104,9 @@ GG.net.onState = (s) => {
     phase = s.phase;
   }
   st.last = s.last ? normalize(s.last) : null;
-  Snd.music(s.phase !== 'reveal' && st.players.length > 0, 120);
+  // 待ち受けと本番で温度を変える。同じループを流し続けると全部が同じ緊張度になる
+  Snd.mood(!st.players.length ? 'off' : s.phase === 'play' ? 'play'
+         : s.phase === 'reveal' ? 'tense' : 'lobby');
 };
 GG.net.onPressed = (n, lv) => {
   st.sent = n;
@@ -156,6 +158,10 @@ function cue(key, name) {
 function seinoCues(left) {
   for (let i = 0; i <= countIn; i++) {
     const at = -(countIn - i) * beat;
+    // 最後の1拍の手前で曲を完全に止める。無音がいちばん強い緊張装置。
+    if (i === countIn - 1 && left <= at && !fired.has(round + ':hush')) {
+      fired.add(round + ':hush'); Snd.hush(beat / 1000 + 1.1);
+    }
     if (left <= at && cue(round + ':c' + i, i === countIn ? 'beat' : 'tick') && i === countIn) {
       hitStop = .06; shake = 8;
     }

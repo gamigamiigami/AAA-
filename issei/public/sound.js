@@ -26,7 +26,7 @@ Snd.init = function () {
   Snd.master.connect(comp); comp.connect(ctx.destination);
 
   Snd.sfxGain = ctx.createGain(); Snd.sfxGain.gain.value = 1;
-  Snd.musicGain = ctx.createGain(); Snd.musicGain.gain.value = .34;
+  Snd.musicGain = ctx.createGain(); Snd.musicGain.gain.value = 0;
   Snd.sfxGain.connect(Snd.master); Snd.musicGain.connect(Snd.master);
 
   // 短い残響。乾いた音のままだと安っぽく聞こえる。
@@ -42,6 +42,9 @@ Snd.init = function () {
   const revGain = ctx.createGain(); revGain.gain.value = .18;
   rev.connect(revGain); revGain.connect(Snd.master);
   Snd.rev = rev;
+  /* 曲の残響は必ず曲のバスを通す。1音ずつ直接 rev へ送ると、
+   * 曲を黙らせても残響だけが鳴り続け、無音の場面が作れない。 */
+  Snd.musicGain.connect(rev);
 
   // ノイズ源（打楽器用）
   const nlen = ctx.sampleRate * 2;
@@ -159,51 +162,116 @@ Snd.sfx = function (name, at) {
 };
 
 // ---------------------------------------------------------------- 音楽
-/* 待ち受け〜プレイ中に薄く流す。ベース + 和音 + 裏拍のハット。
- * 拍が画面と揃うので、リズムの手掛かりにもなる。 */
+/* 曲がループしているだけでは音楽になっていない。必要なのは3つ。
+ *   1. 口ずさめる旋律があること
+ *   2. 場面でテンポと厚みが変わること（待ち受けと本番が同じ温度では困る）
+ *   3. いちばん大事な瞬間に、音が止まること
+ * 3が最重要。無音はいちばん強い緊張装置で、しかも一銭もかからない。 */
+
+/* A ドリアン。i - IV - i - VII。短調の中に長調のIVが来るので、
+ * Am-F-G-C という手垢のついた響きにならない。夜の屋上には少し明るすぎる
+ * くらいがちょうどいい。 */
 const PROG = [
   [45, [57, 60, 64]],   // Am
-  [41, [53, 57, 60]],   // F
-  [43, [55, 59, 62]],   // G
-  [40, [52, 55, 60]]    // C/E
+  [50, [57, 62, 66]],   // D   ← ドリアンの明るいIV。この曲の性格はここで決まる
+  [45, [57, 60, 64]],   // Am
+  [43, [55, 59, 62]]    // G
 ];
 
-Snd.music = function (on, bpm) {
+/* 動機。「い・っ・せ・い」の4音。5→6→1→5 と上がって主音に落ちる。
+ * 2小節目でドリアンの6度（F#）を必ず踏む。ここがこの曲の指紋になる。
+ * s = 8分音符いくつ目か（1小節=8）、n = MIDI、d = 長さ（8分いくつ分） */
+const MOTIF = [
+  { s:  0, n: 64, d: 1.0 },   // E
+  { s:  2, n: 66, d: 0.5 },   // F#
+  { s:  3, n: 69, d: 1.5 },   // A
+  { s:  6, n: 64, d: 1.0 },   // E
+  { s: 16, n: 64, d: 1.0 },
+  { s: 18, n: 69, d: 0.5 },   // A
+  { s: 19, n: 71, d: 1.5 },   // B
+  { s: 22, n: 69, d: 2.0 }    // A
+];
+
+/* 場面ごとの層。全部を常に鳴らすと、静かな場面が作れない。 */
+const MOOD = {
+  lobby: { bpm:  96, drums: false, lead: true,  chord: .05, bass: .22, level: .26 },
+  play:  { bpm: 132, drums: true,  lead: true,  chord: .07, bass: .30, level: .34 },
+  tense: { bpm: 132, drums: true,  lead: false, chord: .04, bass: .30, level: .30 }
+};
+Snd.MOOD = MOOD; Snd.MOTIF = MOTIF; Snd.PROG = PROG;
+
+/* 主旋律の声。ベースや和音と同じ音色だと旋律が埋もれる。
+ * 少し歪んだ鋸波にローパスを当てて、上に浮かせる。 */
+function lead(o) {
+  const ctx = Snd.ctx, t = o.at;
+  const g = ctx.createGain();
+  const f = ctx.createBiquadFilter();
+  f.type = 'lowpass'; f.Q.value = 6;
+  f.frequency.setValueAtTime(1500, t);
+  f.frequency.exponentialRampToValueAtTime(2900, t + .05);
+  f.frequency.exponentialRampToValueAtTime(1100, t + o.dur);
+  for (const d of [-9, 9]) {
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(N(o.n), t);
+    osc.detune.value = d;
+    osc.connect(f); osc.start(t); osc.stop(t + o.dur + .1);
+  }
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(o.gain, t + .012);
+  g.gain.setValueAtTime(o.gain, t + o.dur * .7);
+  g.gain.exponentialRampToValueAtTime(.0001, t + o.dur);
+  f.connect(g); g.connect(Snd.musicGain);
+}
+
+Snd._mood = null;
+Snd.music = function (on, bpm) {          // 旧名。呼び出し側が残っている間だけ
+  Snd.mood(on ? 'play' : 'off');
+};
+
+Snd.mood = function (name) {
   if (!Snd.ctx) return;
-  if (!on) {
+  if (name === 'off') {
     if (Snd._music) { clearInterval(Snd._music.timer); Snd._music = null; }
+    Snd._mood = null;
     Snd.musicGain.gain.setTargetAtTime(0, now(), .2);
     return;
   }
-  if (Snd._music) return;
-  Snd.musicGain.gain.setTargetAtTime(.34, now(), .3);
+  const M = MOOD[name] || MOOD.play;
+  if (Snd._mood === name) return;
+  Snd._mood = name;
+  Snd.musicGain.gain.cancelScheduledValues(now());
+  Snd.musicGain.gain.setTargetAtTime(M.level, now(), .3);
 
-  const beat = 60 / (bpm || 120);
-  const st = { next: now() + .1, step: 0 };
+  if (Snd._music) { Snd._music.M = M; return; }   // 走っている拍は切らさない
+
+  const st = { next: now() + .1, step: 0, M: M };
   const schedule = () => {
+    const m = st.M;
+    const beat = 60 / m.bpm;
     while (st.next < now() + .4) {
-      const t = st.next, s = st.step;
+      const t = st.next, s = st.step, inBar = s % 8;
       const bar = (s >> 3) % PROG.length;
       const [bass, chord] = PROG[bar];
 
-      if (s % 8 === 0 || s % 8 === 3 || s % 8 === 6) {
-        tone({ at: t, f0: N(bass - 12), dur: .34, gain: .3, type: 'triangle',
+      if (inBar === 0 || inBar === 3 || inBar === 6) {
+        tone({ at: t, f0: N(bass - 12), dur: .34, gain: m.bass, type: 'triangle',
                cutoff: 700, bus: Snd.musicGain, wet: false, thick: false });
       }
-      if (s % 8 === 0) {  // キック
-        noise({ at: t, type: 'lowpass', f0: 220, f1: 60, dur: .16, gain: .5, bus: Snd.musicGain });
+      if (m.drums) {
+        if (inBar === 0) noise({ at: t, type: 'lowpass', f0: 220, f1: 60, dur: .16, gain: .5, bus: Snd.musicGain });
+        if (inBar === 4) noise({ at: t, f0: 2000, dur: .13, gain: .22, q: .6, bus: Snd.musicGain });
+        if (s % 2 === 1) noise({ at: t, f0: 9000, dur: .035, gain: .09, q: .5, bus: Snd.musicGain });
       }
-      if (s % 8 === 4) {  // スネア
-        noise({ at: t, f0: 2000, dur: .13, gain: .22, q: .6, bus: Snd.musicGain });
-      }
-      if (s % 2 === 1) {  // 裏拍のハット
-        noise({ at: t, f0: 9000, dur: .035, gain: .09, q: .5, bus: Snd.musicGain });
-      }
-      // 和音を分散で
-      const n = chord[s % chord.length];
-      tone({ at: t, f0: N(n + 12), dur: .2, gain: .07, type: 'square',
-             cutoff: 2600, bus: Snd.musicGain, thick: false });
+      tone({ at: t, f0: N(chord[s % chord.length] + 12), dur: .2, gain: m.chord,
+             type: 'square', cutoff: 2600, bus: Snd.musicGain, thick: false });
 
+      if (m.lead) {
+        const pos = s % 32;
+        for (const nt of MOTIF) {
+          if (nt.s === pos) lead({ at: t, n: nt.n, dur: beat * nt.d * .92, gain: .18 });
+        }
+      }
       st.next += beat / 2;
       st.step++;
     }
@@ -213,12 +281,28 @@ Snd.music = function (on, bpm) {
   Snd._music = st;
 };
 
-Snd.duck = function (amount, sec) {
+/* 完全に黙らせる。「せーの！」の直前はここを呼ぶ。
+ * 音を小さくするのでは足りない。ゼロにしないと客は息を止めない。 */
+Snd.hush = function (sec) {
   if (!Snd.ctx) return;
   const g = Snd.musicGain.gain;
   g.cancelScheduledValues(now());
-  g.setTargetAtTime(.34 * (1 - amount), now(), .03);
-  g.setTargetAtTime(.34, now() + (sec || .5), .25);
+  g.setTargetAtTime(0, now(), .05);
+  Snd._hushUntil = now() + (sec || 1.2);
+  clearTimeout(Snd._hushT);
+  Snd._hushT = setTimeout(() => {
+    const M = MOOD[Snd._mood] || MOOD.play;
+    if (Snd._mood) Snd.musicGain.gain.setTargetAtTime(M.level, now(), .25);
+  }, (sec || 1.2) * 1000);
+};
+
+Snd.duck = function (amount, sec) {
+  if (!Snd.ctx) return;
+  const M = MOOD[Snd._mood] || MOOD.play;
+  const g = Snd.musicGain.gain;
+  g.cancelScheduledValues(now());
+  g.setTargetAtTime(M.level * (1 - amount), now(), .03);
+  g.setTargetAtTime(M.level, now() + (sec || .5), .25);
 };
 
 window.Snd = Snd;

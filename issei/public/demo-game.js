@@ -28,6 +28,7 @@ const players = CAST_DEF.map((d, i) => Object.assign({}, d, {
   face: 'smile', poseName: 'idle', dist: 0, moving: false
 }));
 const YOU = players[0];
+const cueFired = new Set();   // 同じ合図で二度鳴らさない
 const order = S.seat(players);
 
 { const mc = $('#me').getContext('2d');
@@ -66,7 +67,7 @@ addEventListener('keyup', e => { if (e.code === 'Space') onUp(e); });
 
 function onDown(e) {
   Snd.init();
-  if (phase === 'idle') { Snd.music(true, 120); return startRound(); }
+  if (phase === 'idle') { Snd.mood('lobby'); return startRound(); }
   if (phase !== 'play') return;
   const t = (e && e.timeStamp > 0) ? e.timeStamp : now();
   if (game === 'seino') {
@@ -102,10 +103,12 @@ function startRound() {
   st.cardWord = game === 'seino' ? 'せーの！' : 'とまれ！';
   st.cardHue  = game === 'seino' ? '#2E7BC4' : '#B03050';
   st.cardT = 0; cardHit = false; phase = 'card';
+  Snd.mood('play');
 }
 
 function beginRound() {
   phase = 'play'; st.last = null; st.sent = 0; wipe = .55; st.revealT = 0;
+  cueFired.clear();
   for (const p of players) {
     p.face = 'smile'; p.sq.to(1); p.poseName = 'idle'; p.lean = 0;
     p.dist = 0; p.moving = false; p.pending = null;
@@ -157,6 +160,7 @@ function finish() {
   scoreShown = YOU.score; scEl.textContent = YOU.score;
 
   const won = st.last.winners.indexOf(0) >= 0;
+  Snd.mood('tense');
   Snd.duck(.6, .9);
   Snd.sfx(won || st.last.ok ? 'win' : 'lose');
   if (navigator.vibrate) navigator.vibrate(won ? [40, 60, 40] : 150);
@@ -276,7 +280,23 @@ function loop(ms) {
   wipe = Math.max(0, wipe - dt * 3.2);
 
   if (phase === 'play' && game === 'daruma') updateDaruma();
-  if (phase === 'play' && game === 'seino') st.left = g.target - now();
+  if (phase === 'play' && game === 'seino') {
+    st.left = g.target - now();
+    /* 予告の拍。そして最後の1拍の手前で曲を完全に止める。
+     * 音を小さくするのでは足りない。ゼロにしないと客は息を止めない。 */
+    for (let i = 0; i <= COUNT_IN; i++) {
+      const at = -(COUNT_IN - i) * BEAT;
+      if (st.left > at) continue;
+      if (i === COUNT_IN - 1 && !cueFired.has('hush')) {
+        cueFired.add('hush'); Snd.hush(BEAT / 1000 + 1.1);
+      }
+      if (!cueFired.has('c' + i)) {
+        cueFired.add('c' + i);
+        Snd.sfx(i === COUNT_IN ? 'beat' : 'tick');
+        if (i === COUNT_IN) { hitStop = .06; shake = 8; }
+      }
+    }
+  }
 
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.save();

@@ -25,7 +25,11 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
   const screen = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   screen.on('pageerror', e => errors.push('[screen] ' + e.message));
-  screen.on('console', m => { if (m.type() === 'error') errors.push('[screen] ' + m.text()); });
+  // 外部フォントはこの検証環境からは取れない（本番と公開先では読める）
+  const netFail = (t) => /Failed to load resource/.test(t);
+  screen.on('console', m => {
+    if (m.type() === 'error' && !netFail(m.text())) errors.push('[screen] ' + m.text());
+  });
   await screen.goto(BASE + '/screen.html');
   await sleep(1200);
   await screen.screenshot({ path: path.join(OUT, '01-lobby.png') });
@@ -37,7 +41,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const lag = i === 5 ? 300 : 0;
     const pg = await browser.newPage({ viewport: { width: 390, height: 780 } });
     pg.on('pageerror', e => errors.push('[phone] ' + e.message));
-    pg.on('console', m => { if (m.type() === 'error') errors.push('[phone] ' + m.text()); });
+    pg.on('console', m => {
+      if (m.type() === 'error' && !netFail(m.text())) errors.push('[phone] ' + m.text());
+    });
     await pg.goto(BASE + '/phone.html' + (lag ? '?lag=' + lag : ''));
     await pg.fill('#name', names[i]);
     await pg.click('#go');

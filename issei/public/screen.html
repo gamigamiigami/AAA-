@@ -3,49 +3,50 @@
 <head>
 <meta charset="utf-8">
 <title>一斉 — メイン画面</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #0e1017;
-    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #120724; }
   body { display: flex; align-items: center; justify-content: center; }
   canvas { display: block; }
-  #hint { position: fixed; right: 14px; bottom: 12px; color: #3d4658; font-size: 12px;
-    font-family: ui-monospace, monospace; }
+  /* 会場では誰も画面の隅を読まない。操作の案内は最小に、消えるように。 */
+  #hint { position: fixed; left: 16px; bottom: 12px; color: #4A3568; font-size: 12px;
+    font-family: "Zen Maru Gothic", system-ui, sans-serif; letter-spacing: .06em;
+    transition: opacity .6s; }
 </style>
 </head>
 <body>
 <canvas id="screen" width="1280" height="720"></canvas>
-<div id="hint">SPACE = 開始 / 停止</div>
+<div id="hint">SPACE = かいし / ていし</div>
 
 <script src="common.js"></script>
+<script src="art.js"></script>
+<script src="sound.js"></script>
+<script src="stage.js"></script>
 <script>
 'use strict';
-const W = 1280, H = 720;
+/* メイン画面。描画はすべて stage.js に任せる。
+ * デモと本番で描き分けを持つと必ず食い違い、どちらかが古くなる。 */
+const S = Stage, W = S.W, H = S.H;
 const cv = document.getElementById('screen');
 const c = cv.getContext('2d');
-let state = null, running = false;
+const hintEl = document.getElementById('hint');
 
-/* 音は必ずメイン画面から出す。1台のスピーカーから全員に同時に届く、
- * この形式でいちばん速く公平な情報路。スマホからは音を出さない。 */
-let actx = null;
-const fired = new Set();
-function beep(kind) {
-  if (!actx) return;
-  const t = actx.currentTime;
-  const o = actx.createOscillator(), g = actx.createGain();
-  const spec = { tick: [440, 'sine', 0.12, 0.09], hit: [880, 'square', 0.26, 0.22],
-                 turn: [180, 'sawtooth', 0.3, 0.35], chant: [330, 'triangle', 0.1, 0.07] }[kind];
-  o.frequency.value = spec[0]; o.type = spec[1];
-  g.gain.setValueAtTime(spec[2], t);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + spec[3]);
-  o.connect(g); g.connect(actx.destination);
-  o.start(t); o.stop(t + spec[3] + 0.05);
-}
+let net = null, running = false;
+const fired = new Set();                 // 同じ合図で二度鳴らさない
+const st = { tSec: 0, revealT: 0, players: [], order: [], code: null,
+             last: null, sent: 0, watching: false, chant: null, goal: 240,
+             cardWord: '', cardHue: '#2E7BC4', cardT: 1 };
+let live = null, liveAt = 0;
+let phase = 'lobby', game = null, gs = null, beat = S.BEAT, countIn = 4, round = -1;
+let shake = 0, flash = 0, hitStop = 0, prevMs = 0;
 
 function resize() {
   const s = Math.min(innerWidth / W, innerHeight / H);
-  cv.style.width = (W * s) + 'px'; cv.style.height = (H * s) + 'px';
   const dpr = Math.min(devicePixelRatio || 1, 2);
+  cv.style.width = (W * s) + 'px'; cv.style.height = (H * s) + 'px';
   cv.width = W * dpr; cv.height = H * dpr;
 }
 addEventListener('resize', resize); resize();
@@ -53,234 +54,202 @@ addEventListener('resize', resize); resize();
 addEventListener('keydown', (e) => {
   if (e.code !== 'Space') return;
   e.preventDefault();
-  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-  actx.resume();
+  Snd.init();
   running = !running;
+  hintEl.style.opacity = running ? 0 : 1;
   GG.net.post(running ? '/api/start' : '/api/stop');
 });
 
+/* 参加者はフレームをまたいで生かす。毎回作り直すとバネも瞬きも初期化され、
+ * 全員が同じ位相で同じ動きになる。 */
+const pool = new Map();
+function syncPlayers(list) {
+  let changed = list.length !== st.players.length;
+  const next = list.map((r, i) => {
+    let p = pool.get(r.id);
+    if (!p) { p = { id: r.id, seed: (r.id * 2654435761 >>> 0) % 1000,
+                    face: 'smile', poseName: 'idle', dist: 0, moving: false };
+              pool.set(r.id, p); changed = true; }
+    p.name = r.name; p.shape = r.shape; p.color = r.color; p.score = r.score;
+    if (st.players[i] && st.players[i].id !== r.id) changed = true;
+    return p;
+  });
+  st.players = next;
+  if (changed) st.order = S.seat(next);
+}
+
 GG.net.onState = (s) => {
-  state = s;
-  if (s.phase === 'play') pressedHint = 0;
-  if (s.phase === 'lobby') { fired.clear(); running = false; }
+  syncPlayers(s.players);
+  st.code = s.code;
+  beat = s.beat || S.BEAT;
+  if (s.round !== round) { round = s.round; fired.clear(); live = null; }
+  game = s.game && s.game.id; gs = s.g;
+  countIn = (s.game && s.game.countIn) || 4;
+  if (s.g && s.g.goal) st.goal = s.g.goal;
+
+  if (s.phase !== phase) {
+    if (s.phase === 'play') {
+      st.sent = 0;
+      for (const p of st.players) {
+        p.face = 'smile'; p.poseName = 'idle'; p.dist = 0; p.moving = false;
+        if (p.sq) p.sq.to(1);
+      }
+      // 命令札。何をするのかを一瞬で殴り込む。読ませる文章では遅い。
+      st.cardWord = game === 'seino' ? 'せーの！' : 'とまれ！';
+      st.cardHue = game === 'seino' ? '#2E7BC4' : '#B03050';
+      st.cardT = 0;
+    }
+    if (s.phase === 'reveal') { st.revealT = 0; onReveal(s.last); }
+    if (s.phase === 'lobby') { running = false; hintEl.style.opacity = 1; }
+    phase = s.phase;
+  }
+  st.last = s.last ? normalize(s.last) : null;
+  Snd.music(s.phase !== 'reveal' && st.players.length > 0, 120);
 };
-let pressedHint = 0;
-GG.net.onPressed = (n) => { pressedHint = n; };
+GG.net.onPressed = (n, lv) => {
+  st.sent = n;
+  if (lv) { live = lv; liveAt = GG.clock.nowServer(); }
+};
+
+/* サーバの語彙を Stage の語彙に寄せる。判定側の名前を画面の都合で変えない。 */
+function normalize(L) {
+  return {
+    game: L.game, ok: L.success, spread: L.spread, threshold: L.threshold,
+    goal: L.goal, winners: L.winners,
+    entries: L.entries.map(e => Object.assign({}, e, {
+      fin: e.finishedAt, seed: (e.id * 2654435761 >>> 0) % 1000
+    }))
+  };
+}
+
+function onReveal(L) {
+  const ok = L && L.success;
+  Snd.duck(.6, .9);
+  Snd.sfx(ok ? 'win' : 'lose');
+  hitStop = ok ? .12 : .09;
+  if (ok) flash = .45; else shake = 12;
+  if (!L) return;
+  // 全員が同時に同じ顔になると、6体が1つの部品に見える。順位順に遅らせる。
+  L.entries.forEach((e, i) => {
+    const p = pool.get(e.id); if (!p) return;
+    const w = L.winners.indexOf(e.id) >= 0;
+    const bad = e.caught || e.error === null || e.error === undefined;
+    p.reactAt = .12 + i * .11;
+    p.pending = { face: w ? 'joy' : bad ? 'sad' : 'flat',
+                  poseName: w ? 'cheer' : bad ? 'flop' : 'idle' };
+  });
+}
 
 (async () => {
   await GG.clock.sync();
   GG.clock.startRefining();
-  GG.net.listen();
+  net = GG.net.listen();
   requestAnimationFrame(frame);
 })();
 
-function frame() {
+// ---------------------------------------------------------------- 音の合図
+function cue(key, name) {
+  if (fired.has(key)) return false;
+  fired.add(key); Snd.sfx(name); return true;
+}
+
+function seinoCues(left) {
+  for (let i = 0; i <= countIn; i++) {
+    const at = -(countIn - i) * beat;
+    if (left <= at && cue(round + ':c' + i, i === countIn ? 'beat' : 'tick') && i === countIn) {
+      hitStop = .06; shake = 8;
+    }
+  }
+}
+
+function darumaCues(t) {
+  st.watching = false; st.chant = null;
+  for (const ch of gs.chants) {
+    if (t >= ch.start) cue(round + ':s' + ch.start, 'chant');
+    if (t >= ch.turnAt && cue(round + ':t' + ch.turnAt, 'turn')) { shake = 13; hitStop = .1; }
+    if (t >= ch.start && t < ch.watchUntil) {
+      st.watching = t >= ch.turnAt;
+      st.chant = st.watching ? null : (t - ch.start) / (ch.turnAt - ch.start);
+      break;
+    }
+  }
+}
+
+/* 途中経過を補間する。届いた値のまま止めると、押しっぱなしの間 誰も動かず、
+ * イベントが届いた瞬間だけワープする。 */
+function applyLive() {
+  if (!live || !gs) return;
+  const t = GG.clock.nowServer();
+  for (const p of st.players) {
+    const m = live[p.id];
+    if (!m) { p.dist = 0; p.moving = false; continue; }
+    const held = m.held + (m.moving ? Math.max(0, t - m.at) : 0);
+    p.dist = Math.min(st.goal, held / 1000 * (gs.speed || 30));
+    p.moving = m.moving;
+    p.poseName = m.caught ? 'flop' : m.moving ? (st.watching ? 'shock' : 'walk') : 'idle';
+  }
+}
+
+// ---------------------------------------------------------------- 描画
+function frame(ms) {
   requestAnimationFrame(frame);
+  let dt = Math.min(.05, (ms - prevMs) / 1000); prevMs = ms;
+  if (hitStop > 0) { hitStop -= dt; dt = 0; }   // ヒットストップ中は世界を止める
+  st.tSec += dt; st.revealT += dt;
+  st.cardT = Math.min(1, st.cardT + dt / 1.15);
+
   const dpr = Math.min(devicePixelRatio || 1, 2);
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
-  c.fillStyle = '#0e1017'; c.fillRect(0, 0, W, H);
-  if (!state) return text('接続中…', W / 2, H / 2, 30, '#5a6478');
+  c.fillStyle = '#120724'; c.fillRect(0, 0, W, H);
 
-  if (state.phase === 'play') (state.game.id === 'seino' ? drawSeino : drawDaruma)();
-  else if (state.phase === 'reveal') drawReveal();
-  else drawLobby();
-
-  drawRoster();
-}
-
-function text(s, x, y, size, color, weight, align) {
-  c.font = (weight || 700) + ' ' + size + 'px "Hiragino Maru Gothic ProN", system-ui, sans-serif';
-  c.textAlign = align || 'center'; c.textBaseline = 'middle';
-  c.fillStyle = color; c.fillText(s, x, y);
-}
-
-function drawLobby() {
-  text('一斉', W / 2, 150, 92, '#fff');
-  text('ルームコード', W / 2, 300, 18, '#5a6478');
-  c.font = '700 96px ui-monospace, monospace';
-  c.textAlign = 'center'; c.fillStyle = '#FFD400';
-  c.fillText(state.code, W / 2, 372);
-  text(state.players.length + '人 参加中', W / 2, 470, 26, '#8e97ab');
-  text('SPACE で開始', W / 2, 530, 20, '#4a5468', 500);
-}
-
-function sent() {
-  text('送信済み ' + pressedHint + ' / ' + state.players.length, W / 2, 672, 22, '#6b7488', 500);
-}
-
-// ---------------------------------------------------------------- せーの
-function drawSeino() {
-  const g = state.g, beat = state.beat;
-  const left = GG.clock.until(g.target);
-
-  for (let i = 0; i <= state.game.countIn; i++) {
-    const at = -(state.game.countIn - i) * beat;
-    const key = state.round + ':' + i;
-    if (left <= at && !fired.has(key)) { fired.add(key); beep(i === state.game.countIn ? 'hit' : 'tick'); }
+  if (!st.players.length && !st.code) {
+    Art.label(c, 'せつぞく中…', W / 2, H / 2, 28, 'rgba(255,247,232,.5)', { ow: .3 });
+    return;
   }
 
-  text(state.game.verb, W / 2, 118, 76, '#fff');
-  text(state.game.hint, W / 2, 186, 22, '#8e97ab', 500);
-
-  const cx = W / 2, cy = 410, R = 190;
-  c.lineWidth = 5; c.strokeStyle = 'rgba(255,255,255,0.28)';
-  c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke();
-
-  const k = Math.max(0, Math.min(1.6, left / (state.game.countIn * beat)));
-  const near = Math.abs(left) < 90;
-  c.lineWidth = near ? 12 : 7;
-  c.strokeStyle = near ? '#FFD400' : '#2E8BFF';
-  c.beginPath(); c.arc(cx, cy, Math.max(6, R * k), 0, Math.PI * 2); c.stroke();
-
-  if (left > 0) text(String(Math.ceil(left / beat)), cx, cy, 96, 'rgba(255,255,255,0.9)');
-  else text('いま！', cx, cy, 62, '#FFD400');
-  sent();
-}
-
-// ---------------------------------------------------------------- だるまさん
-const TRACK_X0 = 150, TRACK_X1 = W - 190;
-
-function drawDaruma() {
-  const g = state.g;
-  const t = GG.clock.nowServer();
-
-  // いまの掛け声と、鬼がこちらを見ているか
-  let cur = null, watching = false;
-  for (const ch of g.chants) {
-    if (t >= ch.start && t < ch.watchUntil) { cur = ch; watching = t >= ch.turnAt; break; }
-  }
-  for (const ch of g.chants) {
-    const key = state.round + ':' + ch.turnAt;
-    if (t >= ch.turnAt && !fired.has(key)) { fired.add(key); beep('turn'); }
-    const k2 = state.round + ':s' + ch.start;
-    if (t >= ch.start && !fired.has(k2)) { fired.add(k2); beep('chant'); }
+  const beatOn = phase === 'play' && game === 'seino';
+  for (const p of st.players) {
+    S.stepPlayer(p, dt, st.tSec, { beat: beatOn });
+    if (p.pending && st.revealT >= p.reactAt) {
+      p.face = p.pending.face; p.poseName = p.pending.poseName;
+      const w = p.poseName === 'cheer';
+      p.sq.x = w ? .72 : 1.14; p.sq.v = w ? 5 : -1.6;
+      p.pending = null;
+    }
   }
 
-  text(watching ? 'ふりむいた！' : 'だるまさんが……',
-       W / 2, 92, 62, watching ? '#FF3B4E' : '#fff');
-  text(state.game.hint, W / 2, 152, 20, '#8e97ab', 500);
+  c.save();
+  if (shake > 0) c.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
 
-  // 進む道
-  c.fillStyle = '#171c27';
-  c.fillRect(TRACK_X0 - 20, 230, TRACK_X1 - TRACK_X0 + 60, 300);
-  c.strokeStyle = 'rgba(255,255,255,0.12)'; c.lineWidth = 2;
-  for (let i = 0; i <= 10; i++) {
-    const x = TRACK_X0 + (TRACK_X1 - TRACK_X0) * i / 10;
-    c.beginPath(); c.moveTo(x, 240); c.lineTo(x, 520); c.stroke();
-  }
-  text('ゴール', TRACK_X1 + 20, 210, 18, '#FFD400', 700);
-
-  // 鬼
-  const ox = TRACK_X1 + 60, oy = 380;
-  c.save(); c.translate(ox, oy);
-  if (watching) {
-    c.fillStyle = '#FF3B4E';
-    c.beginPath(); c.arc(0, 0, 46, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#fff';
-    c.beginPath(); c.arc(-16, -8, 9, 0, Math.PI * 2); c.arc(14, -8, 9, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#141414';
-    c.beginPath(); c.arc(-16, -8, 4.5, 0, Math.PI * 2); c.arc(14, -8, 4.5, 0, Math.PI * 2); c.fill();
+  if (phase === 'play') {
+    if (game === 'seino') {
+      st.left = GG.clock.until(gs.target);
+      seinoCues(st.left);
+      // 溜め。目標の2拍前からしゃがませる。溜めがないと成功が「弾けた」に見えない。
+      if (st.left < beat * 2) for (const p of st.players)
+        if (p.poseName === 'idle') p.poseName = 'ready';
+      S.seino(c, st);
+    } else {
+      darumaCues(GG.clock.nowServer());
+      applyLive();
+      S.daruma(c, st);
+    }
+    if (st.cardT < 1) S.card(c, st);        // 札は開始直後にだけ被せる
+  } else if (phase === 'reveal' && st.last) {
+    (st.last.game === 'seino' ? S.seinoReveal : S.darumaReveal)(c, st);
   } else {
-    c.fillStyle = '#5a6478';
-    c.beginPath(); c.arc(0, 0, 46, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#3d4658';
-    c.beginPath(); c.arc(0, 6, 30, 0, Math.PI * 2); c.fill();
+    S.idle(c, st);
   }
+
+  S.roster(c, st);
   c.restore();
 
-  // 掛け声の進み具合
-  if (cur && !watching) {
-    const k = (t - cur.start) / (cur.turnAt - cur.start);
-    c.fillStyle = 'rgba(255,255,255,0.1)';
-    c.fillRect(W / 2 - 260, 570, 520, 12);
-    c.fillStyle = '#FFD400';
-    c.fillRect(W / 2 - 260, 570, 520 * Math.min(1, k), 12);
-  } else if (watching) {
-    c.fillStyle = 'rgba(255,59,78,0.25)';
+  if (flash > 0) {
+    c.fillStyle = 'rgba(255,255,255,' + (flash * .5).toFixed(3) + ')';
     c.fillRect(0, 0, W, H);
   }
-
-  // 参加者。表示は遅れてもよい（判定は最後に時刻から作り直すので影響しない）
-  const ps = state.players;
-  ps.forEach((p, i) => {
-    const y = 260 + (i % 8) * 34;
-    GG.drawShape(c, p.shape, p.color, TRACK_X0, y, 12);
-  });
-
-  sent();
-}
-
-// ---------------------------------------------------------------- 結果
-function drawReveal() {
-  const L = state.last;
-  if (!L) return;
-  if (L.game === 'seino') return revealSeino(L);
-  return revealDaruma(L);
-}
-
-function revealSeino(L) {
-  if (L.success) {
-    text('そろった！', W / 2, 106, 72, '#FFD400');
-    text('全員 +1点', W / 2, 172, 26, '#35D06A', 500);
-  } else {
-    text('ばらけた…', W / 2, 106, 72, '#fff');
-    text('ばらつき ' + (L.spread === null ? '—' : L.spread + 'ms')
-       + '  /  ' + L.threshold + 'ms 以内で成功', W / 2, 172, 24, '#8e97ab', 500);
-  }
-  GG.scatter(c, { x: 120, y: 400, w: W - 240, entries: L.entries, range: 300 });
-  podium(L.entries.filter(e => e.error !== null).slice(0, 3), e => GG.fmt(e.error));
-}
-
-function revealDaruma(L) {
-  const win = L.entries.find(e => e.finishedAt !== null);
-  if (win) { text(win.name + ' が ゴール！', W / 2, 100, 62, '#FFD400'); }
-  else { text('ぜんいん つかまった', W / 2, 100, 62, '#fff'); }
-
-  // 到達距離を横棒で並べる
-  const rows = L.entries.slice(0, 10);
-  const bx = 300, bw = 620;
-  rows.forEach((e, i) => {
-    const y = 200 + i * 42;
-    GG.drawShape(c, e.shape, e.color, bx - 40, y, 13);
-    c.font = '500 15px system-ui'; c.textAlign = 'right'; c.textBaseline = 'middle';
-    c.fillStyle = e.caught ? '#5a6478' : '#c3cbdb';
-    c.fillText(e.name, bx - 62, y);
-
-    c.fillStyle = 'rgba(255,255,255,0.07)';
-    c.fillRect(bx, y - 9, bw, 18);
-    c.fillStyle = e.finishedAt !== null ? '#FFD400' : e.caught ? '#4a5468' : e.color;
-    c.fillRect(bx, y - 9, bw * (e.dist / L.goal), 18);
-
-    c.textAlign = 'left'; c.fillStyle = e.caught ? '#FF3B4E' : '#8e97ab';
-    c.font = '500 14px system-ui';
-    c.fillText(e.caught ? 'つかまった' : e.finishedAt !== null ? 'ゴール' : '', bx + bw + 14, y);
-  });
-}
-
-function podium(top, label) {
-  let x = W / 2 - (top.length - 1) * 150;
-  for (const e of top) {
-    GG.drawShape(c, e.shape, e.color, x, 560, 22);
-    text(e.name, x, 604, 18, '#c3cbdb', 500);
-    c.font = '500 20px ui-monospace, monospace';
-    c.textAlign = 'center'; c.fillStyle = '#FFD400';
-    c.fillText(label(e), x, 634);
-    x += 300;
-  }
-}
-
-function drawRoster() {
-  const ps = state.players;
-  if (!ps.length) return;
-  const y = H - 26; let x = 30;
-  c.textBaseline = 'middle';
-  for (const p of ps) {
-    GG.drawShape(c, p.shape, p.color, x, y, 11);
-    c.font = '500 13px system-ui'; c.textAlign = 'left'; c.fillStyle = '#7b8698';
-    c.fillText(p.name + ' ' + p.score, x + 17, y);
-    x += 26 + c.measureText(p.name + ' ' + p.score).width + 20;
-    if (x > W - 140) break;
-  }
+  shake = Math.max(0, shake - dt * 44);
+  flash = Math.max(0, flash - dt * 2.2);
 }
 </script>
 </body>

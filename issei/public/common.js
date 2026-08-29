@@ -83,7 +83,7 @@ GG.net = {
     const es = new EventSource('/api/events?' + q);
     es.onmessage = (e) => {
       const ev = JSON.parse(e.data);
-      if (ev.partial) { if (this.onPressed) this.onPressed(ev.pressed); return; }
+      if (ev.partial) { if (this.onPressed) this.onPressed(ev.pressed, ev.live); return; }
       if (ev.type === 'state' && this.onState) this.onState(ev);
     };
     return es;

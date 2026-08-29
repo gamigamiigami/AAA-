@@ -100,28 +100,54 @@ const daruma = {
 
   /* 押下の区間を時系列に組み直して、区間が監視窓に重なったら脱落。
    * 表示は遅れてもよいが、判定はここで時刻から作り直すので遅延に影響されない。 */
+  /* 到着順がばらばらでも、時刻で並べ直してから区間にする。
+   * closeAt は「まだ離していない区間」をどこで閉じるか。判定では終了時刻、
+   * 途中経過では現在時刻を渡す。 */
+  spansOf(g, id, closeAt) {
+    const evs = (g.events[id] || []).slice().sort((a, b) => a.t - b.t);
+    const spans = [];
+    let openAt = null;
+    for (const e of evs) {
+      if (e.down && openAt === null) openAt = e.t;
+      else if (!e.down && openAt !== null) { spans.push([openAt, e.t]); openAt = null; }
+    }
+    if (openAt !== null) spans.push([openAt, closeAt]);
+    return { spans, open: openAt !== null };
+  },
+
+  caughtAtOf(g, spans) {
+    for (const ch of g.chants) {
+      for (const [a, b] of spans) {
+        if (a < ch.watchUntil && b > ch.turnAt) return ch.turnAt;
+      }
+    }
+    return null;
+  },
+
+  /* 途中経過。大画面に走者を出すために使う。
+   * 位置は隠す必要がない ―― 走っている姿が見えないレースは競技にならない。
+   * 判定はあくまで judge が時刻から作り直すので、ここが遅れても結果は動かない。 */
+  live(g, players, t) {
+    const out = {};
+    for (const p of players) {
+      const { spans, open } = this.spansOf(g, p.id, t);
+      const caughtAt = this.caughtAtOf(g, spans);
+      let held = 0;
+      for (const [a, b] of spans) {
+        const end = caughtAt === null ? b : Math.min(b, caughtAt);
+        if (end > a) held += end - a;
+      }
+      out[p.id] = { held: Math.round(held), moving: open && caughtAt === null,
+                    caught: caughtAt !== null, at: t };
+    }
+    return out;
+  },
+
   judge(g, players) {
     const entries = [];
     for (const p of players) {
-      const evs = (g.events[p.id] || []).slice().sort((a, b) => a.t - b.t);
-
-      // 押下区間を作る（閉じていない最後の区間は endsAt で閉じる）
-      const spans = [];
-      let openAt = null;
-      for (const e of evs) {
-        if (e.down && openAt === null) openAt = e.t;
-        else if (!e.down && openAt !== null) { spans.push([openAt, e.t]); openAt = null; }
-      }
-      if (openAt !== null) spans.push([openAt, g.endsAt]);
-
-      // いつ捕まったか
-      let caughtAt = null;
-      for (const ch of g.chants) {
-        for (const [a, b] of spans) {
-          if (a < ch.watchUntil && b > ch.turnAt) { caughtAt = ch.turnAt; break; }
-        }
-        if (caughtAt !== null) break;
-      }
+      const { spans } = this.spansOf(g, p.id, g.endsAt);
+      const caughtAt = this.caughtAtOf(g, spans);
 
       // 捕まるまでに押していた合計時間が距離になる
       let held = 0, finishedAt = null;

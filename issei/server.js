@@ -208,11 +208,18 @@ const server = http.createServer(async (req, res) => {
     const pl = room.players.get(body.id);
     if (!pl || room.phase !== 'play') return json(res, 200, { ok: false });
     if (room.def.accept(room.g, pl.id, body)) {
-      // 人数だけを配る。誰が・何秒に押したかは開示まで出さない。
-      const n = room.def.id === 'seino'
-        ? Object.keys(room.g.presses).length
-        : Object.keys(room.g.events).length;
-      broadcast({ type: 'state', partial: true, pressed: n });
+      /* せーのは人数だけを配る。誰が・何ms速かったかを途中で出すと、
+       * その場で回線の差が見えてしまう。開示は全員同時。
+       * だるまは逆に位置を配る。走者の見えないレースは競技として成立しない。
+       * どちらも判定は最後に時刻から作り直すので、この配信は結果に影響しない。 */
+      if (room.def.id === 'seino') {
+        broadcast({ type: 'state', partial: true,
+                    pressed: Object.keys(room.g.presses).length });
+      } else {
+        broadcast({ type: 'state', partial: true,
+                    pressed: Object.keys(room.g.events).length,
+                    live: room.def.live(room.g, [...room.players.values()], now()) });
+      }
     }
     return json(res, 200, { ok: true });
   }

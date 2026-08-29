@@ -53,6 +53,10 @@ const now = () => performance.now();
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 // QA用。?card=1 で命令カードを保持したまま止める（撮影のため。進行には影響しない）
 const HOLD_CARD = new URLSearchParams(location.search).get('card') === '1';
+/* QA用。?win=1 で必ず成功させる。勝利の画面（紙吹雪・全員の歓喜）は
+ * 普通に回すとなかなか出ず、いちばん華やかな1枚を検証できないまま
+ * 「たぶん大丈夫」で済ませることになる。撮れない画面は直っていないのと同じ。 */
+const FORCE_WIN = new URLSearchParams(location.search).get('win') === '1';
 
 function setBtn(label, disabled, hit) {
   btn.textContent = label; btn.disabled = !!disabled;
@@ -149,10 +153,10 @@ function beginRound() {
      *   押し忘れ … たまに押さない。これが無いと「おさなかった」画面が
      *              永久に出ない */
     for (const p of players) if (!p.you) {
-      const form = .5 + Math.random() * 1.15;
-      const flyer = Math.random() < .18
+      const form = FORCE_WIN ? .12 : .5 + Math.random() * 1.15;
+      const flyer = !FORCE_WIN && Math.random() < .18
         ? (Math.random() < .5 ? -1 : 1) * (170 + Math.random() * 260) : 0;
-      if (Math.random() < .07) continue;               // 押し忘れ
+      if (!FORCE_WIN && Math.random() < .07) continue;   // 押し忘れ
       const at = g.target + gauss() * p.sigma * form + flyer;
       setTimeout(() => { if (phase === 'play' && game === 'seino') {
         g.press[p.id] = at; st.sent++; p.sq.x = .66; p.sq.v = 3.6; p.poseName = 'cheer'; p.face = 'joy';
@@ -160,6 +164,12 @@ function beginRound() {
     }
     setBtn('おす', false, false);
     foot.textContent = 'しろい わが かさなったら おす';
+    if (FORCE_WIN) setTimeout(() => {   // 自分のぶんも自動で押す
+      if (phase === 'play' && game === 'seino' && g.press[0] === undefined) {
+        g.press[0] = g.target + 12; st.sent++;
+        YOU.poseName = 'cheer'; YOU.face = 'joy';
+      }
+    }, Math.max(0, g.target + 12 - now()));
   } else {
     const chants = []; let t = now() + 1200; const until = now() + 21000;
     while (t < until) {

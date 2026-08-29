@@ -529,6 +529,10 @@ Stage.roster = function (c, st) {
   }
   show.sort((a, b) => (a.spot ? a.spot.x : 0) - (b.spot ? b.spot.x : 0));
   const best = Math.max(0, ...st.players.map(p => p.score));
+  /* 首位の印は、首位が少数のときだけ出す。協力ゲームなので全員が同点に
+   * なる回があり、そこで6人全員に王冠が付くと、印ではなく飾りになる。 */
+  const leaders = st.players.filter(p => p.score === best).length;
+  const markBest = best > 0 && leaders <= Math.max(1, st.players.length / 3);
 
   const BH = 48, by = H - BH;
   c.save();
@@ -551,7 +555,7 @@ Stage.roster = function (c, st) {
       p.you ? PAL.cream : 'rgba(255,247,232,.72)', { ow: .34, align: 'left' });
     Art.num(c, String(p.score), x + 23 + nm + 9, H - 25, 19,
       p.you ? PAL.focus : 'rgba(255,247,232,.5)', { ow: .34, align: 'left' });
-    if (best > 0 && p.score === best) {
+    if (markBest && p.score === best) {
       c.save(); c.translate(x, H - 40); c.scale(.56, .56);
       c.beginPath();
       c.moveTo(-11, 6); c.lineTo(-11, -6); c.lineTo(-5, -1); c.lineTo(0, -9);

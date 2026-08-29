@@ -1298,12 +1298,24 @@ Art.floor = function (c, W, H, y, tint, vpx, hzy) {
       // 節は板幅の1割まで。大きくすると木目ではなく染みに見える
       const rr = Math.abs(half) * (.065 + (hash(i * 53 + j) * .5 + .5) * .045);
       if (rr < 1.1) continue;
-      c.globalAlpha = .26;
-      c.beginPath(); c.ellipse(kx, ky, rr, rr * .60, .3, 0, TAU);
+      const rot = hash(i * 17 + j * 5) * .9;                 // 向きは個体ごと
+      const flat = .48 + (hash(i * 37 + j * 3) * .5 + .5) * .32;
+
+      /* 節は木目の上に貼った印ではなく、木目を止める物。
+       * まず継ぎ目の線をこの範囲だけ板の色で消してから、
+       * まわりに寄った木目を描き、最後に節そのものを置く。 */
+      c.globalAlpha = .55;
+      c.fillStyle = base;
+      c.beginPath(); c.ellipse(kx, ky, rr * 2.3, rr * 1.5 * flat, rot, 0, TAU); c.fill();
+
+      c.globalAlpha = .16;   // 節を避けて回り込む木目
+      for (const m of [1.35, 1.85, 2.35]) {
+        c.beginPath(); c.ellipse(kx, ky, rr * m, rr * m * flat, rot, 0, TAU);
+        Art.stroke(c, 'rgba(64,32,10,.9)', Math.max(.7, rr * .16));
+      }
+      c.globalAlpha = .3;
+      c.beginPath(); c.ellipse(kx, ky, rr, rr * flat, rot, 0, TAU);
       c.fillStyle = '#3A1C08'; c.fill();
-      c.globalAlpha = .13;   // 節のまわりに木目が寄る
-      c.beginPath(); c.ellipse(kx, ky, rr * 1.9, rr * 1.05, .3, 0, TAU);
-      Art.stroke(c, 'rgba(64,32,10,.9)', Math.max(.7, rr * .2));
     }
   }
   c.restore();
@@ -1589,7 +1601,8 @@ Art.rigPools = function (c, W, H, y) {
     // 弱く。5つ重なるので、1つを強くすると床の木の色が飛ぶ
     // 板の縞は alpha .05〜.11。それを上回らないと、床でいちばん明るい場所が
     // 「誰にも照らされていない板」になる。灯りは必ず縞より強く。
-    g.addColorStop(0, 'rgba(' + tint + ',' + (.12 * L.on).toFixed(3) + ')');
+    // 縞は .05〜.11。灯りが暗い側へ振れても必ず上回るように下限を置く
+    g.addColorStop(0, 'rgba(' + tint + ',' + (.09 + .07 * L.on).toFixed(3) + ')');
     g.addColorStop(1, 'rgba(' + tint + ',0)');
     c.fillStyle = g;
     const pr = W * (.085 + Math.abs(L.aim) * .10);

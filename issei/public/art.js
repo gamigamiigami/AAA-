@@ -538,20 +538,148 @@ Art.measure = function (c, text, size, opt) {
   c.restore(); return w;
 };
 
+// ---------------------------------------------------------------- 体型
+/* 体の輪郭。ここが全員同じだと、角や耳をいくら足しても
+ * シルエットは「同じ卵に小物を載せたもの」にしかならない。
+ * 遠目20pxの黒い塊だけで誰か分かることが条件なので、
+ * 縦横比ではなく輪郭そのものを作り分ける。 */
+Art.bodyPath = function (c, kind, x, y, rx, ry) {
+  const k = .5523;
+  const B = (x1, y1, x2, y2, x3, y3) => c.bezierCurveTo(x1, y1, x2, y2, x3, y3);
+  c.beginPath();
+  switch (kind) {
+
+    case 'pear':      // 肩が狭く腰が重い
+      c.moveTo(x, y - ry);
+      B(x + rx * .30, y - ry,      x + rx * .52, y - ry * .66,  x + rx * .55, y - ry * .20);
+      B(x + rx * .60, y + ry * .30, x + rx,      y + ry * .50,  x + rx * .94, y + ry * .78);
+      B(x + rx * .86, y + ry,      x - rx * .86, y + ry,        x - rx * .94, y + ry * .78);
+      B(x - rx,      y + ry * .50, x - rx * .60, y + ry * .30,  x - rx * .55, y - ry * .20);
+      B(x - rx * .52, y - ry * .66, x - rx * .30, y - ry,       x, y - ry);
+      break;
+
+    case 'bell': {    // 底が平らでどっしり。据わっている
+      const rr = ry * .22;
+      c.moveTo(x - rx, y + ry - rr);
+      c.lineTo(x - rx, y + ry * .1);
+      B(x - rx, y - ry * .52, x - rx * .88, y - ry, x, y - ry);
+      B(x + rx * .88, y - ry, x + rx, y - ry * .52, x + rx, y + ry * .1);
+      c.lineTo(x + rx, y + ry - rr);
+      c.quadraticCurveTo(x + rx, y + ry, x + rx - rr, y + ry);
+      c.lineTo(x - rx + rr, y + ry);
+      c.quadraticCurveTo(x - rx, y + ry, x - rx, y + ry - rr);
+      break;
+    }
+
+    case 'tall': {    // 細長いカプセル
+      const w = rx * .88, rr = Math.min(w, ry * .46);
+      c.moveTo(x - w, y + ry - rr);
+      c.lineTo(x - w, y - ry + rr);
+      B(x - w, y - ry + rr * (1 - k), x - w * k, y - ry, x, y - ry);
+      B(x + w * k, y - ry, x + w, y - ry + rr * (1 - k), x + w, y - ry + rr);
+      c.lineTo(x + w, y + ry - rr);
+      B(x + w, y + ry - rr * (1 - k), x + w * k, y + ry, x, y + ry);
+      B(x - w * k, y + ry, x - w, y + ry - rr * (1 - k), x - w, y + ry - rr);
+      break;
+    }
+
+    case 'wide': {    // 上が狭く底が広い座布団。低く構えている
+      const rr = Math.min(rx, ry) * .34, tw = rx * .68;
+      c.moveTo(x - tw + rr, y - ry);
+      c.lineTo(x + tw - rr, y - ry);
+      c.quadraticCurveTo(x + tw, y - ry, x + tw + (rx - tw) * .5, y - ry + rr);
+      c.lineTo(x + rx, y + ry - rr);
+      c.quadraticCurveTo(x + rx, y + ry, x + rx - rr, y + ry);
+      c.lineTo(x - rx + rr, y + ry);
+      c.quadraticCurveTo(x - rx, y + ry, x - rx, y + ry - rr);
+      c.lineTo(x - tw - (rx - tw) * .5, y - ry + rr);
+      c.quadraticCurveTo(x - tw, y - ry, x - tw + rr, y - ry);
+      break;
+    }
+
+    case 'block': {   // 肩のある丸四角。角ばりが遠目でも効く
+      const rr = Math.min(rx, ry) * .46;
+      c.moveTo(x - rx + rr, y - ry);
+      c.lineTo(x + rx - rr, y - ry);
+      c.quadraticCurveTo(x + rx, y - ry, x + rx, y - ry + rr);
+      c.lineTo(x + rx, y + ry - rr);
+      c.quadraticCurveTo(x + rx, y + ry, x + rx - rr, y + ry);
+      c.lineTo(x - rx + rr, y + ry);
+      c.quadraticCurveTo(x - rx, y + ry, x - rx, y + ry - rr);
+      c.lineTo(x - rx, y - ry + rr);
+      c.quadraticCurveTo(x - rx, y - ry, x - rx + rr, y - ry);
+      break;
+    }
+
+    case 'drop':      // 頭が尖ったしずく
+      c.moveTo(x, y - ry);
+      B(x + rx * .22, y - ry * .74, x + rx, y - ry * .22, x + rx, y + ry * .30);
+      B(x + rx, y + ry * .80, x + rx * .58, y + ry, x, y + ry);
+      B(x - rx * .58, y + ry, x - rx, y + ry * .80, x - rx, y + ry * .30);
+      B(x - rx, y - ry * .22, x - rx * .22, y - ry * .74, x, y - ry);
+      break;
+
+    case 'spin':      // 上下が尖った紡錘
+      c.moveTo(x, y - ry);
+      B(x + rx * .18, y - ry * .70, x + rx, y - ry * .30, x + rx, y + ry * .06);
+      B(x + rx, y + ry * .52, x + rx * .30, y + ry * .78, x, y + ry);
+      B(x - rx * .30, y + ry * .78, x - rx, y + ry * .52, x - rx, y + ry * .06);
+      B(x - rx, y - ry * .30, x - rx * .18, y - ry * .70, x, y - ry);
+      break;
+
+    case 'gem':       // 角のある六角形。丸ばかりの中に直線を1体入れる
+      c.moveTo(x, y - ry);
+      c.lineTo(x + rx * .90, y - ry * .40);
+      c.lineTo(x + rx, y + ry * .36);
+      c.lineTo(x + rx * .46, y + ry);
+      c.lineTo(x - rx * .46, y + ry);
+      c.lineTo(x - rx, y + ry * .36);
+      c.lineTo(x - rx * .90, y - ry * .40);
+      break;
+
+    case 'dome': {    // 上は半円、下は角のある平ら
+      const rr = ry * .16;
+      c.moveTo(x - rx, y + ry - rr);
+      c.lineTo(x - rx, y - ry * .06);
+      B(x - rx, y - ry * .68, x - rx * .58, y - ry, x, y - ry);
+      B(x + rx * .58, y - ry, x + rx, y - ry * .68, x + rx, y - ry * .06);
+      c.lineTo(x + rx, y + ry - rr);
+      c.quadraticCurveTo(x + rx, y + ry, x + rx - rr, y + ry);
+      c.lineTo(x - rx + rr, y + ry);
+      c.quadraticCurveTo(x - rx, y + ry, x - rx, y + ry - rr);
+      break;
+    }
+
+    case 'peanut':    // くびれのある瓢箪
+      c.moveTo(x, y - ry);
+      B(x + rx * .80, y - ry, x + rx, y - ry * .48, x + rx * .54, y - ry * .04);
+      B(x + rx * .30, y + ry * .18, x + rx, y + ry * .34, x + rx * .90, y + ry * .70);
+      B(x + rx * .78, y + ry, x - rx * .78, y + ry, x - rx * .90, y + ry * .70);
+      B(x - rx, y + ry * .34, x - rx * .30, y + ry * .18, x - rx * .54, y - ry * .04);
+      B(x - rx, y - ry * .48, x - rx * .80, y - ry, x, y - ry);
+      break;
+
+    default:
+      Art.eggPath(c, x, y, rx, ry, .14);
+      return;
+  }
+  c.closePath();
+};
+
 // ---------------------------------------------------------------- キャラクター
 /* 一座の6人。全員が体型・頭部・顔つきの三重で分かれる。
  * 遠目20pxのシルエットだけで判別できることが条件。色は補助でしかない。 */
 const CAST = {
-  circle:   { rx: 1.00, ry: 1.00, crest: 'scarf',   eye: 'round',  brow: false },
-  triangle: { rx: 1.00, ry: 1.02, crest: 'ears',    eye: 'droop',  brow: true  },
-  square:   { rx: 1.18, ry: .82,  crest: 'brow',    eye: 'narrow', brow: true  },
-  star:     { rx: .86,  ry: 1.18, crest: 'tuft',    eye: 'sparkle',brow: false },
-  heart:    { rx: 1.12, ry: .90,  crest: 'floppy',  eye: 'round',  brow: false },
-  diamond:  { rx: .82,  ry: 1.20, crest: 'horn',    eye: 'sharp',  brow: true  },
-  pentagon: { rx: 1.06, ry: .96,  crest: 'crown',   eye: 'round',  brow: true  },
-  hexagon:  { rx: .94,  ry: 1.06, crest: 'antenna', eye: 'sparkle',brow: false },
-  crown:    { rx: 1.20, ry: .84,  crest: 'trio',    eye: 'narrow', brow: true  },
-  moon:     { rx: .90,  ry: 1.10, crest: 'hood',    eye: 'droop',  brow: false }
+  circle:   { body: 'egg',    rx: 1.00, ry: 1.00, crest: 'scarf',   eye: 'round',  brow: false },
+  triangle: { body: 'drop',   rx:  .92, ry: 1.10, crest: 'ears',    eye: 'droop',  brow: true  },
+  square:   { body: 'block',  rx: 1.22, ry:  .80, crest: 'brow',    eye: 'narrow', brow: true  },
+  star:     { body: 'spin',   rx:  .80, ry: 1.26, crest: 'tuft',    eye: 'sparkle',brow: false },
+  heart:    { body: 'bell',   rx: 1.14, ry:  .88, crest: 'floppy',  eye: 'round',  brow: false },
+  diamond:  { body: 'tall',   rx:  .70, ry: 1.34, crest: 'horn',    eye: 'sharp',  brow: true  },
+  pentagon: { body: 'pear',   rx: 1.02, ry: 1.00, crest: 'crown',   eye: 'round',  brow: true  },
+  hexagon:  { body: 'gem',    rx: 1.00, ry: 1.04, crest: 'antenna', eye: 'sparkle',brow: false },
+  crown:    { body: 'wide',   rx: 1.30, ry:  .74, crest: 'trio',    eye: 'narrow', brow: true  },
+  moon:     { body: 'peanut', rx:  .86, ry: 1.16, crest: 'hood',    eye: 'droop',  brow: false }
 };
 Art.CAST = CAST;
 
@@ -599,7 +727,7 @@ Art.chara = function (c, o) {
   // 重なったとき分離させる縁。人が密集する画面では必須。
   if (o.sticker) {
     c.save();
-    Art.eggPath(c, 0, 0, rx * 1.13, ry * 1.11, .13);
+    Art.bodyPath(c, cast.body, 0, 0, rx * 1.13, ry * 1.11);
     c.fillStyle = o.sticker; c.fill();
     c.restore();
   }
@@ -624,7 +752,7 @@ Art.chara = function (c, o) {
   crest(c, cast.crest, rx, ry, r, col, line, lw, o);
   c.restore();
 
-  Art.vinyl(c, () => Art.eggPath(c, 0, 0, rx, ry, .14), { x: 0, y: 0, rx, ry, color: col, lw });
+  Art.vinyl(c, () => Art.bodyPath(c, cast.body, 0, 0, rx, ry), { x: 0, y: 0, rx, ry, color: col, lw });
 
   /* 腕は胴の「あと」に描く。前に描くと胴に隠れて、どのポーズでも
    * 体の外に出た指先しか見えず、ポーズが読めない。 */
@@ -663,7 +791,7 @@ Art.chara = function (c, o) {
 
   // ほっぺ。体色によって見え方が変わるので、明るい色ほど濃く入れる。
   c.save();
-  Art.eggPath(c, 0, 0, rx, ry, .14); c.clip();
+  Art.bodyPath(c, cast.body, 0, 0, rx, ry); c.clip();
   const [pr, pg, pb] = rgb(col);
   const lumi = (pr * .3 + pg * .59 + pb * .11) / 255;
   c.globalAlpha = .28 + lumi * .34;
@@ -716,12 +844,17 @@ function crest(c, kind, rx, ry, r, col, line, lw, o) {
       Art.vinyl(c, () => Art.roundRect(c, -rx * .8, -ry * 1.2, rx * 1.6, ry * .36, ry * .17),
         { x: 0, y: -ry * 1.02, rx: rx * .8, ry: ry * .18, color: dark, lw, spec: false, bounce: 0 });
       break;
+    /* 一本の長い線は、頭の飾りではなく描画の残骸に見える。
+     * 短い房を3本、根元から扇形に散らす。 */
     case 'tuft': { c.save(); c.rotate(sway * 2);
-      const p = () => { c.beginPath();
-        c.moveTo(-rx * .12, -ry * .94);
-        c.quadraticCurveTo(rx * .72, -ry * 1.5, rx * .04, -ry * 2.02); };
-      p(); Art.stroke(c, line, r * .2);
-      p(); Art.stroke(c, Art.shade(col, .2), r * .1);
+      [[-.34, .62], [-.02, .80], [.30, .58]].forEach(([lean, len], i) => {
+        const p = () => { c.beginPath();
+          c.moveTo(rx * lean * .5, -ry * .92);
+          c.quadraticCurveTo(rx * (lean * 1.5 + .1), -ry * (.92 + len * .6),
+                             rx * (lean * 2.1), -ry * (.92 + len)); };
+        p(); Art.stroke(c, line, r * .19);
+        p(); Art.stroke(c, Art.shade(col, .18 + i * .06), r * .095);
+      });
       c.restore(); break; }
     case 'floppy':
       [-1, 1].forEach(sd => { c.save(); c.rotate(sway * sd * 1.6);
@@ -730,13 +863,15 @@ function crest(c, kind, rx, ry, r, col, line, lw, o) {
           { x: sd * rx * .86, y: -ry * .26, rx: rx * .25, ry: ry * .52,
             color: dark, lw: lw * .85, spec: false, bounce: 0 });
         c.restore(); }); break;
+    /* 角は体の高さの3割まで。長すぎると角ではなくアンテナに見えるし、
+     * 縦長の体につけると画面の上に飛び出して構図を割る。 */
     case 'horn':
       Art.vinyl(c, () => { c.beginPath();
-        c.moveTo(-rx * .18, -ry * .96);
-        c.quadraticCurveTo(-rx * .04, -ry * 1.78, rx * .12, -ry * 1.86);
-        c.quadraticCurveTo(rx * .2, -ry * 1.34, rx * .2, -ry * .94);
+        c.moveTo(-rx * .22, -ry * .96);
+        c.quadraticCurveTo(-rx * .06, -ry * 1.30, rx * .14, -ry * 1.36);
+        c.quadraticCurveTo(rx * .26, -ry * 1.16, rx * .26, -ry * .94);
         c.closePath(); },
-        { x: 0, y: -ry * 1.34, rx: rx * .2, ry: ry * .46,
+        { x: 0, y: -ry * 1.14, rx: rx * .24, ry: ry * .22,
           color: Art.PAL.cream, lw, spec: false, bounce: 0 }); break;
     case 'crown':
       Art.vinyl(c, () => { c.beginPath();

@@ -670,16 +670,26 @@ Art.bodyPath = function (c, kind, x, y, rx, ry) {
 /* 一座の6人。全員が体型・頭部・顔つきの三重で分かれる。
  * 遠目20pxのシルエットだけで判別できることが条件。色は補助でしかない。 */
 const CAST = {
-  circle:   { body: 'egg',    rx: 1.00, ry: 1.00, crest: 'scarf',   eye: 'round',  brow: 'arch' },
-  triangle: { body: 'drop',   rx:  .92, ry: 1.10, crest: 'ears',    eye: 'droop',  brow: 'worry' },
-  square:   { body: 'block',  rx: 1.22, ry:  .80, crest: 'brow',    eye: 'narrow', brow: 'thick' },
-  star:     { body: 'spin',   rx:  .80, ry: 1.26, crest: 'tuft',    eye: 'sparkle',brow: 'arch' },
-  heart:    { body: 'bell',   rx: 1.14, ry:  .88, crest: 'floppy',  eye: 'round',  brow: 'none' },
-  diamond:  { body: 'tall',   rx:  .70, ry: 1.34, crest: 'horn',    eye: 'sharp',  brow: 'slant' },
-  pentagon: { body: 'pear',   rx: 1.02, ry: 1.00, crest: 'crown',   eye: 'round',  brow: 'flat' },
-  hexagon:  { body: 'gem',    rx: 1.00, ry: 1.04, crest: 'antenna', eye: 'sparkle',brow: 'none' },
-  crown:    { body: 'wide',   rx: 1.30, ry:  .74, crest: 'trio',    eye: 'narrow', brow: 'thick' },
-  moon:     { body: 'peanut', rx:  .86, ry: 1.16, crest: 'hood',    eye: 'droop',  brow: 'worry' }
+  circle:   { body: 'egg',    rx: 1.00, ry: 1.00, crest: 'scarf',   eye: 'round',
+              brow: 'arch',  mouth: 'arc' },
+  triangle: { body: 'drop',   rx:  .92, ry: 1.10, crest: 'ears',    eye: 'droop',
+              brow: 'worry', mouth: 'small' },
+  square:   { body: 'block',  rx: 1.22, ry:  .80, crest: 'brow',    eye: 'slit',
+              brow: 'thick', mouth: 'wide',  cheek: false },
+  star:     { body: 'spin',   rx:  .80, ry: 1.26, crest: 'tuft',    eye: 'sparkle',
+              brow: 'arch',  mouth: 'arc' },
+  heart:    { body: 'bell',   rx: 1.14, ry:  .88, crest: 'floppy',  eye: 'tall',
+              brow: 'none',  mouth: 'wave' },
+  diamond:  { body: 'tall',   rx:  .70, ry: 1.34, crest: 'horn',    eye: 'sharp',
+              brow: 'slant', mouth: 'line',  cheek: false },
+  pentagon: { body: 'pear',   rx: 1.02, ry: 1.00, crest: 'crown',   eye: 'round',
+              brow: 'flat',  mouth: 'wide' },
+  hexagon:  { body: 'gem',    rx: 1.00, ry: 1.04, crest: 'antenna', eye: 'dot',
+              brow: 'none',  mouth: 'small' },
+  crown:    { body: 'wide',   rx: 1.30, ry:  .74, crest: 'trio',    eye: 'slit',
+              brow: 'thick', mouth: 'wave',  cheek: false },
+  moon:     { body: 'peanut', rx:  .86, ry: 1.16, crest: 'hood',    eye: 'tall',
+              brow: 'worry', mouth: 'arc' }
 };
 Art.CAST = CAST;
 
@@ -798,6 +808,7 @@ Art.chara = function (c, o) {
   }
 
   // ほっぺ。体色によって見え方が変わるので、明るい色ほど濃く入れる。
+  if (cast.cheek !== false) {
   c.save();
   Art.bodyPath(c, cast.body, 0, 0, rx, ry); c.clip();
   const [pr, pg, pb] = rgb(col);
@@ -811,6 +822,7 @@ Art.chara = function (c, o) {
     c.beginPath(); c.ellipse(sd * rx * .56, ry * .2, rx * .32, ry * .21, 0, 0, TAU); c.fill();
   });
   c.restore();
+  }
 
   face(c, o, cast, rx, ry, r);
   c.restore();
@@ -920,6 +932,20 @@ function crest(c, kind, rx, ry, r, col, line, lw, o) {
 }
 
 /* 顔つきも個体で変える。目の形が4種あるだけで、同じ色でも別人に見える。 */
+/* 目の型。以前は間隔と半径をわずかに変えるだけで、表示サイズでは
+ * 全員が同じ白丸2つだった。体型を10種に分けたのに顔が1種では、
+ * 「卵」問題が胴から顔へ移動しただけになる。
+ * 大きさ・間隔・高さ・縦横比・瞳の割合を、差が出る量で振る。 */
+const EYE = {
+  round:   { r: 1.00, gap: .33, y: -.10, ry: 1.08, shear:  0,   pupil: .56 },
+  tall:    { r:  .84, gap: .29, y: -.13, ry: 1.52, shear:  0,   pupil: .50 },
+  slit:    { r: 1.10, gap: .39, y: -.07, ry:  .44, shear:  0,   pupil: .74 },
+  sparkle: { r: 1.26, gap: .31, y: -.14, ry: 1.10, shear:  0,   pupil: .58, spark: true },
+  sharp:   { r:  .92, gap: .30, y: -.10, ry:  .96, shear: -.26, pupil: .60 },
+  dot:     { r:  .54, gap: .37, y: -.05, ry: 1.00, shear:  0,   pupil: .98 },
+  droop:   { r: 1.02, gap: .34, y: -.05, ry: 1.02, shear:  0,   pupil: .56, droop: .20 }
+};
+
 /* 眉の素の形。ここがキャラの「顔つき」になる。
  * i = 眉頭の高さ、o = 眉尻の高さ（どちらも下が正）、w = 太さ。 */
 const BROW_BASE = {
@@ -933,10 +959,9 @@ const BROW_BASE = {
 
 function face(c, o, cast, rx, ry, r) {
   const f = o.face || 'smile';
-  const kind = cast.eye;
-  const gap = kind === 'narrow' ? .38 : kind === 'sharp' ? .3 : .33;
-  const ex = rx * gap, ey = -ry * .1;
-  let er = r * (kind === 'sparkle' ? .25 : kind === 'narrow' ? .19 : .215);
+  const E2 = EYE[cast.eye] || EYE.round;
+  const ex = rx * E2.gap, ey = ry * E2.y;
+  const er = r * .215 * E2.r;
   const lx = clamp(o.look ? o.look[0] : 0, -1, 1) * er * .36;
   const ly = clamp(o.look ? o.look[1] : 0, -1, 1) * er * .36;
 
@@ -947,24 +972,26 @@ function face(c, o, cast, rx, ry, r) {
       Art.stroke(c, Art.PAL.ink, r * .075); });
   } else {
     [-1, 1].forEach(sd => {
-      const wide = f === 'shock' ? 1.18 : 1;
+      // 驚いたときだけ、どの型でも目を丸く見開く。型の差より状況が優先される
+      const wide = f === 'shock' ? 1.22 : 1;
+      const dy = ey + er * (E2.droop || 0);
       c.save();
-      if (kind === 'sharp') c.transform(1, 0, sd * -.22, 1, 0, 0);
+      if (E2.shear) c.transform(1, 0, sd * E2.shear, 1, 0, 0);
       c.beginPath();
-      const ry2 = er * (kind === 'narrow' ? .62 : kind === 'droop' ? 1.0 : 1.08) * wide;
-      c.ellipse(sd * ex, ey + (kind === 'droop' ? er * .16 : 0), er * wide, ry2, 0, 0, TAU);
+      const ry2 = er * (f === 'shock' ? 1.15 : E2.ry) * wide;
+      c.ellipse(sd * ex, dy, er * wide, ry2, 0, 0, TAU);
       c.fillStyle = Art.PAL.cream; c.fill();
       Art.stroke(c, Art.PAL.ink, r * .055);
-      const prr = er * (f === 'shock' ? .32 : kind === 'narrow' ? .62 : .56);
-      c.beginPath(); c.arc(sd * ex + lx, ey + ly + (kind === 'droop' ? er * .2 : 0), prr, 0, TAU);
+      const prr = Math.min(er * wide, ry2) * (f === 'shock' ? .42 : E2.pupil) * 1.05;
+      c.beginPath(); c.arc(sd * ex + lx, dy + ly + er * (E2.droop || 0) * .6, prr, 0, TAU);
       c.fillStyle = '#241733'; c.fill();
       c.beginPath();
-      c.arc(sd * ex + lx - prr * .34, ey + ly - prr * .42, prr * .38, 0, TAU);
+      c.arc(sd * ex + lx - prr * .34, dy + ly - prr * .42, prr * .38, 0, TAU);
       c.fillStyle = '#fff'; c.fill();
-      if (kind === 'sparkle') {
+      if (E2.spark) {
         c.globalAlpha = .75;
         c.beginPath();
-        c.arc(sd * ex + lx + prr * .34, ey + ly + prr * .36, prr * .22, 0, TAU); c.fill();
+        c.arc(sd * ex + lx + prr * .34, dy + ly + prr * .36, prr * .22, 0, TAU); c.fill();
       }
       c.restore();
     });
@@ -993,8 +1020,26 @@ function face(c, o, cast, rx, ry, r) {
   const my = ry * .3;
   c.beginPath();
   if (f === 'smile') {
-    c.moveTo(-r * .2, my - r * .04);
-    c.quadraticCurveTo(0, my + r * .18, r * .2, my - r * .04);
+    /* ふだんの口。ここだけキャラごとに変える。画面に出ている時間が
+     * いちばん長いのは待機の顔で、そこが全員同じだと性格が生まれない。
+     * 感情がついたときは全員共通でいい ―― 状況のほうが強いので。 */
+    const M = cast.mouth || 'arc';
+    if (M === 'wide') {
+      c.moveTo(-r * .29, my - r * .05);
+      c.quadraticCurveTo(0, my + r * .20, r * .29, my - r * .05);
+    } else if (M === 'small') {
+      c.moveTo(-r * .10, my - r * .02);
+      c.quadraticCurveTo(0, my + r * .12, r * .10, my - r * .02);
+    } else if (M === 'wave') {            // への字と逆への字を継いだ波形。とぼけた顔
+      c.moveTo(-r * .22, my + r * .05);
+      c.quadraticCurveTo(-r * .11, my - r * .07, 0, my + r * .04);
+      c.quadraticCurveTo(r * .11, my + r * .15, r * .22, my - r * .02);
+    } else if (M === 'line') {            // 真一文字。感情を出さない
+      c.moveTo(-r * .17, my); c.lineTo(r * .17, my);
+    } else {
+      c.moveTo(-r * .2, my - r * .04);
+      c.quadraticCurveTo(0, my + r * .18, r * .2, my - r * .04);
+    }
     Art.stroke(c, Art.PAL.ink, r * .085);
   } else if (f === 'joy') {
     c.moveTo(-r * .25, my - r * .07);

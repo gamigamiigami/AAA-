@@ -46,12 +46,16 @@ const HZ = Art.horizon(STAGE_Y);
 const rowAt = (y) => ({ y, s: 1.18 * (y - HZ) / (630 - HZ) });
 const ROWS = [rowAt(508), rowAt(566), rowAt(630)];
 
-/* 手前ほど間隔を広く取る＝奥行き。ただし最前列でも参加者一覧の帯に
- * 重ならない位置で止める。足元が帯に食い込むと画面の底が抜けて見える。 */
+/* 走者のレーン。大きさは手で決めない —— 廊下と同じ地平線から引く。
+ * 手打ちにすると、壁は奥へ収束しているのに走者だけ縮まず、
+ * 「遠い」ではなく「小さい」に見える。
+ * ただし奥行きの幅は取りすぎない。正しい遠近をそのまま当てると最奥が
+ * 豆粒になり、誰が誰か分からなくなる。手前の帯にも重ねない。 */
+const D_HZ = D_Y - 26;                     // 廊下の消失点と同じ高さ
+const laneAt = (y, dx) => ({ y, dx, scale: 1.24 * (y - D_HZ) / (632 - D_HZ) });
 const LANES = [
-  { y: D_Y + 24,  scale: .70, dx: -34 }, { y: D_Y + 66,  scale: .79, dx:  26 },
-  { y: D_Y + 112, scale: .89, dx: -16 }, { y: D_Y + 162, scale: 1.0, dx:  38 },
-  { y: D_Y + 216, scale: 1.11, dx: -28 }, { y: D_Y + 276, scale: 1.24, dx: 12 }
+  laneAt(470, -30), laneAt(500, 24), laneAt(532, -14),
+  laneAt(566, 30), laneAt(598, -22), laneAt(632, 10)
 ];
 
 const Stage = { W, H, STAGE_Y, D_Y, D_X0, D_X1, SEATS, ROWS, LANES, BEAT: 500, COUNT_IN: 4 };
@@ -340,21 +344,13 @@ Stage.daruma = function (c, st) {
   flag(); Art.stroke(c, PAL.ink, 4);
   Art.label(c, 'ゴール', gx + 43, D_Y - 68, 18, PAL.cream, { ow: .32 });
 
-  /* 鬼は床の補色側に置く。危険色の床と同じ色にすると主役が沈む。 */
+  // 鬼は専用の描画。プレイヤーと同じ関数で色だけ黒くすると敵に見えない
   const ox = D_X1 + 168, oy = D_Y + 236, or = 66;
   Art.longShadow(c, ox - 30, oy + 2, or * .8, 240, watching ? .6 : .38);
-  Art.chara(c, { x: ox, y: oy - or, r: or, color: watching ? '#2E1436' : '#332748',
-    shape: 'crown', seed: 999, face: watching ? 'mad' : 'flat',
-    look: watching ? [-1, 0] : [1, .3], shadowY: oy + 4, shadowK: .7,
+  Art.contact(c, ox, oy + 4, or * .9, .7);
+  Art.oni(c, { x: ox, y: oy - or, r: or, watching,
     bob: watching ? Math.sin(st.tSec * 24) * 3 : -Math.abs(Math.sin(st.tSec * 3)) * 5,
-    rot: watching ? 0 : .09, armT: st.tSec * 2 });
-  if (watching) {
-    c.save(); c.globalCompositeOperation = 'lighter';
-    const gg = c.createRadialGradient(ox, oy - or * 1.1, 0, ox, oy - or * 1.1, 90);
-    gg.addColorStop(0, 'rgba(255,70,80,.5)'); gg.addColorStop(1, 'rgba(255,70,80,0)');
-    c.fillStyle = gg; c.beginPath(); c.arc(ox, oy - or * 1.1, 90, 0, Art.TAU); c.fill();
-    c.restore();
-  }
+    rot: watching ? 0 : .07 });
 
   st.players.forEach((p, i) => {
     const L = LANES[i % LANES.length];

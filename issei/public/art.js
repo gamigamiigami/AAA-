@@ -1270,6 +1270,77 @@ Art.corridor = function (c, W, H, y, t, danger) {
   c.fillStyle = ao; c.fillRect(0, y - 40, W, 42);
 };
 
+/* 鬼。プレイヤーと同じ描画関数で色だけ黒くすると、「大きくて黒いけん」に
+ * しかならない。この画面で唯一の敵役なので、描き方から分ける。
+ *   - 逆光。奥の出口から光が来るので、体は潰れた影、縁だけが光る
+ *   - 角はシルエットに食い込ませる。頭に貼った三角は「載っている」だけ
+ *   - 左右非対称。人の作るキャラは左右で高さが違う
+ *   - 目は細い一本線。振り向いた瞬間だけ見開く
+ * 大きさで威圧するのは最後の手段。 */
+Art.oni = function (c, o) {
+  const rx = o.r * 1.16, ry = o.r * 1.02;
+  const watching = o.watching;
+  c.save();
+  c.translate(o.x, o.y + (o.bob || 0));
+  if (o.rot) c.rotate(o.rot);
+
+  const path = () => {
+    c.beginPath();
+    c.moveTo(-rx * .96, ry * .92);
+    c.bezierCurveTo(-rx * 1.08, ry * .10, -rx * .94, -ry * .42, -rx * .64, -ry * .64);
+    c.lineTo(-rx * .52, -ry * 1.18);      // 角1（短い）
+    c.lineTo(-rx * .31, -ry * .72);
+    c.lineTo(-rx * .07, -ry * 1.46);      // 角2（いちばん長い。中央より少し左）
+    c.lineTo(rx * .17, -ry * .76);
+    c.lineTo(rx * .41, -ry * 1.10);       // 角3
+    c.lineTo(rx * .57, -ry * .68);
+    c.bezierCurveTo(rx * .94, -ry * .46, rx * 1.10, ry * .14, rx * .98, ry * .92);
+    c.quadraticCurveTo(0, ry * 1.14, -rx * .96, ry * .92);
+    c.closePath();
+  };
+
+  // 体は潰れた影。ハイライトも頬紅も乗せない
+  path();
+  const g = c.createLinearGradient(0, -ry, 0, ry);
+  g.addColorStop(0, watching ? '#2A0A16' : '#1B0E28');
+  g.addColorStop(1, watching ? '#12040A' : '#0C0616');
+  c.fillStyle = g; c.fill();
+
+  /* 縁の光。奥（出口）の側の輪郭だけを光らせる。
+   * パスで切り抜いてから、ずらした同じパスを描くと、ずらした逆側に縁が残る。 */
+  c.save(); path(); c.clip();
+  c.translate(o.r * .13, o.r * .09);
+  path();
+  Art.stroke(c, watching ? 'rgba(255,120,110,.85)' : 'rgba(214,178,255,.5)', o.r * .17);
+  c.restore();
+
+  // 目。ふだんは細い一本線、振り向いた瞬間だけ見開く
+  const ey = -ry * .12, ex = rx * .33;
+  [-1, 1].forEach(sd => {
+    c.save();
+    c.translate(sd * ex, ey);
+    c.rotate(sd * (watching ? -.20 : -.08));
+    if (watching) {
+      c.beginPath();
+      c.moveTo(-o.r * .20, -o.r * .05); c.lineTo(o.r * .20, -o.r * .13);
+      c.lineTo(o.r * .17, o.r * .10);   c.lineTo(-o.r * .17, o.r * .06);
+      c.closePath();
+      c.fillStyle = '#FF4740'; c.fill();
+      c.save(); c.globalCompositeOperation = 'lighter';
+      const q = c.createRadialGradient(0, 0, 0, 0, 0, o.r * .5);
+      q.addColorStop(0, 'rgba(255,80,60,.75)'); q.addColorStop(1, 'rgba(255,80,60,0)');
+      c.fillStyle = q; c.beginPath(); c.arc(0, 0, o.r * .5, 0, TAU); c.fill();
+      c.restore();
+    } else {
+      c.beginPath();
+      c.moveTo(-o.r * .19, 0); c.lineTo(o.r * .19, -o.r * .03);
+      Art.stroke(c, 'rgba(255,150,130,.6)', o.r * .05);
+    }
+    c.restore();
+  });
+  c.restore();
+};
+
 /* 逆光の長い影。奥から光が来る空間で、手前に伸ばす。 */
 Art.longShadow = function (c, x, y, rx, len, strength) {
   c.save();

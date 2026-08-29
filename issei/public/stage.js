@@ -434,13 +434,19 @@ function podium(c, st, top, label) {
 /* 常時表示。8人を超えたら上位5人＋自分だけを出す。
  * 6人時の見た目を先に作ると、30人で必ず壊れる。 */
 Stage.roster = function (c, st) {
-  const sorted = st.players.slice().sort((a, b) => b.score - a.score);
-  let show = sorted;
+  /* 並び順は舞台の左→右に合わせる。点数順にすると、覚えたアイコンの位置が
+   * 毎ラウンド動いて、目で照合できなくなる。この画面の仕事は順位ではなく
+   * 「どれが自分か」なので、位置は動かさない。
+   * 首位は並べ替えではなく印で示す。 */
+  let show = st.players.slice();
   if (st.players.length > 8) {
-    show = sorted.slice(0, 5);
+    const top = st.players.slice().sort((a, b) => b.score - a.score).slice(0, 5);
     const me = st.players.find(p => p.you);
-    if (me && show.indexOf(me) < 0) show.push(me);
+    if (me && top.indexOf(me) < 0) top.push(me);
+    show = top;
   }
+  show.sort((a, b) => (a.spot ? a.spot.x : 0) - (b.spot ? b.spot.x : 0));
+  const best = Math.max(0, ...st.players.map(p => p.score));
   const cw = 96, pad = 14;
   const total = show.length * cw + pad * 2;
   const rx0 = W - 18 - total;
@@ -453,6 +459,15 @@ Stage.roster = function (c, st) {
       p.you ? PAL.cream : 'rgba(255,247,232,.72)', { ow: .34, align: 'left' });
     Art.num(c, String(p.score), x + 21, H - 26, 18,
       p.you ? PAL.focus : 'rgba(255,247,232,.45)', { ow: .34, align: 'left' });
+    // 首位の印。並べ替える代わりにこれで示す
+    if (best > 0 && p.score === best) {
+      c.save(); c.translate(x - 13, H - 54); c.scale(.7, .7);
+      c.beginPath();
+      c.moveTo(-11, 6); c.lineTo(-11, -6); c.lineTo(-5, -1); c.lineTo(0, -9);
+      c.lineTo(5, -1); c.lineTo(11, -6); c.lineTo(11, 6); c.closePath();
+      c.fillStyle = PAL.gold; c.fill(); Art.stroke(c, PAL.ink, 3);
+      c.restore();
+    }
   });
 };
 

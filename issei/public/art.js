@@ -1106,13 +1106,16 @@ Art.FX.prototype.burst = function (x, y, o) {
   for (let i = 0; i < n; i++) {
     const a = o.dir === undefined ? Math.random() * TAU
       : o.dir + (Math.random() - .5) * (o.spread || TAU);
-    const sp = (o.speed || 300) * (.4 + Math.random() * .8);
-    this.list.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - (o.lift || 0),
+    /* 奥行き。0が遠く、1が手前。大きさ・速さ・落ち方・明るさを全部これで振る。
+     * 1層のままだと、同じ紙が同じ速さで散るだけの平らな絵になる。 */
+    const z = Math.random();
+    const sp = (o.speed || 300) * (.4 + Math.random() * .8) * (.55 + z * .75);
+    this.list.push({ x, y, z, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - (o.lift || 0) * (.6 + z * .6),
       life: (o.life || .8) * (.75 + Math.random() * .5), t: 0,
-      size: (o.size || 9) * (.6 + Math.random() * .8),
+      size: (o.size || 9) * (.6 + Math.random() * .8) * (.5 + z * .95),
       color: (o.color || [Art.PAL.gold])[(Math.random() * (o.color || [1]).length) | 0],
       spin: (Math.random() - .5) * 16, rot: Math.random() * TAU,
-      kind: o.kind || 'confetti', grav: o.grav === undefined ? 950 : o.grav });
+      kind: o.kind || 'confetti', grav: (o.grav === undefined ? 950 : o.grav) * (.62 + z * .62) });
   }
 };
 Art.FX.prototype.ring = function (x, y, o) {
@@ -1130,7 +1133,9 @@ Art.FX.prototype.update = function (dt) {
   }
 };
 Art.FX.prototype.draw = function (c) {
-  for (const p of this.list) {
+  // 奥から描く。手前の紙が奥の紙に隠れると、層が逆さに見える
+  const order = this.list.slice().sort((a, b) => (a.z || 0) - (b.z || 0));
+  for (const p of order) {
     const k = p.t / p.life;
     c.save();
     if (p.ring) {
@@ -1140,9 +1145,11 @@ Art.FX.prototype.draw = function (c) {
       Art.stroke(c, p.color, p.lw * (1 - k * .7));
       c.restore(); continue;
     }
-    c.globalAlpha = Art.sat((1 - k) * 2.4);
+    // 遠い紙は暗く薄く。空気に負けるほど遠くにある
+    const z = p.z === undefined ? 1 : p.z;
+    c.globalAlpha = Art.sat((1 - k) * 2.4) * (.42 + z * .58);
     c.translate(p.x, p.y); c.rotate(p.rot);
-    c.fillStyle = p.color;
+    c.fillStyle = z < .5 ? Art.shade(p.color, -.3 + z * .5) : p.color;
     if (p.kind === 'star') {
       c.beginPath();
       for (let i = 0; i < 10; i++) {
@@ -1492,6 +1499,18 @@ Art.backdrop = function (c, W, H, y, t) {
     c.beginPath(); c.arc(L.x, L.y - 2, 6, 0, TAU);
     c.fillStyle = 'rgba(255,225,170,' + (.5 + L.on * .5) + ')'; c.fill();
   }
+  /* トラスにも光を当てる。灯りが5つ点いているのに構造物だけ塗り一発だと、
+   * そこが画面でいちばん未加工な帯になる。 */
+  c.save(); c.globalCompositeOperation = 'lighter';
+  c.beginPath(); c.rect(36, ty - 4, W - 72, 26); c.clip();
+  for (const L of lamps) {
+    const q = c.createRadialGradient(L.x, ty + 12, 0, L.x, ty + 12, 78);
+    q.addColorStop(0, 'rgba(255,214,160,' + (.30 * L.on).toFixed(3) + ')');
+    q.addColorStop(1, 'rgba(255,214,160,0)');
+    c.fillStyle = q; c.beginPath(); c.arc(L.x, ty + 12, 78, 0, TAU); c.fill();
+  }
+  c.restore();
+
   c.restore();
   Art.lamps = lamps;   // 床が光だまりを落とすために使う
 };

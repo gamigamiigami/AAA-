@@ -20,20 +20,27 @@ const D_Y = 356, D_X0 = 150, D_X1 = W - 330;
 
 /* 舞台上の立ち位置。等間隔に並べた瞬間、絵は「for文が並べた画面」になる。
  * 奥行き3列、大きさに差、間隔に粗密、全員が違う方を向く。
- * 席は人数ぶん先に決めておき、参加順に配る。 */
+ *
+ * ただし粗密には下限がある。手前の1人が奥の1人の真上に来ると、奥の名前も
+ * 頭の飾りも消え、2体が1体の奇形に見える。前後で重なるときは、手前の体の
+ * 半径の1.28倍は必ず横にずらす —— 体だけでなく、頭の飾りと足元の名前まで
+ * よけないと意味がない。重なりは奥行きのためであって、隠すためではない。
+ * どの人数でも成り立つことは機械で確認してある。 */
 const SEATS = [
-  { x: 452, row: 2, look: [ .1, -.7], tilt: -.02 },
-  { x: 700, row: 1, look: [-.6, -.3], tilt:  .05 },
-  { x: 344, row: 1, look: [ .5, -.5], tilt: -.06 },   // ↓奥の1人と少し重なる
-  { x: 946, row: 1, look: [-.7, -.2], tilt:  .03 },
-  { x: 452, row: 0, look: [-.2, -.6], tilt: -.03 },   // ↑手前の1人と少し重なる
-  { x: 866, row: 0, look: [ .8, -.2], tilt:  .07 },   // 右の1人と近づける
-  { x: 762, row: 2, look: [-.2, -.6], tilt:  .02 },
-  { x: 168, row: 1, look: [ .7, -.3], tilt: -.04 },
-  { x: 1088, row: 0, look: [-.6, -.4], tilt: .05 },
-  { x: 596, row: 0, look: [ .2, -.7], tilt: -.02 }
-];
-const ROWS = [ { y: 508, s: .80 }, { y: 566, s: .96 }, { y: 648, s: 1.18 } ];
+  { x: 628, row: 2, look: [ .1, -.7], tilt: -.02 },   // 自分。最前列の中央
+  { x: 300, row: 1, look: [ .5, -.5], tilt: -.06 },
+  { x: 978, row: 1, look: [-.7, -.2], tilt:  .03 },
+  { x: 108, row: 0, look: [ .7, -.3], tilt: -.04 },
+  { x: 486, row: 0, look: [-.2, -.6], tilt: -.03 },
+  { x: 860, row: 0, look: [-.6, -.4], tilt:  .05 },
+  { x: 186, row: 2, look: [ .6, -.4], tilt:  .04 },
+  { x:1092, row: 2, look: [-.5, -.5], tilt: -.05 },
+  { x: 762, row: 1, look: [-.2, -.6], tilt:  .02 },
+  { x:1160, row: 1, look: [-.8, -.2], tilt:  .06 }
+]
+/* 最前列は、足元の名前が参加者一覧の帯にぶつからない高さで止める。
+ * 名前が帯に食われると、画面でいちばん大きい1人だけが無名になる。 */
+const ROWS = [ { y: 508, s: .80 }, { y: 566, s: .96 }, { y: 630, s: 1.18 } ];
 
 /* 手前ほど間隔を広く取る＝奥行き。ただし最前列でも参加者一覧の帯に
  * 重ならない位置で止める。足元が帯に食い込むと画面の底が抜けて見える。 */
@@ -159,7 +166,7 @@ Stage.seino = function (c, st) {
   heading(c, 'せーの！', 74, '#7FE9FF', 92, -.02);
   Art.label(c, 'ぜんいん そろえて おす', W / 2, 160, 27, 'rgba(255,247,232,.85)', { ow: .3 });
   Stage.cast(c, st);
-  hud(c, 'そうしん', st.sent + ' / ' + st.players.length);
+  hud(c, 'おした人', st.sent + ' / ' + st.players.length);
 };
 
 Stage.seinoReveal = function (c, st) {
@@ -178,39 +185,92 @@ Stage.seinoReveal = function (c, st) {
   const sp = L.spread;
   const has = sp !== null && sp !== undefined;
   const tight = has && sp <= 80;
-  Art.label(c, 'ばらつき', W / 2 - 104, 196, 22, 'rgba(255,247,232,.6)', { ow: .3, align: 'right' });
-  Art.num(c, (has ? sp : '—') + 'ms', W / 2 + 6, 198, 46,
-    tight ? '#39C96A' : PAL.danger, { align: 'left', ow: .34 });
+/* ラベルと値を中央で突き合わせると間に穴が空き、別々の断片に読める。
+   * 値を中心に置き、ラベルはその肩に小さく添える。 */
+  const vw = Art.numWidth(c, (has ? sp : '\u2014') + 'ms', 46);
+  Art.label(c, 'ばらつき', W / 2 - vw / 2 - 10, 190, 20, 'rgba(255,247,232,.6)',
+    { ow: .3, align: 'right' });
+  Art.num(c, (has ? sp : '\u2014') + 'ms', W / 2 + 30, 198, 46,
+    tight ? '#39C96A' : PAL.danger, { align: 'center', ow: .34 });
   // 失敗の理由を分けて言う。「揃わなかった」と「押さない人がいた」は別の話。
   const miss = L.entries.filter(e => e.error === null || e.error === undefined).length;
   Art.label(c, L.ok ? 'ぜんいん +1てん'
       : miss ? miss + '人が おさなかった'
-      : '80ms いないで せいこう',
+      : '80ms 以内で そろう',
     W / 2, 250, 25, 'rgba(255,247,232,.72)', { ow: .3 });
 
   Stage.cast(c, st, { forceLook: [0, -.15] });
-  strip(c, st, L.entries, 190, 400, W - 380);
+  strip(c, st, L.entries, 190, 348, W - 380);
 };
 
-/* ズレの帯。分析グラフではなく「どこに集まったか」を見せる補助。 */
+/* ズレの帯。分析グラフではなく「どこに集まったか」を見せる補助。
+ *
+ * 目盛りは固定する。毎回いちばん外れた人に合わせて伸縮させると、同じ 300ms が
+ * ラウンドごとに違う長さに見え、比べるための物差しが比べられなくなる。
+ * 外に出た人は端に張り付かせ、振り切れたことを矢印で見せる。
+ *
+ * 重なった人は縦に積む。6人いて3人しか見えない帯は、この画面の存在意義を失う。 */
+const STRIP_RANGE = 400;      // 端は ±0.4秒。ここを超えたら「振り切れ」
+const STRIP_OK = 80;          // 成功の幅
+const STRIP_H = 132;          // 帯の高さは固定。人数で伸びると舞台を食う
+
 function strip(c, st, entries, x, y, w) {
   const hits = entries.filter(e => e.error !== null && e.error !== undefined);
   if (!hits.length) return;
-  const peak = Math.max(60, ...hits.map(e => Math.abs(e.error)));
-  const range = Math.ceil(peak * 1.25 / 20) * 20;
-  const px = ms => x + w / 2 + Art.clamp(ms / range, -1, 1) * (w / 2 - 26);
+  const half = w / 2 - 30;
+  const px = ms => x + w / 2 + Art.clamp(ms / STRIP_RANGE, -1, 1) * half;
+  const sorted = hits.slice().sort((a2, b2) => a2.error - b2.error);
 
-  Art.slab(c, x - 22, y - 34, w + 44, 74, '#3A2358', { depth: 6, r: 24 });
+  /* 重なった人は軸の上下へ交互に逃がす。上へ積むだけだと塔になり、
+   * 「上にいるほど何かが上」という無い意味を読ませてしまう。
+   * 段が増えたら帯を伸ばすのではなく、丸を小さくする。帯が伸びると舞台を隠す。 */
+  const budget = 40;
+  let R = 16, placed = [];
+  for (;;) {
+    const rowH = R * 2.1;
+    placed = []; let deepest = 0;
+    for (const e of sorted) {
+      const ex = px(e.error);
+      let k = 0, lv = 0;
+      while (placed.some(q => q.lv === lv && Math.abs(q.x - ex) < R * 2.05)) {
+        k++; lv = (k % 2 ? 1 : -1) * Math.ceil(k / 2);
+      }
+      placed.push({ e, x: ex, lv, over: Math.abs(e.error) > STRIP_RANGE });
+      deepest = Math.max(deepest, Math.abs(lv));
+    }
+    if (deepest * rowH + R <= budget || R <= 7) break;
+    R -= 1;
+  }
+  const rowH = R * 2.1;
+
+  const top = y - STRIP_H / 2;
+  Art.slab(c, x - 22, top, w + 44, STRIP_H, '#3A2358', { depth: 6, r: 24 });
+
+  // 成功の幅を先に敷く。合格ラインが見えないと、ばらつきの数字を評価できない。
+  c.fillStyle = 'rgba(57,201,106,.16)';
+  c.fillRect(px(-STRIP_OK), y - budget, px(STRIP_OK) - px(-STRIP_OK), budget * 2);
   c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y);
   Art.stroke(c, 'rgba(255,255,255,.18)', 3);
-  c.beginPath(); c.moveTo(px(0), y - 20); c.lineTo(px(0), y + 20);
+  c.beginPath(); c.moveTo(px(0), y - budget - 4); c.lineTo(px(0), y + budget + 4);
   Art.stroke(c, PAL.focus, 4);
-  Art.num(c, '-' + range, px(-range), y + 26, 17, 'rgba(255,247,232,.55)', { ow: .34 });
-  Art.num(c, '+' + range, px(range), y + 26, 17, 'rgba(255,247,232,.55)', { ow: .34 });
-  for (const e of hits) {
-    Art.chara(c, { x: px(e.error), y: y - 6, r: 15, color: e.color, shape: e.shape,
-      seed: e.seed, face: e.bad ? 'sad' : 'joy', feet: false, arms: false,
-      sticker: e.you ? PAL.focus : '#3A2358' });
+
+  const ly = top + STRIP_H - 17;
+  Art.label(c, 'ぴったり', px(0), ly, 16, PAL.focus, { ow: .34 });
+  Art.label(c, 'はやい', px(-STRIP_RANGE), ly, 16, 'rgba(255,247,232,.5)', { ow: .34 });
+  Art.label(c, 'おそい', px(STRIP_RANGE), ly, 16, 'rgba(255,247,232,.5)', { ow: .34 });
+
+  for (const q of placed) {
+    const e = q.e, cy = y - q.lv * rowH;
+    if (q.over) {   // 振り切れた人は端で外を向く三角を添える
+      const sd = e.error > 0 ? 1 : -1;
+      c.beginPath();
+      c.moveTo(q.x + sd * (R + 16), cy); c.lineTo(q.x + sd * (R + 3), cy - 9);
+      c.lineTo(q.x + sd * (R + 3), cy + 9); c.closePath();
+      c.fillStyle = PAL.danger; c.fill(); Art.stroke(c, PAL.ink, 3);
+    }
+    Art.chara(c, { x: q.x, y: cy, r: R, color: e.color, shape: e.shape,
+      seed: e.seed, face: Math.abs(e.error) <= STRIP_OK ? 'joy' : 'flat',
+      feet: false, arms: false, sticker: e.you ? PAL.focus : '#3A2358' });
   }
 }
 

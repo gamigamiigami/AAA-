@@ -465,18 +465,46 @@ Art.label = function (c, text, x, y, size, color, opt) {
   c.fillStyle = color; c.fillText(text, x, y);
   c.restore();
 };
-/* 数値専用。等幅（タビュラー）にしないと桁が揃わず、比較画面として読めない。 */
+/* 数値専用。桁送りを自前で固定する。
+ * 等幅フォントに逃げると、読み込みに失敗した瞬間 OS のプログラマ用書体に落ち、
+ * 斜線入りのゼロがそのまま客の画面に出る。書体はブランドのまま、
+ * 数字の送り幅だけを一番広い字に揃えれば、桁は必ず揃う。 */
 Art.num = function (c, text, x, y, size, color, opt) {
   opt = opt || {};
+  const str = String(text);
   c.save();
-  c.font = '600 ' + size + 'px "Roboto Mono", ui-monospace, monospace';
-  c.textAlign = opt.align || 'center'; c.textBaseline = 'middle';
+  c.font = '900 ' + size + 'px "Zen Maru Gothic", "Hiragino Maru Gothic ProN", sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  const isNum = (ch) => ch >= '0' && ch <= '9';
+  let cell = 0;
+  for (let d = 0; d < 10; d++) cell = Math.max(cell, c.measureText(String(d)).width);
+  const cells = [];
+  let total = 0;
+  for (const ch of str) {
+    const w = isNum(ch) ? cell : c.measureText(ch).width;
+    cells.push(w); total += w;
+  }
+  const x0 = opt.align === 'left' ? x : opt.align === 'right' ? x - total : x - total / 2;
+  // フチは全字ぶんを先に引く。1字ずつ引くと隣の字の塗りを上書きする。
   if (opt.outline !== false) {
     c.lineJoin = 'round'; c.strokeStyle = opt.outlineColor || Art.PAL.ink;
-    c.lineWidth = size * (opt.ow || .3); c.strokeText(text, x, y);
+    c.lineWidth = size * (opt.ow || .3);
+    let px = x0;
+    [...str].forEach((ch, i) => { c.strokeText(ch, px + cells[i] / 2, y); px += cells[i]; });
   }
-  c.fillStyle = color; c.fillText(text, x, y);
+  c.fillStyle = color;
+  let px = x0;
+  [...str].forEach((ch, i) => { c.fillText(ch, px + cells[i] / 2, y); px += cells[i]; });
   c.restore();
+};
+Art.numWidth = function (c, text, size) {
+  c.save();
+  c.font = '900 ' + size + 'px "Zen Maru Gothic", "Hiragino Maru Gothic ProN", sans-serif';
+  let cell = 0;
+  for (let d = 0; d < 10; d++) cell = Math.max(cell, c.measureText(String(d)).width);
+  let t = 0;
+  for (const ch of String(text)) t += (ch >= '0' && ch <= '9') ? cell : c.measureText(ch).width;
+  c.restore(); return t;
 };
 
 Art.measure = function (c, text, size, opt) {

@@ -505,11 +505,35 @@ const CAST = {
 };
 Art.CAST = CAST;
 
+/* 状態別ポーズ。キャラは「立っているだけ」では感情を持たない。
+ * 待機／溜め／歓喜／落胆／驚き／歩行の6つを用意し、間は必ず補間する。
+ * 縦の跳ねはここに入れない ——「持ち上がったまま止まる」と浮いて見えるので、
+ * 跳躍は Stage 側の重力つきホップが受け持つ。 */
+Art.POSE = {
+  idle:  { arm:  .50, spread:  .02, lean:  0,   tilt:  0,   lift: 0, squash: 1    },
+  ready: { arm:  .62, spread: -.30, lean:  .16, tilt:  .07, lift: 2, squash:  .91 },
+  cheer: { arm:-1.90, spread:  .30, lean:  0,   tilt: -.06, lift: 0, squash: 1.06 },
+  flop:  { arm:  .95, spread:  .02, lean:  .18, tilt:  .2,  lift: 5, squash:  .93 },
+  shock: { arm:-1.05, spread:  .55, lean: -.12, tilt: -.03, lift: 0, squash: 1.09 },
+  walk:  { arm:  .45, spread:  .04, lean:  .06, tilt:  0,   lift: 0, squash: 1    }
+};
+const POSE_KEYS = ['arm', 'spread', 'lean', 'tilt', 'lift', 'squash'];
+Art.poseLerp = function (a, b, t) {
+  const o = {};
+  for (const k of POSE_KEYS) {
+    const av = a && a[k] !== undefined ? a[k] : (k === 'squash' ? 1 : 0);
+    const bv = b && b[k] !== undefined ? b[k] : (k === 'squash' ? 1 : 0);
+    o[k] = av + (bv - av) * t;
+  }
+  return o;
+};
+
 Art.chara = function (c, o) {
   const cast = CAST[o.shape] || CAST.circle;
   const r = o.r, col = o.color;
+  const P = o.pose || Art.POSE.idle;
   // 呼び出し側がバネを渡してくる。0以下だと平方根が NaN になり描画全体が落ちる。
-  const sq = clamp(o.squash === undefined ? 1 : o.squash, .3, 2);
+  const sq = clamp((o.squash === undefined ? 1 : o.squash) * (P.squash || 1), .3, 2);
   const rx = r * cast.rx / Math.sqrt(sq), ry = r * cast.ry * sq;
   const line = Art.outlineOf(col);
   const lw = Math.max(1.7, r * .12);
@@ -517,9 +541,10 @@ Art.chara = function (c, o) {
   if (o.shadowY !== undefined) Art.contact(c, o.x, o.shadowY, rx * .95, o.shadowK);
 
   c.save();
-  c.translate(o.x, o.y + (o.bob || 0));
-  if (o.rot) c.rotate(o.rot);
-  if (o.lean) c.transform(1, 0, o.lean, 1, 0, 0);
+  c.translate(o.x, o.y + (o.bob || 0) + (P.lift || 0) * (r / 44));
+  if (o.rot || P.tilt) c.rotate((o.rot || 0) + (P.tilt || 0));
+  const lean = (o.lean || 0) + (P.lean || 0);
+  if (lean) c.transform(1, 0, -lean * .5, 1, 0, 0);
 
   // 重なったとき分離させる縁。人が密集する画面では必須。
   if (o.sticker) {
@@ -542,19 +567,6 @@ Art.chara = function (c, o) {
     });
   }
 
-  if (o.arms !== false) {
-    const sw = o.armUp ? -1.5
-      : (o.walk ? Math.sin(o.walk + Math.PI) : Math.sin((o.armT || 0) + (o.seed || 0)) * .35);
-    [-1, 1].forEach(sd => {
-      const draw = () => { c.beginPath();
-        c.moveTo(sd * rx * .8, ry * .02);
-        c.quadraticCurveTo(sd * rx * 1.18, ry * (.32 + sw * sd * .22),
-                           sd * rx * (o.armUp ? .86 : 1.04), ry * (.58 + sw * sd * .3)); };
-      draw(); Art.stroke(c, line, r * .23);
-      draw(); Art.stroke(c, Art.shade(col, -.06), r * .12);
-    });
-  }
-
   /* 二次モーション。頭の飾りは体より遅れて動く。
    * 全部が同時に動くと、人形ではなく図形に見える。 */
   c.save();
@@ -563,6 +575,41 @@ Art.chara = function (c, o) {
   c.restore();
 
   Art.vinyl(c, () => Art.eggPath(c, 0, 0, rx, ry, .14), { x: 0, y: 0, rx, ry, color: col, lw });
+
+  /* 腕は胴の「あと」に描く。前に描くと胴に隠れて、どのポーズでも
+   * 体の外に出た指先しか見えず、ポーズが読めない。 */
+  if (o.arms !== false) {
+    const swing = o.walk ? Math.sin(o.walk + Math.PI) * .5 : 0;
+    const sp = (P.spread || 0);
+    /* 腕の長さ。上げるポーズほど伸ばす。バンザイで手が頭より下だと
+     * 「上げた」に見えないし、極端な姿勢での伸びはアニメーションの基本。 */
+    const AL = r * .70 + Math.max(0, -(P.arm || 0)) * r * .23;
+    [-1, 1].forEach(sd => {
+      const a = (P.arm || 0) + swing * sd
+        + Math.sin((o.armT || 0) * 1.3 + (o.seed || 0) + sd) * .05;
+      // a を仰角に変換する。a が負ほど上、正ほど下。
+      const el = -a * .9 - .35;
+      /* 肩は胴の輪郭上に置く。中に置くと腕が顔の上を横切ってしまう。
+       * 腕を上げるほど付け根も上へ移す。 */
+      const ph = clamp(el * .35 - .18, -.55, .2);
+      const sx = sd * rx * Math.cos(ph) * .93, sy = -ry * Math.sin(ph) * .93;
+      const ow = 1 + sp;
+      const hx = sx + sd * AL * Math.cos(el) * ow;
+      const hy = sy - AL * Math.sin(el);
+      // 肘。腕の中点を進行方向の外側へ逃がすと、棒ではなく腕に見える。
+      const mx = (sx + hx) / 2 + sd * AL * .17, my = (sy + hy) / 2 + AL * .1;
+      const draw = () => { c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(mx, my, hx, hy); };
+      c.lineCap = 'round';
+      /* 腕は胴より暗く、手先は明るく。同色同幅だと、上げた腕が
+       * 頭の飾り（耳・角）と見分けられず、突起が4本あるように見える。 */
+      draw(); Art.stroke(c, line, r * .27);
+      draw(); Art.stroke(c, Art.shade(col, -.24), r * .145);
+      // 手先。丸を置くと腕が「終わって」見える
+      c.beginPath(); c.arc(hx, hy, r * .135, 0, TAU);
+      c.fillStyle = Art.shade(col, .12); c.fill();
+      Art.stroke(c, line, r * .075);
+    });
+  }
 
   // ほっぺ。体色によって見え方が変わるので、明るい色ほど濃く入れる。
   c.save();

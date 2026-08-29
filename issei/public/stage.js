@@ -35,10 +35,12 @@ const SEATS = [
 ];
 const ROWS = [ { y: 508, s: .80 }, { y: 566, s: .96 }, { y: 648, s: 1.18 } ];
 
+/* 手前ほど間隔を広く取る＝奥行き。ただし最前列でも参加者一覧の帯に
+ * 重ならない位置で止める。足元が帯に食い込むと画面の底が抜けて見える。 */
 const LANES = [
-  { y: D_Y + 34,  scale: .70, dx: -34 }, { y: D_Y + 84,  scale: .80, dx:  26 },
-  { y: D_Y + 134, scale: .90, dx: -16 }, { y: D_Y + 190, scale: 1.0, dx:  38 },
-  { y: D_Y + 250, scale: 1.1, dx: -28 }, { y: D_Y + 316, scale: 1.24, dx: 12 }
+  { y: D_Y + 24,  scale: .70, dx: -34 }, { y: D_Y + 66,  scale: .79, dx:  26 },
+  { y: D_Y + 112, scale: .89, dx: -16 }, { y: D_Y + 162, scale: 1.0, dx:  38 },
+  { y: D_Y + 216, scale: 1.11, dx: -28 }, { y: D_Y + 276, scale: 1.24, dx: 12 }
 ];
 
 const Stage = { W, H, STAGE_Y, D_Y, D_X0, D_X1, SEATS, ROWS, LANES, BEAT: 500, COUNT_IN: 4 };
@@ -81,7 +83,7 @@ Stage.cast = function (c, st, opt) {
     const r = (p.you ? 48 : 43) * row.s;
     Art.lightPool(c, sp.x, row.y, r * 2.2, r * .7, '#FFD79B', .1 + depth * .06);
     Art.chara(c, { x: sp.x, y: row.y - r, r, color: p.color, shape: p.shape, seed: p.seed,
-      face: p.face, squash: p.squash, bob: p.bob * row.s, lean: p.lean, armUp: p.armUp,
+      face: p.face, squash: p.squash, bob: p.bob * row.s, lean: p.lean, pose: p.pose,
       crestLag: p.crestLag, blink: p.blink > 0, shadowY: row.y + 2, shadowK: .55,
       armT: st.tSec * 2, rot: sp.tilt, look: opt.forceLook || sp.look });
     Art.label(c, p.name, sp.x, row.y + 26 * row.s, 21 * row.s,
@@ -266,7 +268,7 @@ Stage.daruma = function (c, st) {
       face: watching && moving ? 'shock' : moving ? 'joy' : 'flat',
       look: [1, 0], blink: p.blink > 0, shadowY: L.y, sticker: 'rgba(20,10,40,.5)',
       walk: moving && !watching ? st.tSec * 13 + p.seed : 0,
-      lean: watching && moving ? .18 : 0, crestLag: p.crestLag,
+      pose: p.pose, crestLag: p.crestLag,
       bob: moving && !watching ? -Math.abs(Math.sin(st.tSec * 13 + p.seed)) * r * .16 : 0 });
     if (p.you) marker(c, x, L.y - r * 2 - 36 + Math.sin(st.tSec * 4) * 4);
   });
@@ -325,7 +327,7 @@ function podium(c, st, top, label) {
     Art.chara(c, { x: s.x + face.skew * .4, y: standY - s.r, r: s.r,
       color: e.color, shape: e.shape, seed: e.seed,
       face: s.rank === 0 ? 'joy' : e.caught ? 'sad' : 'flat',
-      armUp: s.rank === 0, armT: st.tSec * 2,
+      pose: Art.POSE[s.rank === 0 ? 'cheer' : e.caught ? 'flop' : 'idle'], armT: st.tSec * 2,
       bob: -Math.abs(Math.sin(st.tSec * (s.rank === 0 ? 6 : 3) + s.rank)) * (s.rank === 0 ? 9 : 4) });
     Art.title(c, String(s.rank + 1), s.x, topY + s.h * .5, 40,
       { fill: s.rank === 0 ? PAL.cream : 'rgba(255,247,232,.75)', extrude: 4 });
@@ -359,14 +361,52 @@ Stage.roster = function (c, st) {
   });
 };
 
-/* 参加者1人ぶんのモーション更新。デモも本番も同じ動きにする。 */
-Stage.stepPlayer = function (p, dt, tSec) {
-  if (!p.sq) { p.sq = new Art.Spring(1, 330, 15).to(1); p.crestLag = 0;
-               p.bob = 0; p.lean = 0; p.blink = 0; p.nextBlink = 1 + Math.random() * 3; }
+/* 参加者1人ぶんのモーション更新。デモも本番も同じ動きにする。
+ * ポーズは切り替えではなく補間する。パッと差し替わると人形の付け替えに見える。 */
+Stage.stepPlayer = function (p, dt, tSec, opt) {
+  opt = opt || {};
+  if (!p.sq) {
+    p.sq = new Art.Spring(1, 330, 15).to(1);
+    p.crestLag = 0; p.bob = 0; p.lean = 0;
+    p.blink = 0; p.nextBlink = 1 + Math.random() * 3;
+    p.poseName = 'idle';
+    p.pose = Object.assign({}, Art.POSE.idle);
+    p.hop = 0; p.hopV = 0; p.lastPose = 'idle';
+  }
+
+  /* ポーズが変わった瞬間だけ、跳躍の初速を与える。
+   * 歓喜は跳ぶ、驚きは軽く浮く、落胆は跳ばない。 */
+  if (p.poseName !== p.lastPose) {
+    if (p.poseName === 'cheer') p.hopV = -430;
+    else if (p.poseName === 'shock') p.hopV = -190;
+    p.lastPose = p.poseName;
+  }
+  // 重力で落として、着地で1回だけ小さく弾ませる。等速で戻すと風船に見える。
+  if (p.hopV !== 0 || p.hop < 0) {
+    p.hopV += 2600 * dt;
+    p.hop += p.hopV * dt;
+    if (p.hop >= 0) {
+      p.hop = 0;
+      p.hopV = p.hopV > 260 ? -p.hopV * .26 : 0;
+      if (p.hopV !== 0) { p.sq.x = 1.16; p.sq.v = -2.2; }
+    }
+  }
   const prevSq = p.squash === undefined ? 1 : p.squash;
   p.squash = Math.max(.4, Math.min(1.6, p.sq.step(dt)));
   p.crestLag += ((prevSq - p.squash) * 26 - p.crestLag) * Math.min(1, dt * 12);
-  p.bob = -Math.abs(Math.sin(tSec * Math.PI * 1000 / Stage.BEAT + p.seed)) * 7;
+
+  const tgt = Art.POSE[p.poseName] || Art.POSE.idle;
+  // 歓喜と驚きは速く、落胆はゆっくり。感情ごとに追従の速さを変える。
+  const rate = p.poseName === 'cheer' || p.poseName === 'shock' ? 15
+             : p.poseName === 'flop' ? 6 : 10;
+  p.pose = Art.poseLerp(p.pose, tgt, Math.min(1, dt * rate));
+
+  /* 待機は拍ではなく呼吸で上下させる。拍で跳ねるのはプレイ中だけ。
+   * 常に拍で動いていると、静かな場面が作れず全部が同じテンションになる。 */
+  if (opt.beat) p.bob = -Math.abs(Math.sin(tSec * Math.PI * 1000 / Stage.BEAT + p.seed)) * 7;
+  else p.bob = Math.sin(tSec * 1.6 + p.seed) * 2.6;
+  p.bob += p.hop;
+
   p.nextBlink -= dt;
   if (p.nextBlink <= 0) { p.blink = .12; p.nextBlink = 2.2 + Math.random() * 3.4; }
   p.blink = Math.max(0, p.blink - dt);

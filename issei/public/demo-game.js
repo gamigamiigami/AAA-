@@ -25,7 +25,7 @@ const players = CAST_DEF.map((d, i) => Object.assign({}, d, {
   id: i, you: i === 0, score: 0, seed: i * 37 + 5,
   sigma: [0, 55, 38, 92, 46, 70][i],
   bravery: [0, .82, .6, .95, .5, .72][i],
-  face: 'smile', armUp: false, dist: 0, moving: false
+  face: 'smile', poseName: 'idle', dist: 0, moving: false
 }));
 const YOU = players[0];
 const order = S.seat(players);
@@ -73,7 +73,7 @@ function onDown(e) {
     if (g.press[0] !== undefined) return;
     g.press[0] = t; st.sent++;
     Snd.sfx('tap');
-    YOU.sq.x = .62; YOU.sq.v = 4.2; YOU.armUp = true; YOU.face = 'joy';
+    YOU.sq.x = .62; YOU.sq.v = 4.2; YOU.poseName = 'cheer'; YOU.face = 'joy';
     hitStop = .055;
     fx.burst(YOU.spot.x, YOU.row.y - 70, { n: 12, color: ['#fff', PAL.focusGlow],
       speed: 260, size: 8, kind: 'star', life: .5, lift: 60 });
@@ -107,7 +107,7 @@ function startRound() {
 function beginRound() {
   phase = 'play'; st.last = null; st.sent = 0; wipe = .55; st.revealT = 0;
   for (const p of players) {
-    p.face = 'smile'; p.sq.to(1); p.armUp = false; p.lean = 0;
+    p.face = 'smile'; p.sq.to(1); p.poseName = 'idle'; p.lean = 0;
     p.dist = 0; p.moving = false; p.pending = null;
   }
   if (game === 'seino') {
@@ -116,7 +116,7 @@ function beginRound() {
     for (const p of players) if (!p.you) {
       const at = g.target + gauss() * p.sigma;
       setTimeout(() => { if (phase === 'play' && game === 'seino') {
-        g.press[p.id] = at; st.sent++; p.sq.x = .66; p.sq.v = 3.6; p.armUp = true; p.face = 'joy';
+        g.press[p.id] = at; st.sent++; p.sq.x = .66; p.sq.v = 3.6; p.poseName = 'cheer'; p.face = 'joy';
       } }, Math.max(0, at - now()));
     }
     setBtn('おす', false, false);
@@ -166,8 +166,8 @@ function finish() {
     const p = players[e.id];
     const w = st.last.winners.indexOf(p.id) >= 0;
     p.reactAt = .12 + i * .11;
-    p.pending = { face: w ? 'joy' : e.bad ? 'sad' : 'flat', armUp: w,
-                  lean: w ? 0 : (e.bad ? .12 : 0) };
+    p.pending = { face: w ? 'joy' : e.bad ? 'sad' : 'flat',
+                  poseName: w ? 'cheer' : e.bad ? 'flop' : 'idle' };
   });
   hitStop = (won || st.last.ok) ? .12 : .09;
   if (won || st.last.ok) {
@@ -249,12 +249,20 @@ function loop(ms) {
   }
   fx.update(dt);
 
+  /* 溜め。目標の2拍前からしゃがませる。溜めがないと、成功しても
+   * 「跳ねた」だけで「こらえて弾けた」に見えない。 */
+  if (phase === 'play' && game === 'seino' && now() > g.target - BEAT * 2) {
+    for (const p of players)
+      if (g.press[p.id] === undefined && p.poseName === 'idle') p.poseName = 'ready';
+  }
+
   for (const p of players) {
-    S.stepPlayer(p, dt, st.tSec);
+    S.stepPlayer(p, dt, st.tSec, { beat: phase === 'play' && game === 'seino' });
     if (p.pending && st.revealT >= p.reactAt) {
-      p.face = p.pending.face; p.armUp = p.pending.armUp; p.lean = p.pending.lean;
-      p.sq.x = p.pending.armUp ? .72 : 1.14; p.sq.v = p.pending.armUp ? 5 : -1.6;
-      if (p.pending.armUp) fx.burst(p.spot.x, p.row.y - 70, {
+      const won = p.pending.poseName === 'cheer';
+      p.face = p.pending.face; p.poseName = p.pending.poseName;
+      p.sq.x = won ? .72 : 1.14; p.sq.v = won ? 5 : -1.6;
+      if (won) fx.burst(p.spot.x, p.row.y - 70, {
         n: 8, color: [PAL.gold, '#fff'], speed: 220, size: 9, kind: 'star', life: .6, lift: 90 });
       p.pending = null;
     }
@@ -312,6 +320,7 @@ function updateDaruma() {
     let held = 0; p.moving = false;
     for (const [a, b] of spans) { held += (b === null ? t : b) - a; if (b === null) p.moving = true; }
     p.dist = Math.min(g.goal, held / 1000 * g.speed);
+    p.poseName = p.moving ? (st.watching ? 'shock' : 'walk') : 'idle';
     if (p.moving && !st.watching && Math.random() < .25) {
       const L = S.LANES[p.id % S.LANES.length];
       const x = S.D_X0 + (S.D_X1 - S.D_X0) * (p.dist / g.goal) + L.dx;

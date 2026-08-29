@@ -146,6 +146,17 @@ Art.stroke = function (c, color, lw) {
  * ハイライトの位置・落ち影の向き・床の光だまり、全部ここから導く。
  * 「なぜここが明るいのか」に答えがある画面は、それだけで作り物に見えなくなる。 */
 Art.LIGHT = { x: -.42, y: -.86, sx: .34, sy: .16 };   // sx,sy = 影のずれ方向
+
+/* 吊り物の位置。等間隔に並べた瞬間、それだけで「for文が置いた画面」になる。
+ * 役者が立つ中央を密に、端を疎に。器具・ビーム・床の光だまりを全部ここから引く。
+ * 光っている物と、照らされている物が無関係な画面は、必ず書き割りに見える。 */
+Art.RIG = [
+  { x: .105, aim: -.13, warm: true  },
+  { x: .305, aim: -.05, warm: false },
+  { x: .470, aim:  .02, warm: true  },
+  { x: .625, aim:  .07, warm: false },
+  { x: .865, aim:  .15, warm: true  }
+];
 Art.bounceColor = Art.PAL.wood;
 /* 影の色は床ごとに変える。固定の暗色にすると、赤い床では影が床に溶けて
  * キャラが宙に貼られたステッカーになる。床を敷くときに必ず更新する。 */
@@ -154,7 +165,11 @@ Art.vinyl = function (c, path, o) {
   const col = o.color, x = o.x, y = o.y, rx = o.rx, ry = o.ry;
   c.save();
   path();
-  const g = c.createLinearGradient(x - rx * .45, y - ry, x + rx * .35, y + ry);
+  // 明暗の軸は光源から引く。ここを決め打ちにすると、ハイライトと胴の陰と
+  // 落ち影が別々の太陽を持つことになり、床に置かれて見えなくなる。
+  const LL = Art.LIGHT;
+  const g = c.createLinearGradient(x + rx * LL.x, y + ry * LL.y,
+                                   x - rx * LL.x * .8, y - ry * LL.y * .8);
   g.addColorStop(0, Art.shade(col, .36));
   g.addColorStop(.44, col);
   g.addColorStop(1, Art.shade(col, -.32));
@@ -169,8 +184,8 @@ Art.vinyl = function (c, path, o) {
   // 上縁のリムライト
   if (o.rim !== false) {
     c.globalAlpha = .5;
-    c.beginPath();
-    c.ellipse(x, y - ry * .06, rx * .97, ry * .97, 0, 0, TAU);
+    c.beginPath();   // リムは光の側へ寄せる。真ん中に置くと光の向きが消える
+    c.ellipse(x + rx * LL.x * .1, y + ry * LL.y * .09, rx * .97, ry * .97, 0, 0, TAU);
     Art.stroke(c, Art.shade(col, .75), Math.max(1.2, rx * .07));
     c.globalAlpha = 1;
   }
@@ -202,7 +217,7 @@ Art.contact = function (c, x, y, rx, strength, depth) {
   const d = depth === undefined ? 1 : depth;
   const k = .62 + d * .38;
   const st = (strength === undefined ? .55 : strength) * (.55 + d * .45);
-  const ox = x + rx * Art.LIGHT.sx * .5, oy = y + rx * Art.LIGHT.sy * .18;
+  const ox = x + rx * Art.LIGHT.sx * .9, oy = y + rx * Art.LIGHT.sy * .3;
   const S = Art.shadowColor;
   c.save();
   const g = c.createRadialGradient(ox, oy, 0, ox, oy, rx * k);
@@ -210,7 +225,9 @@ Art.contact = function (c, x, y, rx, strength, depth) {
   g.addColorStop(.5, 'rgba(' + S + ',' + st * .5 + ')');
   g.addColorStop(1, 'rgba(' + S + ',0)');
   c.fillStyle = g;
-  c.beginPath(); c.ellipse(ox, oy, rx * k, rx * k * .3, 0, 0, TAU); c.fill();
+  // 光と反対の向きへ伸ばす。真円の影は「真上からの光」であって、この舞台の光ではない
+  c.beginPath();
+  c.ellipse(ox, oy, rx * k * 1.16, rx * k * .3, Art.LIGHT.sy * .5, 0, TAU); c.fill();
   // 接地点の芯。これが無いと、ぼけた影だけでは床に着いて見えない。
   c.globalAlpha = st * .9;
   c.fillStyle = 'rgb(' + S + ')';
@@ -358,14 +375,19 @@ Art.logo = function (c, x, y, size, opt) {
   c.fillStyle = bg; c.fill();
   Art.stroke(c, Art.PAL.ink, size * .045);
 
-  // 走ってきた勢いを示す尾。装飾ではなく「一斉＝同時」の説明。
-  c.globalAlpha = .5;
-  for (let i = 0; i < 3; i++) {
-    Art.roundRect(c, -w * (1.12 + i * .12), barY + barH * (.2 + i * .2),
-      w * .2, barH * .2, barH * .1);
-    c.fillStyle = gold; c.fill();
+  /* 走ってきた尾。長さはばらばらでも、右端は全部そろえて切る。
+   * 「ばらばらに来たものが一斉にそろう」という、この名前の意味そのもの。
+   * 板を階段状にずらして置くと、意味が消えて描画の残骸に見える。 */
+  const tipX = -w * .96;
+  for (const [ky, len] of [[.16, 1.00], [.40, .58], [.63, 1.36], [.86, .38]]) {
+    const tY = barY + barH * ky, th = barH * .12;
+    const x0 = tipX - w * .36 * len;
+    const tg = c.createLinearGradient(x0, 0, tipX, 0);
+    tg.addColorStop(0, Art.alpha(gold, 0));
+    tg.addColorStop(1, Art.alpha(gold, .6));
+    c.fillStyle = tg;
+    Art.roundRect(c, x0, tY - th / 2, tipX - x0, th, th * .5); c.fill();
   }
-  c.globalAlpha = 1;
 
   Art.title(c, '斉', w * .34, 0, size, { fill: gold, extrude: size * .1 });
   c.restore();
@@ -904,7 +926,8 @@ Art.FX.prototype.draw = function (c) {
 };
 
 // ---------------------------------------------------------------- 舞台
-Art.stage = function (c, W, H, t) {
+/* 舞台の地。空と遠景だけ。トラスと灯りは backdrop が持つ。 */
+Art.sky = function (c, W, H, t) {
   const g = c.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, Art.PAL.sky0); g.addColorStop(1, Art.PAL.sky1);
   c.fillStyle = g; c.fillRect(0, 0, W, H);
@@ -919,26 +942,8 @@ Art.stage = function (c, W, H, t) {
     c.fillRect(x, y, 2.5, 2.5);
   }
   c.restore();
-
-  // 舞台照明。光源は上、消失点も上に揃える。
-  c.save(); c.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 4; i++) {
-    const a = (i - 1.5) * .3 + Math.sin(t * .35 + i * 1.9) * .08;
-    c.save(); c.translate(W * (.18 + i * .21), -34); c.rotate(a);
-    const lg = c.createLinearGradient(0, 0, 0, H * 1.2);
-    lg.addColorStop(0, i % 2 ? 'rgba(255,214,150,.12)' : 'rgba(190,200,255,.09)');
-    lg.addColorStop(1, 'rgba(255,214,150,0)');
-    c.fillStyle = lg;
-    c.beginPath(); c.moveTo(-14, 0);
-    c.lineTo(-W * .16, H * 1.2); c.lineTo(W * .16, H * 1.2); c.lineTo(14, 0);
-    c.closePath(); c.fill(); c.restore();
-  }
-  c.restore();
-
-  const v = c.createRadialGradient(W / 2, H * .46, H * .3, W / 2, H * .46, H);
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(4,0,14,.55)');
-  c.fillStyle = v; c.fillRect(0, 0, W, H);
 };
+Art.stage = Art.sky;   // 旧名。呼び出し側が残っている間だけ
 
 /* 電球の紐。夜のパーティに合う。装飾は必ず見出しより奥に描く。 */
 Art.lights = function (c, W, t, y) {
@@ -1090,7 +1095,11 @@ Art.longShadow = function (c, x, y, rx, len, strength) {
 };
 
 /* 舞台の奥。トラスと吊り照明。スピーカーより舞台らしさに効く。 */
+/* 舞台まわり一式。空 → トラス → 器具 → ビーム → 床の光だまり。
+ * 順番も含めてここに閉じる。ビームだけ別の関数にすると、器具のない位置から
+ * 光が降り、床は誰にも照らされないまま、という画面になる。 */
 Art.backdrop = function (c, W, H, y, t) {
+  Art.sky(c, W, H, t);
   c.save();
   const ty = y - 232;
   // トラス
@@ -1103,24 +1112,68 @@ Art.backdrop = function (c, W, H, y, t) {
   }
   Art.stroke(c, '#4C3D6B', 2);
   c.globalAlpha = 1;
-  // 吊り照明
-  for (let i = 0; i < 5; i++) {
-    const x = W * (.14 + i * .18);
+
+  const lamps = Art.RIG.map((r, i) => {
+    const x = W * r.x;
+    const on = .5 + Math.abs(Math.sin(t * 1.1 + i * 1.4)) * .5;
+    // 吊り棒と器具
     c.beginPath(); c.moveTo(x, ty + 14); c.lineTo(x, ty + 30);
     Art.stroke(c, '#2A2140', 4);
-    Art.roundRect(c, x - 13, ty + 28, 26, 20, 5);
+    c.save(); c.translate(x, ty + 38); c.rotate(r.aim * .5);
+    Art.roundRect(c, -13, -10, 26, 20, 5);
     c.fillStyle = '#2E2444'; c.fill(); Art.stroke(c, '#1C1530', 2);
-    const on = .5 + Math.abs(Math.sin(t * 1.1 + i * 1.4)) * .5;
-    c.save(); c.globalCompositeOperation = 'lighter';
-    const gg = c.createRadialGradient(x, ty + 50, 0, x, ty + 50, 30);
-    gg.addColorStop(0, 'rgba(255,220,160,' + (.3 * on) + ')');
-    gg.addColorStop(1, 'rgba(255,220,160,0)');
-    c.fillStyle = gg; c.beginPath(); c.arc(x, ty + 50, 30, 0, TAU); c.fill();
     c.restore();
-    c.beginPath(); c.arc(x, ty + 48, 6, 0, TAU);
-    c.fillStyle = 'rgba(255,225,170,' + (.5 + on * .5) + ')'; c.fill();
+    return { x, y: ty + 50, on, aim: r.aim, warm: r.warm };
+  });
+
+  // ビームは器具から出す。器具と別の位置から降る光は、光ではなく模様。
+  c.save(); c.globalCompositeOperation = 'lighter';
+  for (const L of lamps) {
+    const reach = (H - L.y) * 1.05;
+    c.save(); c.translate(L.x, L.y); c.rotate(L.aim + Math.sin(t * .35 + L.x) * .015);
+    const lg = c.createLinearGradient(0, 0, 0, reach);
+    const tint = L.warm ? '255,214,150' : '190,200,255';
+    lg.addColorStop(0, 'rgba(' + tint + ',' + (.11 * L.on).toFixed(3) + ')');
+    lg.addColorStop(1, 'rgba(' + tint + ',0)');
+    c.fillStyle = lg;
+    c.beginPath(); c.moveTo(-11, 0);
+    c.lineTo(-W * .13, reach); c.lineTo(W * .13, reach); c.lineTo(11, 0);
+    c.closePath(); c.fill(); c.restore();
+    // 電球そのもの
+    const gg = c.createRadialGradient(L.x, L.y - 2, 0, L.x, L.y - 2, 30);
+    gg.addColorStop(0, 'rgba(255,220,160,' + (.34 * L.on) + ')');
+    gg.addColorStop(1, 'rgba(255,220,160,0)');
+    c.fillStyle = gg; c.beginPath(); c.arc(L.x, L.y - 2, 30, 0, TAU); c.fill();
+  }
+  c.restore();
+  for (const L of lamps) {
+    c.beginPath(); c.arc(L.x, L.y - 2, 6, 0, TAU);
+    c.fillStyle = 'rgba(255,225,170,' + (.5 + L.on * .5) + ')'; c.fill();
+  }
+  c.restore();
+  Art.lamps = lamps;   // 床が光だまりを落とすために使う
+};
+
+/* ビームが床に当たった跡。光っている物と照らされている物をつなぐ最後の一手。
+ * 床を敷いたあとに呼ぶ。 */
+Art.rigPools = function (c, W, H, y) {
+  if (!Art.lamps) return;
+  c.save(); c.globalCompositeOperation = 'lighter';
+  c.beginPath(); c.rect(0, y, W, H - y); c.clip();
+  for (const L of Art.lamps) {
+    // 傾いた分だけ着地点がずれる
+    const fx = L.x + (y + 80 - L.y) * Math.tan(L.aim);
+    const fy = y + 96;
+    const g = c.createRadialGradient(fx, fy, 0, fx, fy, W * .10);
+    const tint = L.warm ? '255,206,140' : '176,190,255';
+    // 弱く。5つ重なるので、1つを強くすると床の木の色が飛ぶ
+    g.addColorStop(0, 'rgba(' + tint + ',' + (.034 * L.on).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(' + tint + ',0)');
+    c.fillStyle = g;
+    c.beginPath(); c.ellipse(fx, fy, W * .10, (H - y) * .26, 0, 0, TAU); c.fill();
   }
   c.restore();
 };
+
 
 window.Art = Art;

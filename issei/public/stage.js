@@ -95,7 +95,8 @@ Stage.cast = function (c, st, opt) {
       armT: st.tSec * 2, rot: sp.tilt, look: opt.forceLook || sp.look });
     Art.label(c, p.name, sp.x, row.y + 26 * row.s, 21 * row.s,
       p.you ? PAL.cream : 'rgba(255,247,232,.55)', { ow: .34 });
-    if (p.you) marker(c, sp.x, row.y + p.bob - r * 2.3 - 34 + Math.sin(st.tSec * 4) * 4);
+    // ▼は頭の飾りの上へ逃がす。冠や角に刺さると、飾りなのか指標なのか読めない
+    if (p.you) marker(c, sp.x, row.y + p.bob - r * 2.75 - 24 + Math.sin(st.tSec * 4) * 4);
   }
 };
 
@@ -110,7 +111,7 @@ function marker(c, x, y) {
 Stage.idle = function (c, st) {
   Art.backdrop(c, W, H, STAGE_Y, st.tSec);
   Art.lights(c, W, st.tSec, -34);
-  Art.floor(c, W, H, STAGE_Y);
+  Art.floor(c, W, H, STAGE_Y); Art.rigPools(c, W, H, STAGE_Y);
   Art.logo(c, W / 2 + 26, 250, 104);
   if (st.code) {
     Art.label(c, 'ルームコード', W / 2, 330, 20, 'rgba(255,247,232,.55)', { ow: .3 });
@@ -128,7 +129,7 @@ Stage.idle = function (c, st) {
 Stage.card = function (c, st) {
   Art.backdrop(c, W, H, STAGE_Y, st.tSec);
   Art.lights(c, W, st.tSec, -34);
-  Art.floor(c, W, H, STAGE_Y);
+  Art.floor(c, W, H, STAGE_Y); Art.rigPools(c, W, H, STAGE_Y);
   Stage.cast(c, st, { forceLook: [0, -.9] });
   Art.card(c, W, H, st.cardWord, st.cardHue || '#C4356B', st.cardT, { t: st.tSec });
 };
@@ -137,7 +138,7 @@ Stage.card = function (c, st) {
 Stage.seino = function (c, st) {
   Art.backdrop(c, W, H, STAGE_Y, st.tSec);
   Art.lights(c, W, st.tSec, -34);
-  Art.floor(c, W, H, STAGE_Y);
+  Art.floor(c, W, H, STAGE_Y); Art.rigPools(c, W, H, STAGE_Y);
 
   const left = st.left, cx = W / 2, cy = 292, R = 118;
   c.beginPath(); c.arc(cx, cy, R, 0, Art.TAU);
@@ -171,8 +172,9 @@ Stage.seino = function (c, st) {
 
 Stage.seinoReveal = function (c, st) {
   const L = st.last;
+  Art.backdrop(c, W, H, STAGE_Y, st.tSec);
   Art.lights(c, W, st.tSec, -34);
-  Art.floor(c, W, H, STAGE_Y);
+  Art.floor(c, W, H, STAGE_Y); Art.rigPools(c, W, H, STAGE_Y);
   const pop = E.outBack(Math.min(1, st.revealT * 2.6));
   c.save(); c.translate(W / 2, 108); c.scale(pop, pop); c.translate(-W / 2, -108);
   heading(c, L.ok ? 'そろった！' : 'ばらけた…', 82,
@@ -346,8 +348,9 @@ Stage.daruma = function (c, st) {
 
 Stage.darumaReveal = function (c, st) {
   const L = st.last;
+  Art.backdrop(c, W, H, STAGE_Y, st.tSec);
   Art.lights(c, W, st.tSec, -34);
-  Art.floor(c, W, H, STAGE_Y);
+  Art.floor(c, W, H, STAGE_Y); Art.rigPools(c, W, H, STAGE_Y);
   const w = L.entries.find(e => e.fin !== null && e.fin !== undefined);
   const pop = E.outBack(Math.min(1, st.revealT * 2.6));
   c.save(); c.translate(W / 2, 104); c.scale(pop, pop); c.translate(-W / 2, -104);

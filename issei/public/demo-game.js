@@ -281,7 +281,7 @@ function loop(ms) {
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.save();
   if (shake > 0) c.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
-  Art.stage(c, W, H, st.tSec);
+  Art.sky(c, W, H, st.tSec);
 
   if (phase === 'card') S.card(c, st);
   else if (phase === 'play') (game === 'seino' ? S.seino : S.daruma)(c, st);

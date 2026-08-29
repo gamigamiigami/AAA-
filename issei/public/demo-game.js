@@ -1,44 +1,56 @@
-/* 一斉 — 体験デモの中身。
- * あなた1人 + コンピュータ5人。判定ロジックは本番の games.js と同じ形。 */
+/* 一斉 — 体験デモ。あなた1人 + コンピュータ5人。
+ * 判定ロジックは本番の games.js と同じ形にしてある。
+ *
+ * 画面設計の原則:
+ *   - 金はロゴだけ。「いま操作する場所」は白。体色に金と白は使わない
+ *   - 装飾は必ず見出しより奥。文字の上に何も乗せない
+ *   - 床の上に置く物は床と同じ消失点を持つ（正面の角丸長方形を載せない）
+ *   - 結果は数字ではなく芝居で見せる。数字は添え物
+ */
 'use strict';
 (function () {
 
 const W = 1280, H = 720;
-const cv = document.getElementById('big');
-const c = cv.getContext('2d');
+const c = document.getElementById('big').getContext('2d');
 const PAL = Art.PAL, E = Art.ease;
 const fx = new Art.FX();
-
-const $ = (s) => document.querySelector(s);
+const $ = s => document.querySelector(s);
 const btn = $('#btn'), foot = $('#foot'), scEl = $('#sc');
 
-// ---------------------------------------------------------------- 参加者
-const SHAPES = ['circle','triangle','square','star','heart','diamond','pentagon','hexagon','crown','moon'];
-const COLORS = [PAL.red, PAL.blue, PAL.yellow, PAL.green, PAL.purple];
-const NAMES = ['あなた', 'たかし', 'ゆい', 'けん', 'まり', 'そう'];
-
-const players = NAMES.map((name, i) => ({
-  id: i, name, you: i === 0, score: 0,
-  shape: SHAPES[i % SHAPES.length],
-  color: COLORS[(i + Math.floor(i / SHAPES.length)) % COLORS.length],
-  seed: i * 37 + 5,
-  sigma: [0, 55, 38, 92, 46, 70][i],      // 腕前のばらつき（ms）
-  bravery: [0, .82, .6, .95, .5, .72][i], // だるまさんで粘る度合い
-  face: 'smile', bob: 0, squash: 1, blink: 0, nextBlink: 1 + i * .7
+// ---------------------------------------------------------------- 一座
+/* 6人が体型・頭部・顔つき・色すべてで分かれるよう手で組む。
+ * 「あなた」は一番目立つ造形（王冠）にする。主人公が地味では困る。 */
+const CAST_DEF = [
+  { name: 'あなた', shape: 'pentagon', color: '#FF4D5E' },
+  { name: 'たかし', shape: 'triangle', color: '#3E8CFF' },
+  { name: 'ゆい',   shape: 'star',     color: '#FFB0D8' },
+  { name: 'けん',   shape: 'crown',    color: '#39C96A' },
+  { name: 'まり',   shape: 'moon',     color: '#A96BEE' },
+  { name: 'そう',   shape: 'square',   color: '#FF8A2B' }
+];
+const players = CAST_DEF.map((d, i) => Object.assign({}, d, {
+  id: i, you: i === 0, score: 0, seed: i * 37 + 5,
+  sigma: [0, 55, 38, 92, 46, 70][i],
+  bravery: [0, .82, .6, .95, .5, .72][i],
+  face: 'smile', bob: 0, squash: 1, lean: 0, armUp: false,
+  blink: 0, nextBlink: 1 + i * .7
 }));
 const YOU = players[0];
 
 { const mc = $('#me').getContext('2d');
   mc.setTransform(2, 0, 0, 2, 0, 0);
-  Art.tick(0);
-  Art.chara(mc, { x: 22, y: 25, r: 15, color: YOU.color, shape: YOU.shape,
-                  seed: YOU.seed, face: 'smile' }); }
+  Art.bounceColor = PAL.wood;
+  Art.chara(mc, { x: 22, y: 27, r: 14, color: YOU.color, shape: YOU.shape,
+                  seed: YOU.seed, face: 'joy' }); }
+// 手元のボタンを自分の色にする。大画面の自分を探す手掛かりになる。
+document.documentElement.style.setProperty('--me', YOU.color);
+document.documentElement.style.setProperty('--me-dark', Art.shade(YOU.color, -.42));
 
 // ---------------------------------------------------------------- 進行
 const BEAT = 500, COUNT_IN = 4;
 let phase = 'idle', game = null, g = null, last = null, sent = 0;
-let shake = 0, flash = 0, wipe = 0, wipeDir = 0;
-let t0 = performance.now(), tSec = 0, prev = t0;
+let shake = 0, flash = 0, wipe = 0, revealT = 0;
+let tSec = 0, prev = performance.now();
 const now = () => performance.now();
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 
@@ -58,16 +70,14 @@ function onDown(e) {
   Snd.init();
   if (phase === 'idle') { Snd.music(true, 120); return startRound(); }
   if (phase !== 'play') return;
-  /* 押した瞬間を端末内で記録する。event.timeStamp はイベントが発生した時刻で、
-   * JS が処理した時刻ではない。本番ではこの値だけをサーバーに送る。 */
   const t = (e && e.timeStamp > 0) ? e.timeStamp : now();
   if (game === 'seino') {
     if (g.press[0] !== undefined) return;
     g.press[0] = t; sent++;
     Snd.sfx('tap');
-    YOU.squash = .72; YOU.face = 'joy';
-    fx.burst(youScreenX(), youScreenY(), { n: 10, color: ['#fff', PAL.yellow],
-      speed: 240, size: 8, kind: 'star', life: .5 });
+    YOU.squash = .68; YOU.armUp = true; YOU.face = 'joy';
+    fx.burst(ARC[0].x, ARC[0].y - 60, { n: 12, color: ['#fff', PAL.focusGlow],
+      speed: 260, size: 8, kind: 'star', life: .5, lift: 60 });
     setBtn('おした！', false, true);
     if (navigator.vibrate) navigator.vibrate(18);
   } else {
@@ -79,7 +89,6 @@ function onDown(e) {
     if (navigator.vibrate) navigator.vibrate(14);
   }
 }
-
 function onUp(e) {
   if (phase !== 'play' || game !== 'daruma' || !g.held[0]) return;
   const t = (e && e.timeStamp > 0) ? e.timeStamp : now();
@@ -90,8 +99,8 @@ function onUp(e) {
 
 function startRound() {
   game = game === 'seino' ? 'daruma' : 'seino';
-  phase = 'play'; last = null; sent = 0; wipe = 1; wipeDir = -1;
-  for (const p of players) { p.face = 'smile'; p.squash = 1; }
+  phase = 'play'; last = null; sent = 0; wipe = 1;
+  for (const p of players) { p.face = 'smile'; p.squash = 1; p.armUp = false; p.lean = 0; }
 
   if (game === 'seino') {
     g = { target: now() + COUNT_IN * BEAT, endsAt: now() + COUNT_IN * BEAT + 1300,
@@ -99,14 +108,13 @@ function startRound() {
     for (const p of players) if (!p.you) {
       const at = g.target + gauss() * p.sigma;
       setTimeout(() => { if (phase === 'play' && game === 'seino') {
-        g.press[p.id] = at; sent++; p.squash = .72; p.face = 'joy';
+        g.press[p.id] = at; sent++; p.squash = .68; p.armUp = true; p.face = 'joy';
       } }, Math.max(0, at - now()));
     }
     setBtn('おす', false, false);
-    foot.textContent = '輪が重なった瞬間に押す';
+    foot.textContent = 'しろい わが かさなったら おす';
   } else {
-    const chants = [];
-    let t = now() + 1200, until = now() + 21000;
+    const chants = []; let t = now() + 1200; const until = now() + 21000;
     while (t < until) {
       const ch = 900 + Math.random() * 2300, wt = 700 + Math.random() * 800;
       chants.push({ start: t, turnAt: t + ch, watchUntil: t + ch + wt });
@@ -116,12 +124,11 @@ function startRound() {
           goal: 240, speed: 30 };
     for (const p of players) if (!p.you) scheduleBot(p);
     setBtn('おしっぱなし', false, false);
-    foot.textContent = '掛け声の間だけ進む。振り向く前に離す';
+    foot.textContent = 'かけごえの あいだだけ すすむ';
   }
   setTimeout(finish, g.endsAt - now());
 }
 
-/* コンピュータのだるまさん。bravery が高いほど振り向きギリギリまで粘る。 */
 function scheduleBot(p) {
   for (const ch of g.chants) {
     const win = ch.turnAt - ch.start;
@@ -134,7 +141,7 @@ function scheduleBot(p) {
 
 function finish() {
   if (phase !== 'play') return;
-  phase = 'reveal'; wipe = 1; wipeDir = -1;
+  phase = 'reveal'; wipe = 1; revealT = 0;
   last = game === 'seino' ? judgeSeino() : judgeDaruma();
   for (const id of last.winners) players[id].score++;
   scEl.textContent = YOU.score;
@@ -144,20 +151,23 @@ function finish() {
   Snd.sfx(won || last.ok ? 'win' : 'lose');
   if (navigator.vibrate) navigator.vibrate(won ? [40, 60, 40] : 150);
 
+  /* 芝居をつける。勝者は万歳、敗者はうなだれる。数字より先にこれが目に入る。 */
   for (const p of players) {
+    const e = last.entries.find(x => x.id === p.id) || {};
     const w = last.winners.indexOf(p.id) >= 0;
-    p.face = w ? 'joy' : (last.entries.find(e => e.id === p.id) || {}).bad ? 'sad' : 'flat';
+    p.face = w ? 'joy' : e.bad ? 'sad' : 'flat';
+    p.armUp = w; p.lean = w ? 0 : (e.bad ? .1 : 0);
   }
   if (won || last.ok) {
-    for (let i = 0; i < 3; i++) setTimeout(() => fx.burst(W / 2, H * .3, {
-      n: 30, color: [PAL.yellow, PAL.pink, PAL.blue, PAL.green, '#fff'],
-      speed: 620, lift: 180, size: 15, life: 1.9, grav: 700 }), i * 130);
-    flash = .5;
-  } else { shake = 11; }
+    for (let i = 0; i < 3; i++) setTimeout(() => fx.burst(W / 2, 150, {
+      n: 34, color: [PAL.gold, PAL.pink, '#3E8CFF', '#39C96A', '#fff'],
+      speed: 640, lift: 200, size: 15, life: 2, grav: 720 }), i * 140);
+    flash = .45;
+  } else shake = 12;
 
   setBtn(last.you, true, false);
   foot.textContent = 'つぎのゲームへ…';
-  setTimeout(() => { phase = 'idle'; startRound(); }, 6200);
+  setTimeout(() => { phase = 'idle'; startRound(); }, 6400);
 }
 
 function judgeSeino() {
@@ -180,8 +190,6 @@ function judgeSeino() {
     you: mine.error === null ? 'みおくり' : (mine.error > 0 ? '+' : '') + mine.error + 'ms' };
 }
 
-/* 押下の区間を組み直して、監視窓と重なったら脱落。
- * 本番ではこれをサーバーが時刻から作り直すので、通信の遅延に影響されない。 */
 function judgeDaruma() {
   const need = g.goal / g.speed * 1000;
   const entries = players.map(p => {
@@ -216,25 +224,34 @@ function judgeDaruma() {
 }
 
 // ---------------------------------------------------------------- 配置
-/* 舞台の上に横一列。中央がわずかに奥（＝上）になるよう弧を描かせると、
- * 平らに並べるより舞台に立っている感じが出る。 */
-const ARC = players.map((p, i) => {
-  const k = players.length === 1 ? .5 : i / (players.length - 1);
-  return { x: 232 + k * 816, y: 606 + Math.sin(k * Math.PI) * -34 };
+const STAGE_Y = 430;
+/* 舞台上の立ち位置は手で決める。等間隔に並べた瞬間、絵は
+ * 「for 文が並べた画面」になる。奥行き3列、大きさに差、間隔に粗密、
+ * そして全員が違う方を向く。 */
+const SPOTS = {
+  'あなた': { x: 470, row: 2, look: [ .1, -.7], tilt: -.02 },
+  'たかし': { x: 648, row: 1, look: [-.5, -.4], tilt:  .04 },
+  'ゆい':   { x: 366, row: 0, look: [ .6, -.5], tilt: -.05 },
+  'けん':   { x: 966, row: 1, look: [-.7, -.2], tilt:  .03 },
+  'まり':   { x: 880, row: 0, look: [-.3, -.6], tilt: -.03 },
+  'そう':   { x: 256, row: 0, look: [ .8, -.2], tilt:  .06 }
+};
+const ROWS = [ { y: 508, s: .82 }, { y: 566, s: .98 }, { y: 648, s: 1.2 } ];
+players.forEach(p => {
+  const sp = SPOTS[p.name] || { x: 500, row: 1, look: [0, -.4], tilt: 0 };
+  p.spot = sp; p.row = ROWS[sp.row];
 });
-const youScreenX = () => ARC[0].x;
-const youScreenY = () => ARC[0].y;
+/* 奥から描いて手前が重なるようにする。重なりは奥行きの一番強い手掛かり。 */
+const DRAW_ORDER = players.slice().sort((a, b) => a.spot.row - b.spot.row);
+const ARC = players.map(p => ({ x: p.spot.x, y: p.row.y }));
 
 // ---------------------------------------------------------------- ループ
-function loop(nowMs) {
+function loop(ms) {
   requestAnimationFrame(loop);
-  const dt = Math.min(.05, (nowMs - prev) / 1000); prev = nowMs;
-  tSec += dt;
-  Art.tick(tSec);
+  const dt = Math.min(.05, (ms - prev) / 1000); prev = ms;
+  tSec += dt; revealT += dt;
   fx.update(dt);
 
-  // 生き物らしさ。拍で弾み、たまに瞬きする。
-  const beatPhase = (tSec * 1000 / BEAT) % 1;
   for (const p of players) {
     p.squash += (1 - p.squash) * Math.min(1, dt * 9);
     p.bob = -Math.abs(Math.sin(tSec * Math.PI * 1000 / BEAT + p.seed)) * 7;
@@ -242,16 +259,15 @@ function loop(nowMs) {
     if (p.nextBlink <= 0) { p.blink = .12; p.nextBlink = 2.2 + Math.random() * 3.4; }
     p.blink = Math.max(0, p.blink - dt);
   }
-  shake = Math.max(0, shake - dt * 42);
+  shake = Math.max(0, shake - dt * 44);
   flash = Math.max(0, flash - dt * 2.2);
-  if (wipeDir) { wipe -= dt * 3.4; if (wipe <= 0) { wipe = 0; wipeDir = 0; } }
+  wipe = Math.max(0, wipe - dt * 3.2);
 
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.save();
   if (shake > 0) c.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
 
   Art.stage(c, W, H, tSec);
-  Art.garland(c, W, tSec, -46);
   if (phase === 'play') (game === 'seino' ? viewSeino : viewDaruma)();
   else if (phase === 'reveal') (last.spread !== undefined ? revealSeino : revealDaruma)();
   else viewIdle();
@@ -261,49 +277,68 @@ function loop(nowMs) {
   c.restore();
 
   if (flash > 0) { c.fillStyle = 'rgba(255,255,255,' + (flash * .5) + ')'; c.fillRect(0, 0, W, H); }
-  if (wipe > 0) {   // 場面転換。上下から閉じた幕が開く
+  if (wipe > 0) {
     const k = E.outCubic(wipe);
     c.fillStyle = PAL.ink;
-    c.fillRect(0, 0, W, H * .5 * k);
-    c.fillRect(0, H - H * .5 * k, W, H * .5 * k);
+    c.fillRect(0, 0, W, H * .52 * k);
+    c.fillRect(0, H - H * .52 * k, W, H * .52 * k);
   }
 }
 requestAnimationFrame(loop);
 
+/* 画面左上の状態表示。プレイの邪魔をしない位置に固定する。 */
+function hud(cap, val) {
+  const w = Math.max(150, Art.measure(c, cap, 15) + 60);
+  Art.slab(c, 20, 20, w, 54, '#2A1B44', { depth: 4, r: 14, shadow: false, lw: 2.5 });
+  Art.label(c, cap, 34, 38, 14, 'rgba(255,247,232,.5)', { align: 'left', ow: .34 });
+  Art.num(c, val, 34, 60, 20, PAL.cream, { align: 'left', ow: .32 });
+}
+
+/* 見出しの帯。文字の背後に必ず落ち影の面を敷いて、装飾から守る。 */
+function heading(text, size, color, y, rot) {
+  const w = Art.measure(c, text, size, { face: '"Dela Gothic One", sans-serif' }) + size * .9;
+  c.save();
+  c.globalAlpha = .38; c.filter = 'blur(16px)';
+  c.fillStyle = '#0A0320';
+  Art.roundRect(c, W / 2 - w / 2, y - size * .78, w, size * 1.56, size * .6);
+  c.fill(); c.restore();
+  Art.title(c, text, W / 2, y, size, { fill: color, rot: rot || 0 });
+}
+
 // ---------------------------------------------------------------- 待ち受け
 function viewIdle() {
-  Art.backdrop(c, W, H, 496, tSec);
-  Art.floor(c, W, H, 496, PAL.purple);
-  Art.title(c, '一斉', W / 2, 200, 128, { rot: -.03 });
-  Art.label(c, 'ボタンを押すと はじまります', W / 2, 300, 26, PAL.cream, { ow: .22 });
-  drawArc();
+  Art.backdrop(c, W, H, STAGE_Y, tSec);
+  Art.lights(c, W, tSec, -34);
+  Art.floor(c, W, H, STAGE_Y);
+  Art.logo(c, W / 2 + 26, 286, 104);
+  Art.label(c, 'ボタンを おすと はじまる', W / 2, 372, 25, PAL.cream, { ow: .26 });
+  drawCast({ look: [0, -.2] });
 }
 
-function drawArc(opt) {
+function drawCast(opt) {
   opt = opt || {};
-  players.forEach((p, i) => {
-    const a = ARC[i];
-    const r = p.you ? 44 : 38;
-    Art.chara(c, { x: a.x, y: a.y - r, r, color: p.color, shape: p.shape,
-      seed: p.seed, face: p.face, squash: p.squash, bob: p.bob,
-      blink: p.blink > 0, shadowY: a.y + 4, armT: tSec * 2,
-      look: opt.look || [0, -.2] });
+  for (const p of DRAW_ORDER) {
+    const sp = p.spot, row = p.row;
+    const depth = sp.row / 2;                       // 0=奥 1=手前
+    const r = (p.you ? 48 : 43) * row.s;
+    // 光だまりの中にいる者ほど明るく見える。床の光と人物を繋ぐ。
+    Art.lightPool(c, sp.x, row.y, r * 2.2, r * .7, '#FFD79B', .1 + depth * .06);
+    Art.chara(c, { x: sp.x, y: row.y - r, r, color: p.color, shape: p.shape, seed: p.seed,
+      face: p.face, squash: p.squash, bob: p.bob * row.s, lean: p.lean, armUp: p.armUp,
+      blink: p.blink > 0, shadowY: row.y + 2, shadowK: .55, armT: tSec * 2,
+      rot: sp.tilt,
+      look: opt.forceLook || sp.look });
+    Art.label(c, p.name, sp.x, row.y + 22 * row.s, 15 * row.s,
+      p.you ? PAL.cream : 'rgba(255,247,232,.55)', { ow: .34 });
     if (p.you) {
-      // 自分がどれか一目で分かるように、頭上に印を出す
-      const yy = a.y + p.bob - r * 2 - 34 + Math.sin(tSec * 4) * 4;
-      c.save(); c.fillStyle = PAL.yellow; c.strokeStyle = PAL.ink; c.lineWidth = 4;
-      c.beginPath(); c.moveTo(a.x, yy + 16); c.lineTo(a.x - 13, yy - 6);
-      c.lineTo(a.x + 13, yy - 6); c.closePath(); c.fill(); c.stroke();
-      c.restore();
-      Art.label(c, 'あなた', a.x, yy - 22, 17, PAL.yellow, { ow: .34 });
+      const yy = row.y + p.bob - r * 2.3 - 34 + Math.sin(tSec * 4) * 4;
+      c.save();
+      c.beginPath(); c.moveTo(sp.x, yy + 17); c.lineTo(sp.x - 14, yy - 7);
+      c.lineTo(sp.x + 14, yy - 7); c.closePath();
+      c.fillStyle = PAL.focus; c.fill();
+      Art.stroke(c, PAL.ink, 3.5); c.restore();
     }
-  });
-}
-
-function sentPill() {
-  const txt = sent + ' / ' + players.length;
-  Art.slab(c, W / 2 - 92, 646, 184, 44, PAL.purple, { depth: 6, r: 22, seed: 71, gloss: false });
-  Art.label(c, 'そうしん ' + txt, W / 2, 666, 20, PAL.cream, { ow: .26 });
+  }
 }
 
 // ---------------------------------------------------------------- せーの
@@ -314,255 +349,279 @@ function viewSeino() {
     if (left <= at && !g.fired.has(i)) {
       g.fired.add(i);
       Snd.sfx(i === COUNT_IN ? 'beat' : 'tick');
-      if (i === COUNT_IN) { fx.ring(W / 2, 330, { r1: 300, color: PAL.yellow, lw: 14, life: .5 }); shake = 6; }
+      if (i === COUNT_IN) { fx.ring(W / 2, 292, { r1: 300, color: PAL.focus, lw: 16, life: .5 }); shake = 7; }
     }
   }
-  Art.backdrop(c, W, H, 496, tSec);
-  Art.floor(c, W, H, 496, PAL.purple);
-  Art.title(c, 'せーの！', W / 2, 92, 84, { rot: -.02 });
-  Art.label(c, 'ぜんいんで おなじ しゅんかん に おす', W / 2, 158, 23, PAL.ink2 || '#E3CBF5', { ow: .24 });
+  Art.backdrop(c, W, H, STAGE_Y, tSec);
+  Art.lights(c, W, tSec, -34);
+  Art.floor(c, W, H, STAGE_Y);
 
-  // 的と、縮む輪
-  const cx = W / 2, cy = 330, R = 150;
-  c.save();
-  c.setLineDash([13, 11]); c.lineDashOffset = -tSec * 26;
-  c.strokeStyle = 'rgba(255,255,255,.42)'; c.lineWidth = 4;
-  c.beginPath(); c.arc(cx, cy, R, 0, Art.TAU); c.stroke();
-  c.restore();
+  const cx = W / 2, cy = 292, R = 118;
+  // 的の輪。画面で最も強い白。ここが機能色。
+  c.beginPath(); c.arc(cx, cy, R, 0, Art.TAU);
+  Art.stroke(c, 'rgba(255,255,255,.22)', 14);
+  c.beginPath(); c.arc(cx, cy, R, 0, Art.TAU);
+  Art.stroke(c, PAL.focus, 5);
 
   const k = Math.max(0, Math.min(1.7, left / (COUNT_IN * BEAT)));
   const near = Math.abs(left) < 90;
-  const rr = Math.max(8, R * k);
   c.save();
-  c.shadowColor = near ? PAL.yellow : PAL.blue; c.shadowBlur = near ? 34 : 18;
-  c.strokeStyle = near ? PAL.yellow : PAL.blue;
-  c.lineWidth = near ? 16 : 9;
-  c.beginPath(); c.arc(cx, cy, rr, 0, Art.TAU); c.stroke();
+  c.shadowColor = PAL.focusGlow; c.shadowBlur = near ? 40 : 20;
+  c.beginPath(); c.arc(cx, cy, Math.max(9, R * k), 0, Art.TAU);
+  Art.stroke(c, near ? PAL.focus : PAL.focusGlow, near ? 17 : 10);
   c.restore();
 
   if (left > 0) {
     const n = Math.ceil(left / BEAT);
     const pop = 1 - ((left % BEAT) / BEAT);
-    Art.title(c, String(n), cx, cy, 96 * (1 + E.outBack(Math.min(1, pop * 3)) * .12), { fill: PAL.cream });
+    Art.title(c, String(n), cx, cy, 100 * (1 + E.outBack(Math.min(1, pop * 3)) * .1),
+      { fill: PAL.cream, extrude: 8 });
   } else {
-    Art.title(c, 'いま！', cx, cy, 76, { fill: PAL.yellow, rot: Math.sin(tSec * 26) * .05 });
+    Art.title(c, 'いま！', cx, cy, 74, { fill: PAL.focus, rot: Math.sin(tSec * 26) * .05, extrude: 8 });
   }
 
-  drawArc({ look: [0, -.55] });
-  sentPill();
+  heading('せーの！', 74, PAL.cream, 92, -.02);
+  Art.label(c, 'ぜんいん そろえて おす', W / 2, 158, 23, 'rgba(255,247,232,.8)', { ow: .28 });
+
+  /* 溜めの芝居。拍が近づくほど身を屈める。 */
+  const crouch = left > 0 ? 1 - Math.min(.22, (1 - Math.min(1, left / (COUNT_IN * BEAT))) * .22) : 1;
+  players.forEach(p => { if (g.press[p.id] === undefined) p.squash = Math.min(p.squash, crouch); });
+  drawCast();
+
+  hud('そうしん', sent + ' / ' + players.length);
 }
 
 function revealSeino() {
   const L = last;
-  Art.floor(c, W, H, 470, PAL.purple);
-  if (L.ok) {
-    Art.title(c, 'そろった！', W / 2, 86, 78, { rot: -.025 });
-    Art.label(c, 'ぜんいん +1てん', W / 2, 148, 25, PAL.green, { ow: .26 });
-  } else {
-    Art.title(c, 'ばらけた…', W / 2, 86, 74, { fill: '#E3CBF5', rot: .015 });
-    Art.label(c, 'ばらつき ' + (L.spread === null ? '—' : L.spread + 'ms') + '　/　80ms いないで せいこう',
-      W / 2, 148, 21, '#C6A9E0', { ow: .24 });
-  }
-  scatter(L.entries, 150, 392, W - 300, 300);
-  podium(L.entries.filter(e => e.error !== null).slice(0, 3),
-    e => (e.error > 0 ? '+' : '') + e.error + 'ms');
-}
+  Art.backdrop(c, W, H, STAGE_Y, tSec);
+  Art.lights(c, W, tSec, -34);
+  Art.floor(c, W, H, STAGE_Y);
 
-/* ズレを競う全ゲームで使い回す散布軸。近い点は縦に積んで潰れないようにする。 */
-function scatter(entries, x, y, w, range) {
-  const cx = x + w / 2;
-  const px = ms => cx + Art.clamp(ms / range, -1, 1) * (w / 2 - 30);
-
-  // 縦に積んだぶんだけ枠を伸ばす。足りないと点が枠を突き抜けて見出しに被る。
-  const rows = Math.max(1, Math.ceil(entries.filter(e => e.error !== null).length / 3));
-  const top = y - 44 - rows * 42 - 26;
-  Art.slab(c, x - 26, top, w + 52, (y + 62) - top, '#4A2270',
-    { depth: 8, r: 20, seed: 33, gloss: false });
-
+  const pop = E.outBack(Math.min(1, revealT * 2.6));
   c.save();
-  c.strokeStyle = 'rgba(255,255,255,.3)'; c.lineWidth = 3; c.lineCap = 'round';
-  c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y); c.stroke();
-  for (const ms of [-range, -range / 2, 0, range / 2, range]) {
-    const gx = px(ms), zero = ms === 0;
-    c.strokeStyle = zero ? PAL.yellow : 'rgba(255,255,255,.25)';
-    c.lineWidth = zero ? 5 : 2;
-    c.beginPath(); c.moveTo(gx, y - (zero ? 20 : 9)); c.lineTo(gx, y + (zero ? 20 : 9)); c.stroke();
-    Art.label(c, (ms > 0 ? '+' : '') + ms, gx, y + 34, 15, '#C6A9E0', { ow: .3, weight: 700 });
-  }
+  c.translate(W / 2, 108); c.scale(pop, pop); c.translate(-W / 2, -108);
+  heading(L.ok ? 'そろった！' : 'ばらけた…', 82,
+    L.ok ? PAL.cream : 'rgba(255,247,232,.9)', 108, L.ok ? -.02 : .015);
   c.restore();
-  Art.label(c, 'はやい', x + 6, top + 20, 15, '#8E6BB0', { align: 'left', ow: .3 });
-  Art.label(c, 'おそい', x + w - 6, top + 20, 15, '#8E6BB0', { align: 'right', ow: .3 });
 
-  const placed = [];
-  for (const e of entries.filter(e => e.error !== null).sort((a, b) => a.error - b.error)) {
-    const gx = px(e.error); let row = 0;
-    while (placed.some(q => Math.abs(q.x - gx) < 40 && q.row === row)) row++;
-    placed.push({ x: gx, row, e });
-  }
-  for (const q of placed) {
-    const gy = y - 30 - q.row * 42;
-    if (q.e.you) {
-      c.save(); c.globalAlpha = .3 + Math.sin(tSec * 6) * .12;
-      c.fillStyle = PAL.yellow;
-      c.beginPath(); c.arc(q.x, gy, 30, 0, Art.TAU); c.fill(); c.restore();
-    }
-    Art.chara(c, { x: q.x, y: gy, r: 17, color: q.e.color, shape: q.e.shape,
-      seed: q.e.seed, face: q.e.bad ? 'sad' : 'joy' });
-  }
+  // 大きい数字ひとつ。表とグラフではなく、これとキャラの芝居で見せる。
+  const big = L.spread === null ? '—' : String(L.spread);
+  Art.label(c, 'ばらつき', W / 2 - 104, 196, 22, 'rgba(255,247,232,.6)', { ow: .3, align: 'right' });
+  Art.num(c, big + 'ms', W / 2 + 6, 198, 46, L.ok ? '#39C96A' : PAL.danger,
+    { align: 'left', ow: .34 });
+  Art.label(c, L.ok ? 'ぜんいん +1てん' : '80ms いないで せいこう',
+    W / 2, 246, 20, 'rgba(255,247,232,.55)', { ow: .3 });
 
-  const miss = entries.filter(e => e.error === null).length;
-  if (miss) Art.label(c, 'みおくり ' + miss + '人', cx, y + 60, 16, '#8E6BB0', { ow: .3 });
+  drawCast({ look: [0, -.15] });
+  strip(L.entries, 190, 400, W - 380);
 }
 
-function podium(top, label) {
-  const hs = [96, 68, 52], order = [1, 0, 2];
-  const bx = W / 2 - 190;
-  order.forEach((rank, slot) => {
-    const e = top[rank]; if (!e) return;
-    const x = bx + slot * 190, hgt = hs[rank], baseY = 626;
-    Art.slab(c, x - 74, baseY - hgt, 148, hgt, rank === 0 ? PAL.yellow : '#6A3A9C',
-      { depth: 9, r: 12, seed: 40 + rank });
-    Art.chara(c, { x, y: baseY - hgt - 40, r: 33, color: e.color, shape: e.shape,
-      seed: e.seed, face: 'joy', bob: -Math.abs(Math.sin(tSec * 5 + rank)) * 5,
-      shadowY: baseY - hgt - 4 });
-    // 順位の数字を台の面に大きく置く
-    Art.title(c, String(rank + 1), x, baseY - hgt + 34, 40,
-      { fill: rank === 0 ? '#FFF6E3' : '#D9BCF0' });
-    // 名前と記録は台の下。台の上に載せると潰れて読めない。
-    Art.label(c, e.name, x, baseY + 22, 21, PAL.cream, { ow: .3 });
-    Art.label(c, label(e), x, baseY + 46, 18, PAL.yellow, { ow: .3 });
-  });
+/* ズレの帯。分析グラフではなく「どこに集まったか」を一目で見せる補助。
+ * 目盛りは3本だけ。密集したら自動で拡大する。 */
+function strip(entries, x, y, w) {
+  const hits = entries.filter(e => e.error !== null);
+  if (!hits.length) return;
+  const peak = Math.max(60, ...hits.map(e => Math.abs(e.error)));
+  const range = Math.ceil(peak * 1.25 / 20) * 20;
+  const px = ms => x + w / 2 + Art.clamp(ms / range, -1, 1) * (w / 2 - 26);
+
+  Art.slab(c, x - 22, y - 34, w + 44, 74, '#3A2358', { depth: 6, r: 24 });
+  c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y);
+  Art.stroke(c, 'rgba(255,255,255,.18)', 3);
+  c.beginPath(); c.moveTo(px(0), y - 20); c.lineTo(px(0), y + 20);
+  Art.stroke(c, PAL.focus, 4);
+  Art.num(c, '-' + range, px(-range), y + 24, 13, 'rgba(255,247,232,.4)', { ow: .34 });
+  Art.num(c, '+' + range, px(range), y + 24, 13, 'rgba(255,247,232,.4)', { ow: .34 });
+
+  for (const e of hits) {
+    // 重なっても分離するようステッカー縁を付ける
+    Art.chara(c, { x: px(e.error), y: y - 6, r: 15, color: e.color, shape: e.shape,
+      seed: e.seed, face: e.bad ? 'sad' : 'joy', feet: false, arms: false,
+      sticker: e.you ? PAL.focus : '#3A2358' });
+  }
 }
 
 // ---------------------------------------------------------------- だるまさん
+const D_Y = 372, D_X0 = 176, D_X1 = W - 268;
+const LANES = [0, 1, 2, 3, 4, 5].map(i => {
+  const d = i / 5;
+  return { y: D_Y + 40 + d * 232, scale: .72 + d * .5 };
+});
+
 function viewDaruma() {
   const t = now();
   let cur = null, watching = false;
   for (const ch of g.chants) {
     if (t >= ch.start && !g.fired.has('s' + ch.start)) { g.fired.add('s' + ch.start); Snd.sfx('chant'); }
     if (t >= ch.turnAt && !g.fired.has('t' + ch.turnAt)) {
-      g.fired.add('t' + ch.turnAt); Snd.sfx('turn'); shake = 9;
+      g.fired.add('t' + ch.turnAt); Snd.sfx('turn'); shake = 10;
     }
     if (t >= ch.start && t < ch.watchUntil) { cur = ch; watching = t >= ch.turnAt; break; }
   }
 
-  Art.backdrop(c, W, H, 386, tSec);
-  Art.floor(c, W, H, 386, watching ? '#7A2A45' : PAL.purple);
-  if (watching) { c.fillStyle = 'rgba(255,71,87,.14)'; c.fillRect(0, 0, W, H); }
+  Art.backdrop(c, W, H, D_Y, tSec);
+  Art.lights(c, W, tSec, -34);
+  /* 危険時は床を暗く濁った赤にする。鮮やかな赤にすると、
+   * 背景が画面で最も強い色になって主役（鬼）が沈む。 */
+  Art.floor(c, W, H, D_Y, watching ? '#7A3038' : PAL.wood);
+  if (watching) { c.fillStyle = 'rgba(120,10,26,.2)'; c.fillRect(0, 0, W, H); }
 
-  Art.title(c, watching ? 'ふりむいた！' : 'だるまさんが……',
-    W / 2, 78, watching ? 72 : 58,
-    { fill: watching ? PAL.red : PAL.cream, rot: watching ? Math.sin(tSec * 30) * .04 : -.01 });
+  // ゴールの旗。支柱を床まで届かせ、接地影を落とす。
+  const gx = D_X1 + 26;
+  Art.contact(c, gx, D_Y + 214, 30, .4);
+  c.beginPath(); c.moveTo(gx, D_Y + 214); c.lineTo(gx, D_Y - 44);
+  Art.stroke(c, '#2A1F3E', 8);
+  c.beginPath(); c.moveTo(gx, D_Y + 214); c.lineTo(gx, D_Y - 44);
+  Art.stroke(c, '#7D6A9E', 4);
+  Art.vinyl(c, () => { c.beginPath();
+    c.moveTo(gx, D_Y - 44);
+    c.quadraticCurveTo(gx + 44, D_Y - 30 + Math.sin(tSec * 4) * 7, gx + 84, D_Y - 44);
+    c.lineTo(gx + 84, D_Y + 8);
+    c.quadraticCurveTo(gx + 44, D_Y + 22 + Math.sin(tSec * 4) * 7, gx, D_Y + 8);
+    c.closePath(); },
+    { x: gx + 42, y: D_Y - 18, rx: 42, ry: 26, color: PAL.cream, lw: 4, spec: false });
+  Art.label(c, 'ゴール', gx + 42, D_Y - 66, 18, PAL.cream, { ow: .32 });
 
-  const X0 = 190, X1 = W - 250, GY = 386;
-  // ゴールの旗
-  c.save();
-  c.strokeStyle = PAL.ink; c.lineWidth = 7; c.lineCap = 'round';
-  c.beginPath(); c.moveTo(X1, GY + 20); c.lineTo(X1, GY - 150); c.stroke();
-  c.beginPath();
-  c.moveTo(X1, GY - 150);
-  c.quadraticCurveTo(X1 + 46, GY - 136 + Math.sin(tSec * 4) * 6, X1 + 86, GY - 150);
-  c.lineTo(X1 + 86, GY - 96);
-  c.quadraticCurveTo(X1 + 46, GY - 82 + Math.sin(tSec * 4) * 6, X1, GY - 96);
-  c.closePath();
-  Art.ink(c, PAL.yellow, 5);
-  c.restore();
-  Art.label(c, 'ゴール', X1 + 43, GY - 168, 18, PAL.yellow, { ow: .3 });
+  /* 鬼。床の補色側（暗い紫）に置く。危険色の床と同じ色にしない。
+   * 目だけを強く光らせて、振り向いた瞬間に視線が集まるようにする。 */
+  const ox = D_X1 + 168, oy = D_Y + 236;
+  const or = 66;
+  Art.chara(c, { x: ox, y: oy - or, r: or, color: watching ? '#3B1F4E' : '#4A3A66',
+    shape: 'trio' in Art.CAST ? 'crown' : 'crown', seed: 999,
+    face: watching ? 'mad' : 'flat',
+    look: watching ? [-1, 0] : [1, .3], shadowY: oy + 4, shadowK: .6,
+    bob: watching ? Math.sin(tSec * 24) * 3 : -Math.abs(Math.sin(tSec * 3)) * 5,
+    rot: watching ? 0 : .09, armT: tSec * 2 });
+  if (watching) {
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const gg = c.createRadialGradient(ox, oy - or * 1.1, 0, ox, oy - or * 1.1, 90);
+    gg.addColorStop(0, 'rgba(255,70,80,.5)'); gg.addColorStop(1, 'rgba(255,70,80,0)');
+    c.fillStyle = gg; c.beginPath(); c.arc(ox, oy - or * 1.1, 90, 0, Art.TAU); c.fill();
+    c.restore();
+  }
 
-  // 鬼
-  const ox = X1 + 150, oy = GY + 108;
-  Art.chara(c, { x: ox, y: oy, r: 58, color: watching ? PAL.red : '#7A5A96',
-    shape: 'crown', seed: 999, face: watching ? 'mad' : 'flat',
-    look: watching ? [-1, 0] : [1, .3], shadowY: oy + 62,
-    bob: watching ? Math.sin(tSec * 22) * 3 : -Math.abs(Math.sin(tSec * 3)) * 4,
-    rot: watching ? 0 : .08 });
-
-  // 参加者。表示は遅れてよい（判定は最後に時刻から作り直す）
-  /* 奥から手前へ6レーン。奥ほど小さく描かないと、床の上に立っているように見えない。
-   * 自分は必ず一番手前のレーンに置いて、探さなくても目に入るようにする。 */
-  const LANE = [0, 1, 2, 3, 4, 5].map(i => {
-    const d = i / 5;                      // 0=奥 1=手前
-    return { y: GY + 34 + d * 232, scale: .74 + d * .46 };
-  });
-  const order = players.map((p, i) => ({ p, lane: p.you ? 5 : [0, 1, 2, 3, 4][i - 1] || 0 }))
-    .sort((a, b) => a.lane - b.lane);      // 奥から描いて手前が重なるように
-
-  for (const { p, lane } of order) {
-    const L = LANE[lane];
+  /* 参加者。奥から手前へ。横位置も少しずらして縦一列にしない。 */
+  const assign = players.map((p, i) => ({ p, lane: p.you ? 5 : [0, 2, 1, 4, 3][i - 1] }))
+    .sort((a, b) => a.lane - b.lane);
+  for (const { p, lane } of assign) {
+    const L = LANES[lane];
     const spans = g.spans[p.id] || [];
     let held = 0, moving = false;
     for (const [a, b] of spans) { held += (b === null ? t : b) - a; if (b === null) moving = true; }
     const k = Math.min(1, held / 1000 * g.speed / g.goal);
-    const x = X0 + (X1 - X0) * k;
-    const y = L.y;
-    const r = (p.you ? 34 : 30) * L.scale;
-    Art.chara(c, { x, y: y - r, r, color: p.color, shape: p.shape, seed: p.seed,
+    const jitter = Math.sin(p.seed) * 16;
+    const x = D_X0 + (D_X1 - D_X0) * k + jitter;
+    const r = (p.you ? 34 : 29) * L.scale;
+    // 振り向かれた瞬間、動いていた者は体が流れて止まる
+    Art.chara(c, { x, y: L.y - r, r, color: p.color, shape: p.shape, seed: p.seed,
       face: watching && moving ? 'shock' : moving ? 'joy' : 'flat',
-      look: [1, 0], blink: p.blink > 0, shadowY: y + r * .1,
-      walk: moving ? tSec * 13 + p.seed : 0,
-      bob: moving ? -Math.abs(Math.sin(tSec * 13 + p.seed)) * r * .16 : 0,
-      rot: moving ? Math.sin(tSec * 13 + p.seed) * .07 : 0 });
-    if (moving && Math.random() < .25)
-      fx.burst(x - r * .7, y, { n: 1, color: ['#C9A6E8'], speed: 80, size: 6 * L.scale,
+      look: [1, 0], blink: p.blink > 0, shadowY: L.y, sticker: 'rgba(20,10,40,.5)',
+      walk: moving && !watching ? tSec * 13 + p.seed : 0,
+      lean: watching && moving ? .18 : 0,
+      bob: moving && !watching ? -Math.abs(Math.sin(tSec * 13 + p.seed)) * r * .16 : 0 });
+    if (moving && !watching && Math.random() < .25)
+      fx.burst(x - r * .7, L.y, { n: 1, color: ['#E7D2B0'], speed: 80, size: 6 * L.scale,
         kind: 'dot', life: .35, grav: 240 });
     if (p.you) {
-      const yy = y - r * 2 - 34 + Math.sin(tSec * 4) * 4;
-      c.save(); c.fillStyle = PAL.yellow; c.strokeStyle = PAL.ink; c.lineWidth = 4;
-      c.beginPath(); c.moveTo(x, yy + 15); c.lineTo(x - 13, yy - 6);
-      c.lineTo(x + 13, yy - 6); c.closePath(); c.fill(); c.stroke(); c.restore();
+      const yy = L.y - r * 2 - 36 + Math.sin(tSec * 4) * 4;
+      c.save();
+      c.beginPath(); c.moveTo(x, yy + 16); c.lineTo(x - 13, yy - 6);
+      c.lineTo(x + 13, yy - 6); c.closePath();
+      c.fillStyle = PAL.focus; c.fill(); Art.stroke(c, PAL.ink, 3.5); c.restore();
     }
   }
 
-  // 掛け声の進み具合
+  heading(watching ? 'ふりむいた！' : 'だるまさんが……', watching ? 76 : 58,
+    watching ? PAL.danger : PAL.cream, 78, watching ? Math.sin(tSec * 30) * .035 : -.01);
+
+  // 掛け声の進み。舞台の外（下の余白）に置き、キャラと重ねない。
   if (cur && !watching) {
     const k = (t - cur.start) / (cur.turnAt - cur.start);
-    Art.slab(c, W / 2 - 250, 618, 500, 30, '#3A1A5C', { depth: 6, r: 15, seed: 61, gloss: false });
-    c.save();
-    Art.wobbleRect(c, W / 2 - 242, 624, Math.max(6, 484 * Math.min(1, k)), 17, 9, 62);
-    c.fillStyle = k > .8 ? PAL.red : PAL.yellow; c.fill();
-    c.restore();
+    Art.slab(c, W / 2 - 230, 662, 460, 32, '#3A2358', { depth: 5, r: 16 });
+    Art.roundRect(c, W / 2 - 222, 668, Math.max(8, 444 * Math.min(1, k)), 18, 9);
+    c.fillStyle = k > .82 ? PAL.danger : PAL.focus; c.fill();
   }
 }
 
 function revealDaruma() {
   const L = last;
-  Art.floor(c, W, H, 470, PAL.purple);
+  Art.backdrop(c, W, H, STAGE_Y, tSec);
+  Art.lights(c, W, tSec, -34);
+  Art.floor(c, W, H, STAGE_Y);
+
   const w = L.entries.find(e => e.fin !== null);
-  Art.title(c, w ? w.name + ' の かち！' : 'ぜんいん とどかず', W / 2, 78, 62, { rot: -.015 });
+  const pop = E.outBack(Math.min(1, revealT * 2.6));
+  c.save();
+  c.translate(W / 2, 104); c.scale(pop, pop); c.translate(-W / 2, -104);
+  heading(w ? w.name + ' の かち！' : 'ぜんいん とどかず', 64, PAL.cream, 104, -.015);
+  c.restore();
 
-  const bx = 400, bw = 520;
-  L.entries.forEach((e, i) => {
-    const y = 178 + i * 62;
-    Art.chara(c, { x: bx - 52, y, r: 24, color: e.color, shape: e.shape, seed: e.seed,
-      face: e.caught ? 'sad' : e.fin !== null ? 'joy' : 'flat' });
-    Art.label(c, e.name, bx - 92, y, 18, e.caught ? '#8E6BB0' : PAL.cream,
-      { align: 'right', ow: .28 });
+  podium(L.entries.slice(0, 3), e =>
+    e.caught ? 'つかまった' : e.fin !== null ? 'ゴール' : e.dist + '/' + L.goal);
 
-    Art.slab(c, bx, y - 15, bw, 30, '#3A1A5C', { depth: 5, r: 15, seed: 80 + i, gloss: false });
-    const k = e.dist / L.goal;
-    if (k > .02) {
-      c.save();
-      Art.wobbleRect(c, bx + 7, y - 9, Math.max(8, (bw - 14) * k), 18, 9, 90 + i);
-      c.fillStyle = e.fin !== null ? PAL.yellow : e.caught ? '#5B3B78' : e.color;
-      c.fill(); c.restore();
-    }
-    if (e.caught) Art.label(c, 'つかまった', bx + bw + 66, y, 17, PAL.red, { ow: .28 });
-    else if (e.fin !== null) Art.label(c, 'ゴール', bx + bw + 52, y, 17, PAL.yellow, { ow: .28 });
-  });
+  // 4位以下は小さく一列。全員に居場所を与える。
+  const rest = L.entries.slice(3);
+  if (rest.length) {
+    const step = 118, x0 = W / 2 - (rest.length - 1) * step / 2;
+    rest.forEach((e, i) => {
+      const x = x0 + i * step;
+      Art.chara(c, { x, y: 664, r: 22, color: e.color, shape: e.shape, seed: e.seed,
+        face: e.caught ? 'sad' : 'flat', shadowY: 690, feet: false, arms: false,
+        bob: -Math.abs(Math.sin(tSec * 3 + i)) * 3 });
+      Art.label(c, e.name, x, 700, 15, 'rgba(255,247,232,.6)', { ow: .34 });
+    });
+  }
+}
+
+/* 表彰台。床と同じ消失点を持つ立体で、キャラは天面に立ち、影も天面に落ちる。
+ * 1位が最も高く・最も手前・最も大きい。 */
+function podium(top, label) {
+  const slots = [{ rank: 1, x: W / 2 - 220, h: 74, r: 40 },
+                 { rank: 0, x: W / 2,       h: 116, r: 50 },
+                 { rank: 2, x: W / 2 + 220, h: 54, r: 36 }];
+  const baseY = 600;
+  for (const s of slots.sort((a, b) => b.h - a.h)) {   // 低い台を先に描く
+    const e = top[s.rank]; if (!e) continue;
+    const topY = baseY - s.h;
+    const face = Art.podium(c, s.x, topY, baseY, s.rank === 0 ? 176 : 152,
+      s.rank === 0 ? '#C9922E' : '#5B4480', W / 2);
+    const standY = topY - face.depth * .45;
+    Art.contact(c, s.x + face.skew * .4, standY + 4, s.r * .9, .45);
+    Art.chara(c, { x: s.x + face.skew * .4, y: standY - s.r, r: s.r,
+      color: e.color, shape: e.shape, seed: e.seed,
+      face: s.rank === 0 ? 'joy' : e.caught ? 'sad' : 'flat',
+      armUp: s.rank === 0, armT: tSec * 2,
+      bob: -Math.abs(Math.sin(tSec * (s.rank === 0 ? 6 : 3) + s.rank)) * (s.rank === 0 ? 9 : 4) });
+    Art.title(c, String(s.rank + 1), s.x, topY + s.h * .5, 40,
+      { fill: s.rank === 0 ? PAL.cream : 'rgba(255,247,232,.75)', extrude: 4 });
+    Art.label(c, e.name, s.x, baseY + 26, 22, PAL.cream, { ow: .3 });
+    Art.label(c, label(e), s.x, baseY + 52, 17, 'rgba(255,247,232,.6)', { ow: .3 });
+  }
 }
 
 // ---------------------------------------------------------------- 常時表示
+/* 30人でも破綻しないよう、8人を超えたら上位5人＋自分だけを出す。
+ * 6人時の見た目を先に作ると、30人で必ず壊れる。 */
 function roster() {
-  const y = H - 30;
-  Art.slab(c, 16, y - 24, 300, 48, '#2A1240', { depth: 5, r: 24, seed: 12, gloss: false, shadow: false });
-  let x = 46;
-  for (const p of players) {
-    Art.chara(c, { x, y: y - 2, r: 14, color: p.color, shape: p.shape, seed: p.seed,
-      face: p.face, blink: p.blink > 0 });
-    Art.label(c, String(p.score), x + 1, y + 17, 14,
-      p.you ? PAL.yellow : '#B896D6', { ow: .34 });
-    x += 46;
+  const sorted = players.slice().sort((a, b) => b.score - a.score);
+  let show = sorted;
+  if (players.length > 8) {
+    show = sorted.slice(0, 5);
+    if (show.indexOf(YOU) < 0) show.push(YOU);
   }
+  const cw = 84, pad = 12;
+  const total = show.length * cw + pad * 2;
+  const rx0 = W - 18 - total;
+  Art.slab(c, rx0, H - 62, total, 50, '#2A1B44', { depth: 4, r: 25, shadow: false, lw: 2.5 });
+  show.forEach((p, i) => {
+    const x = rx0 + pad + cw * i + cw / 2 - 16;
+    Art.chara(c, { x, y: H - 38, r: 15, color: p.color, shape: p.shape, seed: p.seed,
+      face: p.face, blink: p.blink > 0, feet: false, arms: false });
+    Art.label(c, p.name, x + 21, H - 46, 13,
+      p.you ? PAL.cream : 'rgba(255,247,232,.6)', { ow: .34, align: 'left' });
+    Art.num(c, String(p.score), x + 21, H - 28, 15,
+      p.you ? PAL.focus : 'rgba(255,247,232,.45)', { ow: .34, align: 'left' });
+  });
 }
 
 })();

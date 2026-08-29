@@ -41,15 +41,9 @@
 
   /* ---- 見出し ---- */
   .hero { text-align: center; display: flex; flex-direction: column; gap: 6px; align-items: center; }
-  .hero .logo { font-family: var(--f-disp); font-size: clamp(46px, 10vw, 84px); line-height: 1;
-    color: var(--yellow); letter-spacing: .04em;
-    text-shadow:
-      0 0 0 #241a2e,
-      3px 3px 0 #241a2e, -3px 3px 0 #241a2e, 3px -3px 0 #241a2e, -3px -3px 0 #241a2e,
-      0 4px 0 #241a2e, 0 -4px 0 #241a2e, 4px 0 0 #241a2e, -4px 0 0 #241a2e,
-      0 12px 0 #7A4A00, 0 16px 22px rgba(0,0,0,.55);
-    transform: rotate(-1.5deg);
-  }
+  /* ロゴはキャンバスで描く。CSSの影で別版を組むと、同じ画面に
+     2つのロゴが並んで別ブランドに見える。アセットは1つだけ。 */
+  .hero canvas { width: min(310px, 72vw); height: auto; display: block; }
   .hero .sub { font-family: var(--f-hand); font-size: clamp(13px, 3vw, 17px);
     color: var(--ink-2); transform: rotate(.6deg); }
 
@@ -81,15 +75,16 @@
 
   #btn {
     border: 4px solid #241a2e; border-radius: 26px; padding: 0;
+    font-weight: 900;
     height: 200px; width: 100%;
-    background: linear-gradient(180deg, #FF6B78 0%, var(--red) 55%, #E32F41 100%);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--me) 72%, #fff) 0%, var(--me) 55%, var(--me-dark) 100%);
     color: #fff; font-family: var(--f-disp); font-size: 27px; letter-spacing: .04em;
     text-shadow: 0 3px 0 rgba(0,0,0,.35);
-    box-shadow: 0 9px 0 #8d1a26, 0 14px 20px rgba(0,0,0,.4);
+    box-shadow: 0 9px 0 var(--me-dark), 0 14px 20px rgba(0,0,0,.4);
     touch-action: manipulation; cursor: pointer;
     transition: transform .06s cubic-bezier(.2,.9,.3,1.4), box-shadow .06s, filter .12s;
   }
-  #btn:active, #btn.hit { transform: translateY(8px); box-shadow: 0 1px 0 #8d1a26; }
+  #btn:active, #btn.hit { transform: translateY(8px); box-shadow: 0 1px 0 var(--me-dark); }
   #btn.hit { background: linear-gradient(180deg,#FFE07A 0%, var(--yellow) 55%, #E09A00 100%);
     color: #3A2400; text-shadow: 0 2px 0 rgba(255,255,255,.45); }
   #btn:disabled { background: linear-gradient(180deg,#4A2A6B,#3A1F55); color: #9B7ABA;
@@ -119,7 +114,7 @@
 <div class="wrap">
 
   <div class="hero">
-    <div class="logo">一斉</div>
+    <canvas id="logo" width="620" height="230" aria-label="一斉"></canvas>
     <div class="sub">大画面ひとつと、みんなのスマホで遊ぶ　5〜30人のパーティゲーム</div>
   </div>
 
@@ -163,6 +158,14 @@
 </div>
 
 <script src="public/art.js"></script>
+<script>
+  // ページ上部のロゴ。ステージ内とまったく同じ描画を使う。
+  addEventListener('load', () => {
+    const lc = document.getElementById('logo').getContext('2d');
+    lc.setTransform(2, 0, 0, 2, 0, 0);
+    Art.logo(lc, 165, 58, 92);
+  });
+</script>
 <script src="public/sound.js"></script>
 <script src="public/demo-game.js"></script>
 </body>

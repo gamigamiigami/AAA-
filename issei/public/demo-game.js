@@ -283,13 +283,15 @@ function loop(ms) {
   if (shake > 0) c.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
   Art.sky(c, W, H, st.tSec);
 
-  if (phase === 'card') S.card(c, st);
+  if (phase === 'card') S.cardScene(c, st);
   else if (phase === 'play') (game === 'seino' ? S.seino : S.daruma)(c, st);
   else if (phase === 'reveal') (st.last.spread !== undefined ? S.seinoReveal : S.darumaReveal)(c, st);
   else S.idle(c, st);
 
   fx.draw(c);
   S.roster(c, st);
+  // 札は参加者一覧より後。暗転を一部のレイヤーだけに掛けると重ねただけに見える
+  if (phase === 'card') S.cardOver(c, st);
   c.restore();
 
   if (flash > 0) { c.fillStyle = 'rgba(255,255,255,' + (flash * .5) + ')'; c.fillRect(0, 0, W, H); }

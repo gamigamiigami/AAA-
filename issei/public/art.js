@@ -1236,7 +1236,11 @@ Art.longShadow = function (c, x, y, rx, len, strength) {
 Art.backdrop = function (c, W, H, y, t) {
   Art.sky(c, W, H, t);
   c.save();
-  const ty = y - 232;
+  /* トラスは画面のいちばん上に吊る。中途半端な高さに置くと、横一直線の
+   * 構造物が見出しや数字の真後ろを走ってタンジェントを作るし、
+   * 結果パネルの裏に隠れて両端だけが切り株のように残る。
+   * 上端に置けば、ビームが全部の高さを縦に貫いて空間が縦に伸びる。 */
+  const ty = 20;
   // トラス
   c.globalAlpha = .55;
   Art.roundRect(c, 40, ty, W - 80, 16, 4);

@@ -234,7 +234,6 @@ function frame(ms) {
       applyLive();
       S.daruma(c, st);
     }
-    if (st.cardT < 1) S.card(c, st);        // 札は開始直後にだけ被せる
   } else if (phase === 'reveal' && st.last) {
     (st.last.game === 'seino' ? S.seinoReveal : S.darumaReveal)(c, st);
   } else {
@@ -242,6 +241,8 @@ function frame(ms) {
   }
 
   S.roster(c, st);
+  // 札は開始直後にだけ被せる。参加者一覧より後に置いて、暗転を全部に掛ける
+  if (phase === 'play' && st.cardT < 1) S.cardOver(c, st);
   c.restore();
 
   if (flash > 0) {

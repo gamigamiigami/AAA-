@@ -110,7 +110,7 @@ function marker(c, x, y) {
 // ---------------------------------------------------------------- 待ち受け
 Stage.idle = function (c, st) {
   Art.backdrop(c, W, H, STAGE_Y, st.tSec);
-  Art.lights(c, W, st.tSec, -34);
+  Art.lights(c, W, st.tSec, 92);
   Art.floor(c, W, H, STAGE_Y); Art.rigPools(c, W, H, STAGE_Y);
   Art.logo(c, W / 2 + 26, 250, 104);
   if (st.code) {
@@ -126,18 +126,24 @@ Stage.idle = function (c, st) {
 
 // ---------------------------------------------------------------- 命令カード
 /* ワリオ系の核。実際に「札」を叩きつける。 */
-Stage.card = function (c, st) {
+/* 札の下の舞台。札そのものと分けてあるのは、参加者一覧の帯まで含めて
+ * 暗転させるため。暗幕が一部のレイヤーにしか掛かっていない画面は、
+ * その瞬間に「重ねただけの絵」だと分かる。 */
+Stage.cardScene = function (c, st) {
   Art.backdrop(c, W, H, STAGE_Y, st.tSec);
-  Art.lights(c, W, st.tSec, -34);
+  Art.lights(c, W, st.tSec, 92);
   Art.floor(c, W, H, STAGE_Y); Art.rigPools(c, W, H, STAGE_Y);
   Stage.cast(c, st, { forceLook: [0, -.9] });
+};
+Stage.cardOver = function (c, st) {
   Art.card(c, W, H, st.cardWord, st.cardHue || '#C4356B', st.cardT, { t: st.tSec });
 };
+Stage.card = function (c, st) { Stage.cardScene(c, st); Stage.cardOver(c, st); };
 
 // ---------------------------------------------------------------- せーの
 Stage.seino = function (c, st) {
   Art.backdrop(c, W, H, STAGE_Y, st.tSec);
-  Art.lights(c, W, st.tSec, -34);
+  Art.lights(c, W, st.tSec, 92);
   Art.floor(c, W, H, STAGE_Y); Art.rigPools(c, W, H, STAGE_Y);
 
   const left = st.left, cx = W / 2, cy = 292, R = 118;
@@ -173,7 +179,7 @@ Stage.seino = function (c, st) {
 Stage.seinoReveal = function (c, st) {
   const L = st.last;
   Art.backdrop(c, W, H, STAGE_Y, st.tSec);
-  Art.lights(c, W, st.tSec, -34);
+  Art.lights(c, W, st.tSec, 92);
   Art.floor(c, W, H, STAGE_Y); Art.rigPools(c, W, H, STAGE_Y);
   const pop = E.outBack(Math.min(1, st.revealT * 2.6));
   c.save(); c.translate(W / 2, 108); c.scale(pop, pop); c.translate(-W / 2, -108);
@@ -349,7 +355,7 @@ Stage.daruma = function (c, st) {
 Stage.darumaReveal = function (c, st) {
   const L = st.last;
   Art.backdrop(c, W, H, STAGE_Y, st.tSec);
-  Art.lights(c, W, st.tSec, -34);
+  Art.lights(c, W, st.tSec, 92);
   Art.floor(c, W, H, STAGE_Y); Art.rigPools(c, W, H, STAGE_Y);
   const w = L.entries.find(e => e.fin !== null && e.fin !== undefined);
   const pop = E.outBack(Math.min(1, st.revealT * 2.6));

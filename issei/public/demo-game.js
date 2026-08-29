@@ -23,7 +23,7 @@ const CAST_DEF = [
 ];
 const players = CAST_DEF.map((d, i) => Object.assign({}, d, {
   id: i, you: i === 0, score: 0, seed: i * 37 + 5,
-  sigma: [0, 55, 38, 92, 46, 70][i],
+  sigma: [0, 62, 44, 108, 52, 84][i],
   bravery: [0, .82, .6, .95, .5, .72][i],
   face: 'smile', poseName: 'idle', dist: 0, moving: false
 }));
@@ -140,8 +140,20 @@ function beginRound() {
   if (game === 'seino') {
     g = { target: now() + COUNT_IN * BEAT, endsAt: now() + COUNT_IN * BEAT + 1300,
           press: {}, fired: new Set() };
+    /* 相手の出来はラウンドごとに変える。腕前を固定にすると、外れるのは
+     * 毎回いちばん下手な1人（と自分）だけになり、結果の絵が毎回同じ形に
+     * なる。パーティゲームの笑いは「今日は誰がやらかすか分からない」から
+     * 出るので、ここは揺らすところ。
+     *   form  … その回の調子
+     *   飛び出し … たまに盛大にフライング／固まる
+     *   押し忘れ … たまに押さない。これが無いと「おさなかった」画面が
+     *              永久に出ない */
     for (const p of players) if (!p.you) {
-      const at = g.target + gauss() * p.sigma;
+      const form = .5 + Math.random() * 1.15;
+      const flyer = Math.random() < .18
+        ? (Math.random() < .5 ? -1 : 1) * (170 + Math.random() * 260) : 0;
+      if (Math.random() < .07) continue;               // 押し忘れ
+      const at = g.target + gauss() * p.sigma * form + flyer;
       setTimeout(() => { if (phase === 'play' && game === 'seino') {
         g.press[p.id] = at; st.sent++; p.sq.x = .66; p.sq.v = 3.6; p.poseName = 'cheer'; p.face = 'joy';
       } }, Math.max(0, at - now()));

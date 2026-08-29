@@ -220,7 +220,7 @@ Stage.seinoReveal = function (c, st) {
     W / 2, 250, 25, 'rgba(255,247,232,.72)', { ow: .3 });
 
   Stage.cast(c, st, { forceLook: [0, -.15] });
-  strip(c, st, L.entries, 190, 348, W - 380);
+  strip(c, st, L.entries, 190, 356, W - 380);
 };
 
 /* ズレの帯。分析グラフではなく「どこに集まったか」を見せる補助。
@@ -232,7 +232,7 @@ Stage.seinoReveal = function (c, st) {
  * 重なった人は縦に積む。6人いて3人しか見えない帯は、この画面の存在意義を失う。 */
 const STRIP_RANGE = 400;      // 端は ±0.4秒。ここを超えたら「振り切れ」
 const STRIP_OK = 80;          // 成功の幅
-const STRIP_H = 132;          // 帯の高さは固定。人数で伸びると舞台を食う
+const STRIP_H = 162;          // 帯の高さは固定。人数で伸びると舞台を食う
 
 function strip(c, st, entries, x, y, w) {
   const hits = entries.filter(e => e.error !== null && e.error !== undefined);
@@ -244,46 +244,56 @@ function strip(c, st, entries, x, y, w) {
   /* 重なった人は軸の上下へ交互に逃がす。上へ積むだけだと塔になり、
    * 「上にいるほど何かが上」という無い意味を読ませてしまう。
    * 段が増えたら帯を伸ばすのではなく、丸を小さくする。帯が伸びると舞台を隠す。 */
-  const budget = 40;
-  let R = 16, placed = [];
-  for (;;) {
-    const rowH = R * 2.1;
-    placed = []; let deepest = 0;
-    for (const e of sorted) {
-      const ex = px(e.error);
-      let k = 0, lv = 0;
-      while (placed.some(q => q.lv === lv && Math.abs(q.x - ex) < R * 2.05)) {
-        k++; lv = (k % 2 ? 1 : -1) * Math.ceil(k / 2);
+  /* 重なった人の逃がし方。縮めるより先に、横へずらして段を使う。
+   * 丸を小さくして解決すると、いちばん見せたい「そろった5人」が
+   * 7pxの団子になって誰だか分からなくなる。読めない図に意味はない。 */
+  const budget = 56, R = 15, rowH = R * 1.9;
+  const NUDGE = [0, .85, -.85, 1.7, -1.7];
+  const LEVEL = [0, -1, 1, -2, 2];
+  const placed = [];
+  for (const e of sorted) {
+    const ex = px(e.error);
+    let best = null;
+    outer:
+    for (const lv of LEVEL) for (const nu of NUDGE) {
+      const cx2 = ex + nu * R;
+      if (!placed.some(q => q.lv === lv && Math.abs(q.x - cx2) < R * 1.95)) {
+        best = { lv, x: cx2 }; break outer;
       }
-      placed.push({ e, x: ex, lv, over: Math.abs(e.error) > STRIP_RANGE });
-      deepest = Math.max(deepest, Math.abs(lv));
     }
-    if (deepest * rowH + R <= budget || R <= 7) break;
-    R -= 1;
+    if (!best) best = { lv: 0, x: ex };
+    placed.push({ e, x: best.x, lv: best.lv, over: Math.abs(e.error) > STRIP_RANGE });
   }
-  const rowH = R * 2.1;
 
   const top = y - STRIP_H / 2;
   Art.slab(c, x - 22, top, w + 44, STRIP_H, '#3A2358', { depth: 6, r: 24 });
 
-  /* 合格の幅。紫地に半透明の緑を薄く敷くと、緑ではなく濁った灰色になる。
-   * 「合格ラインの色が灰色」という設計判断はあり得ないので、地の色そのものを
-   * 緑に置き、縁を実線で締める。 */
-  // 角丸の器の中に角の立った矩形を置かない。同じ角の規則に合わせる
+  /* 合格の幅。以前はベタの緑＋蛍光緑の縁で、紫と金でできたこの世界の
+   * どこにも無い色だった。表計算のセルに見える。
+   * 「合格」は色ではなく光で示す —— 舞台の光だまりと同じ暖色を当てる。
+   * ここだけ明るいので、視線は自然に「そろうべき場所」へ行く。 */
   const okw = px(STRIP_OK) - px(-STRIP_OK);
-  Art.roundRect(c, px(-STRIP_OK), y - budget, okw, budget * 2, 10);
-  c.fillStyle = '#22513A'; c.fill();
-  Art.roundRect(c, px(-STRIP_OK), y - budget, okw, budget * 2, 10);
-  Art.stroke(c, '#39C96A', 2);
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  const og = c.createLinearGradient(0, y - budget, 0, y + budget);
+  og.addColorStop(0, 'rgba(255,206,120,.06)');
+  og.addColorStop(.5, 'rgba(255,214,150,.30)');
+  og.addColorStop(1, 'rgba(255,206,120,.06)');
+  c.fillStyle = og;
+  Art.roundRect(c, px(-STRIP_OK), y - budget, okw, budget * 2, 12); c.fill();
+  c.restore();
+  Art.roundRect(c, px(-STRIP_OK), y - budget, okw, budget * 2, 12);
+  Art.stroke(c, 'rgba(255,197,49,.55)', 2);
 
   /* 目盛り。範囲を固定しただけでは物差しにならない。刻みが無いと
    * 「この位置が何msか」を画面から読む手段がない。 */
   const ly = top + STRIP_H - 16;
   for (const ms of [-400, -200, 0, 200, 400]) {
     const tx = px(ms), zero = ms === 0;
+    // 0の線を画面でいちばん明るくしない。情報量ゼロの線に視線を集めない
     c.beginPath(); c.moveTo(tx, y - budget - (zero ? 4 : 0));
     c.lineTo(tx, y + budget + (zero ? 4 : 0));
-    Art.stroke(c, zero ? PAL.focus : 'rgba(255,247,232,.22)', zero ? 4 : 2);
+    Art.stroke(c, zero ? 'rgba(255,197,49,.75)' : 'rgba(255,247,232,.18)', zero ? 2.5 : 2);
     // 単位は ms に統一する。同じ画面に ms と 秒 が混ざると、自分の値が
     // 帯のどこに当たるかを客に暗算させることになる。
     Art.label(c, zero ? 'ぴったり' : (ms > 0 ? '+' : '') + ms + 'ms',
@@ -292,9 +302,9 @@ function strip(c, st, entries, x, y, w) {
   }
   c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y);
   Art.stroke(c, 'rgba(255,255,255,.18)', 3);
-  Art.label(c, 'はやい', x + 6, y - budget - 12, 14, 'rgba(255,247,232,.4)',
+  Art.label(c, 'はやい', x + 26, y - budget - 13, 14, 'rgba(255,247,232,.38)',
     { ow: .34, align: 'left' });
-  Art.label(c, 'おそい', x + w - 6, y - budget - 12, 14, 'rgba(255,247,232,.4)',
+  Art.label(c, 'おそい', x + w - 26, y - budget - 13, 14, 'rgba(255,247,232,.38)',
     { ow: .34, align: 'right' });
 
   for (const q of placed) {
@@ -302,14 +312,16 @@ function strip(c, st, entries, x, y, w) {
     if (q.over) {
       /* 振り切れた人。三角だけでは「どれだけ外したか」が消えるので、
        * 実際の値を横に直接書く。図と数字が食い違う画面は自動生成に見える。 */
+      /* 振り切れた人。矢印も値も帯の内側に置く。外に出すと、
+       * 主役が絵の外へ追い出されたように見える。 */
       const sd = e.error > 0 ? 1 : -1;
       c.beginPath();
-      c.moveTo(q.x + sd * (R + 15), cy); c.lineTo(q.x + sd * (R + 3), cy - 8);
-      c.lineTo(q.x + sd * (R + 3), cy + 8); c.closePath();
+      c.moveTo(q.x + sd * (R + 13), cy); c.lineTo(q.x + sd * (R + 2), cy - 7);
+      c.lineTo(q.x + sd * (R + 2), cy + 7); c.closePath();
       c.fillStyle = PAL.danger; c.fill(); Art.stroke(c, PAL.ink, 3);
       Art.num(c, (e.error > 0 ? '+' : '') + e.error + 'ms',
-        q.x + sd * (R + 22), cy, 16, PAL.danger,
-        { align: sd > 0 ? 'left' : 'right', ow: .38 });
+        q.x - sd * (R + 6), cy - R - 4, 16, PAL.danger,
+        { align: sd > 0 ? 'right' : 'left', ow: .38 });
     }
     Art.chara(c, { x: q.x, y: cy, r: R, color: e.color, shape: e.shape,
       seed: e.seed, face: Math.abs(e.error) <= STRIP_OK ? 'joy' : 'flat',

@@ -32,7 +32,8 @@ const players = CAST_DEF.map((d, i) => Object.assign({}, d, {
   id: i, you: i === 0, score: 0, seed: i * 37 + 5,
   sigma: [0, 55, 38, 92, 46, 70][i],
   bravery: [0, .82, .6, .95, .5, .72][i],
-  face: 'smile', bob: 0, squash: 1, lean: 0, armUp: false,
+  face: 'smile', bob: 0, lean: 0, armUp: false, crestLag: 0,
+  sq: new Art.Spring(1, 330, 15).to(1), reactAt: 0,
   blink: 0, nextBlink: 1 + i * .7
 }));
 const YOU = players[0];
@@ -50,6 +51,11 @@ document.documentElement.style.setProperty('--me-dark', Art.shade(YOU.color, -.4
 const BEAT = 500, COUNT_IN = 4;
 let phase = 'idle', game = null, g = null, last = null, sent = 0;
 let shake = 0, flash = 0, wipe = 0, revealT = 0;
+/* ヒットストップ。決定的な瞬間に数フレームだけ時間を止める。
+ * これが入るだけで、同じ絵でも当たった感じが桁違いに強くなる。 */
+let hitStop = 0;
+let cardT = 0, cardWord = '';          // 命令カードの進行
+let scoreShown = 0, scorePop = new Art.Spring(1, 260, 13);
 let tSec = 0, prev = performance.now();
 const now = () => performance.now();
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
@@ -75,7 +81,8 @@ function onDown(e) {
     if (g.press[0] !== undefined) return;
     g.press[0] = t; sent++;
     Snd.sfx('tap');
-    YOU.squash = .68; YOU.armUp = true; YOU.face = 'joy';
+    YOU.sq.x = .62; YOU.sq.v = 4.2; YOU.sq.to(1); YOU.armUp = true; YOU.face = 'joy';
+    hitStop = .055;
     fx.burst(ARC[0].x, ARC[0].y - 60, { n: 12, color: ['#fff', PAL.focusGlow],
       speed: 260, size: 8, kind: 'star', life: .5, lift: 60 });
     setBtn('おした！', false, true);
@@ -97,10 +104,25 @@ function onUp(e) {
   setBtn('とまれ', false, false);
 }
 
+/* 命令カード。ワリオ系の核はここにある。
+ * 溜める → 叩きつける → 止める → 抜ける。全部違うカーブで動かす。 */
+function showCard(word, then) {
+  cardWord = word; cardT = 0; cardHit = false; phase = 'card';
+  const step = () => {
+    if (cardT >= 1) { then(); return; }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 function startRound() {
   game = game === 'seino' ? 'daruma' : 'seino';
-  phase = 'play'; last = null; sent = 0; wipe = 1;
-  for (const p of players) { p.face = 'smile'; p.squash = 1; p.armUp = false; p.lean = 0; }
+  showCard(game === 'seino' ? 'せーの！' : 'とまれ！', beginRound);
+}
+
+function beginRound() {
+  phase = 'play'; last = null; sent = 0; wipe = .55;
+  for (const p of players) { p.face = 'smile'; p.sq.to(1); p.armUp = false; p.lean = 0; }
 
   if (game === 'seino') {
     g = { target: now() + COUNT_IN * BEAT, endsAt: now() + COUNT_IN * BEAT + 1300,
@@ -108,7 +130,7 @@ function startRound() {
     for (const p of players) if (!p.you) {
       const at = g.target + gauss() * p.sigma;
       setTimeout(() => { if (phase === 'play' && game === 'seino') {
-        g.press[p.id] = at; sent++; p.squash = .68; p.armUp = true; p.face = 'joy';
+        g.press[p.id] = at; sent++; p.sq.x = .66; p.sq.v = 3.6; p.armUp = true; p.face = 'joy';
       } }, Math.max(0, at - now()));
     }
     setBtn('おす', false, false);
@@ -144,6 +166,8 @@ function finish() {
   phase = 'reveal'; wipe = 1; revealT = 0;
   last = game === 'seino' ? judgeSeino() : judgeDaruma();
   for (const id of last.winners) players[id].score++;
+  if (YOU.score !== scoreShown) scorePop.x = 1.7;
+  scoreShown = YOU.score;
   scEl.textContent = YOU.score;
 
   const won = last.winners.indexOf(0) >= 0;
@@ -152,12 +176,16 @@ function finish() {
   if (navigator.vibrate) navigator.vibrate(won ? [40, 60, 40] : 150);
 
   /* 芝居をつける。勝者は万歳、敗者はうなだれる。数字より先にこれが目に入る。 */
-  for (const p of players) {
-    const e = last.entries.find(x => x.id === p.id) || {};
-    const w = last.winners.indexOf(p.id) >= 0;
-    p.face = w ? 'joy' : e.bad ? 'sad' : 'flat';
-    p.armUp = w; p.lean = w ? 0 : (e.bad ? .1 : 0);
-  }
+  /* 全員が同時に同じ顔になると、6体が1つの部品に見える。
+   * 順位順に少しずつ遅らせて反応させる。 */
+  last.entries.forEach((e, i) => {
+    const p = players[e.id];
+    p.reactAt = .12 + i * .11;
+    p.pending = { face: last.winners.indexOf(p.id) >= 0 ? 'joy' : e.bad ? 'sad' : 'flat',
+                  armUp: last.winners.indexOf(p.id) >= 0,
+                  lean: last.winners.indexOf(p.id) >= 0 ? 0 : (e.bad ? .12 : 0) };
+  });
+  hitStop = won || last.ok ? .12 : .09;
   if (won || last.ok) {
     for (let i = 0; i < 3; i++) setTimeout(() => fx.burst(W / 2, 150, {
       n: 34, color: [PAL.gold, PAL.pink, '#3E8CFF', '#39C96A', '#fff'],
@@ -248,17 +276,34 @@ const ARC = players.map(p => ({ x: p.spot.x, y: p.row.y }));
 // ---------------------------------------------------------------- ループ
 function loop(ms) {
   requestAnimationFrame(loop);
-  const dt = Math.min(.05, (ms - prev) / 1000); prev = ms;
+  let dt = Math.min(.05, (ms - prev) / 1000); prev = ms;
+  // ヒットストップ中は世界の時間を止める（UIの明滅だけは進める）
+  if (hitStop > 0) { hitStop -= dt; dt = 0; }
   tSec += dt; revealT += dt;
+  if (phase === 'card') cardT = Math.min(1, cardT + dt / .92);
   fx.update(dt);
 
   for (const p of players) {
-    p.squash += (1 - p.squash) * Math.min(1, dt * 9);
+    const prevSq = p.squash === undefined ? 1 : p.squash;
+    // バネは行き過ぎるので、潰れ量が0以下にならないよう必ず留める
+    p.squash = Math.max(.4, Math.min(1.6, p.sq.step(dt)));
+    p.crestLag += ((prevSq - p.squash) * 26 - p.crestLag) * Math.min(1, dt * 12);
     p.bob = -Math.abs(Math.sin(tSec * Math.PI * 1000 / BEAT + p.seed)) * 7;
     p.nextBlink -= dt;
     if (p.nextBlink <= 0) { p.blink = .12; p.nextBlink = 2.2 + Math.random() * 3.4; }
     p.blink = Math.max(0, p.blink - dt);
+    // 順位順に遅れて反応する
+    if (p.pending && revealT >= p.reactAt) {
+      p.face = p.pending.face; p.armUp = p.pending.armUp; p.lean = p.pending.lean;
+      p.sq.x = p.pending.armUp ? .72 : 1.14; p.sq.v = p.pending.armUp ? 5 : -1.6;
+      if (p.pending.armUp) fx.burst(p.spot.x, p.row.y - 70, {
+        n: 8, color: [PAL.gold, '#fff'], speed: 220, size: 9, kind: 'star', life: .6, lift: 90 });
+      p.pending = null;
+    }
   }
+  scorePop.to(1); scorePop.step(dt);
+  scEl.style.transform = 'scale(' + scorePop.x.toFixed(3) + ')';
+  scEl.style.display = 'inline-block';
   shake = Math.max(0, shake - dt * 44);
   flash = Math.max(0, flash - dt * 2.2);
   wipe = Math.max(0, wipe - dt * 3.2);
@@ -270,6 +315,7 @@ function loop(ms) {
   Art.stage(c, W, H, tSec);
   if (phase === 'play') (game === 'seino' ? viewSeino : viewDaruma)();
   else if (phase === 'reveal') (last.spread !== undefined ? revealSeino : revealDaruma)();
+  else if (phase === 'card') viewCard();
   else viewIdle();
 
   fx.draw(c);
@@ -285,6 +331,52 @@ function loop(ms) {
   }
 }
 requestAnimationFrame(loop);
+
+/* 命令カード。溜め → 叩きつけ → 保持 → 抜け、を別々のカーブで。 */
+let cardHit = false;
+function viewCard() {
+  Art.backdrop(c, W, H, STAGE_Y, tSec);
+  Art.lights(c, W, tSec, -34);
+  Art.floor(c, W, H, STAGE_Y);
+  drawCast({ forceLook: [0, -.9] });
+
+  const t = cardT;
+  let sc, rot, alpha = 1;
+  if (t < .15) {                       // 溜め。わずかに縮んで引く
+    const k = t / .15;
+    sc = 1.5 - .35 * E.outCubic(k); rot = -.16 + .04 * k;
+  } else if (t < .38) {                // 叩きつけ
+    const k = (t - .15) / .23;
+    sc = Art.lerp(1.15, 1, E.outBack(k, 3.4)); rot = Art.lerp(-.12, -.03, E.outCubic(k));
+    if (!cardHit && k > .55) { cardHit = true; hitStop = .085; shake = 14; Snd.sfx('beat'); }
+  } else if (t < .78) {                // 保持。ごくわずかに揺れる
+    sc = 1 + Math.sin((t - .38) * 34) * .012; rot = -.03;
+  } else {                             // 抜け
+    const k = (t - .78) / .22;
+    sc = 1 + E.inCubic(k) * .5; rot = -.03 + k * .1; alpha = 1 - E.inCubic(k);
+  }
+
+  c.save();
+  c.globalAlpha = alpha * .72;
+  c.fillStyle = '#0A0320'; c.fillRect(0, 0, W, H);
+  c.globalAlpha = alpha;
+  c.translate(W / 2, 300); c.rotate(rot); c.scale(sc, sc);
+  // 集中線。溜めの間だけ強い
+  const conc = t < .38 ? 1 : Math.max(0, 1 - (t - .38) * 5);
+  if (conc > .02) {
+    c.save(); c.globalAlpha = alpha * conc * .3;
+    for (let i = 0; i < 26; i++) {
+      const a = i / 26 * Art.TAU + tSec * .5;
+      const r0 = 210 + Art.hash(i * 7) * 60;
+      c.beginPath(); c.moveTo(Math.cos(a) * r0, Math.sin(a) * r0 * .7);
+      c.lineTo(Math.cos(a) * 900, Math.sin(a) * 630);
+      Art.stroke(c, PAL.cream, 2 + Art.hash(i * 13) * 4);
+    }
+    c.restore();
+  }
+  Art.title(c, cardWord, 0, 0, 116, { fill: PAL.cream, extrude: 11 });
+  c.restore();
+}
 
 /* 画面左上の状態表示。プレイの邪魔をしない位置に固定する。 */
 function hud(cap, val) {
@@ -459,7 +551,7 @@ function viewDaruma() {
   for (const ch of g.chants) {
     if (t >= ch.start && !g.fired.has('s' + ch.start)) { g.fired.add('s' + ch.start); Snd.sfx('chant'); }
     if (t >= ch.turnAt && !g.fired.has('t' + ch.turnAt)) {
-      g.fired.add('t' + ch.turnAt); Snd.sfx('turn'); shake = 10;
+      g.fired.add('t' + ch.turnAt); Snd.sfx('turn'); shake = 13; hitStop = .1;
     }
     if (t >= ch.start && t < ch.watchUntil) { cur = ch; watching = t >= ch.turnAt; break; }
   }

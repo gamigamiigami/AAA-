@@ -40,6 +40,26 @@ Art.ease = {
     return n * (t -= 2.625 / d) * t + .984375; },
   inOutCubic: t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 };
+/* バネ。目標へ向かうが行き過ぎて戻る。イージングと違い、
+ * 途中で目標が変わっても破綻しないので、操作への反応に向く。 */
+Art.Spring = function (v, stiff, damp) {
+  this.v = 0; this.x = v; this.t = v;   // 目標は初期値。未設定で0へ引かれる事故を防ぐ
+  this.k = stiff || 210; this.d = damp || 14;
+};
+Art.Spring.prototype.to = function (t) { this.t = t; return this; };
+Art.Spring.prototype.kick = function (amount) { this.v += amount; return this; };
+Art.Spring.prototype.step = function (dt) {
+  const tgt = this.t;
+  // 大きい dt で発散しないよう刻む
+  let left = dt;
+  while (left > 0) {
+    const h = Math.min(1 / 120, left); left -= h;
+    this.v += (-this.k * (this.x - tgt) - this.d * this.v) * h;
+    this.x += this.v * h;
+  }
+  return this.x;
+};
+
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 Art.clamp = clamp;
 Art.lerp = (a, b, t) => a + (b - a) * t;
@@ -401,7 +421,8 @@ Art.CAST = CAST;
 Art.chara = function (c, o) {
   const cast = CAST[o.shape] || CAST.circle;
   const r = o.r, col = o.color;
-  const sq = o.squash === undefined ? 1 : o.squash;
+  // 呼び出し側がバネを渡してくる。0以下だと平方根が NaN になり描画全体が落ちる。
+  const sq = clamp(o.squash === undefined ? 1 : o.squash, .3, 2);
   const rx = r * cast.rx / Math.sqrt(sq), ry = r * cast.ry * sq;
   const line = Art.outlineOf(col);
   const lw = Math.max(1.7, r * .12);
@@ -447,7 +468,12 @@ Art.chara = function (c, o) {
     });
   }
 
+  /* 二次モーション。頭の飾りは体より遅れて動く。
+   * 全部が同時に動くと、人形ではなく図形に見える。 */
+  c.save();
+  if (o.crestLag) { c.translate(o.crestLag * rx * .1, 0); c.rotate(o.crestLag * .12); }
   crest(c, cast.crest, rx, ry, r, col, line, lw, o);
+  c.restore();
 
   Art.vinyl(c, () => Art.eggPath(c, 0, 0, rx, ry, .14), { x: 0, y: 0, rx, ry, color: col, lw });
 

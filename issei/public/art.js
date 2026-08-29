@@ -772,9 +772,13 @@ Art.chara = function (c, o) {
     const A = ARM[cast.arm] || ARM.slim;
     /* 腕の長さ。上げるポーズほど伸ばす。バンザイで手が頭より下だと
      * 「上げた」に見えないし、極端な姿勢での伸びはアニメーションの基本。 */
-    const AL = r * A.len + Math.max(0, -(P.arm || 0)) * r * .23;
+    const AL0 = r * A.len + Math.max(0, -(P.arm || 0)) * r * .23;
     [-1, 1].forEach(sd => {
-      const a = (P.arm || 0) + A.bias + swing * sd
+      /* 左右で姿勢を変える。ここが対称だと、体型と顔をいくら作り分けても
+       * 「12本の腕が1つの姿勢しか持っていない」画面になる。
+       * 揺らぎではなく、片腕を下げ気味・片腕を上げ気味という設計として振る。 */
+      const side = sd > 0 ? A.asym : -A.asym * .55;
+      const a = (P.arm || 0) + A.bias + side + swing * sd
         + Math.sin((o.armT || 0) * 1.3 + (o.seed || 0) + sd) * .05;
       // a を仰角に変換する。a が負ほど上、正ほど下。
       const el = -a * .9 - .35;
@@ -797,6 +801,7 @@ Art.chara = function (c, o) {
       k2 = Math.max(.34, k2 - .04);           // 輪郭の内側へもう一歩
       const sx = sd * rx * Math.cos(ph) * k2, sy = -ry * Math.sin(ph) * k2;
       const ow = 1 + sp;
+      const AL = AL0 * (sd > 0 ? 1 : .90);   // 長さも左右で少し変える
       const hx = sx + sd * AL * Math.cos(el) * ow;
       const hy = sy - AL * Math.sin(el);
       // 肘。腕の中点を進行方向の外側へ逃がすと、棒ではなく腕に見える。
@@ -956,11 +961,11 @@ function crest(c, kind, rx, ry, r, col, line, lw, o) {
  * 長さ・太さ・付け根の高さ・手先の形を体型に合わせて変える。
  * ずんぐりした体に細長い腕は付かないし、背の高い体に短い腕も付かない。 */
 const ARM = {
-  slim:  { len:  .74, w: .115, handR: .118, hand: 'ball',  root:  0,   bias:  0   },
-  long:  { len:  .98, w: .098, handR: .105, hand: 'ball',  root: -.06, bias: -.10 },
-  stout: { len:  .56, w: .195, handR: .170, hand: 'mitt',  root:  .10, bias:  .12 },
-  claw:  { len:  .72, w: .120, handR: .112, hand: 'split', root:  0,   bias: -.05 },
-  stub:  { len:  .56, w: .200, handR: 0,    hand: 'none',  root:  .14, bias:  .14 }
+  slim:  { len:  .74, w: .115, handR: .118, hand: 'ball',  root:  0,   bias:  0,   asym:  .30 },
+  long:  { len:  .98, w: .098, handR: .105, hand: 'ball',  root: -.06, bias: -.10, asym: -.24 },
+  stout: { len:  .56, w: .195, handR: .170, hand: 'mitt',  root:  .10, bias:  .12, asym:  .18 },
+  claw:  { len:  .72, w: .120, handR: .112, hand: 'split', root:  0,   bias: -.05, asym: -.34 },
+  stub:  { len:  .56, w: .200, handR: 0,    hand: 'none',  root:  .14, bias:  .14, asym:  .22 }
 };
 
 /* 目の型。以前は間隔と半径をわずかに変えるだけで、表示サイズでは
@@ -1097,6 +1102,7 @@ function face(c, o, cast, rx, ry, r) {
     c.lineTo(0, my - r * .05); c.lineTo(r * .21, my + r * .09);
     Art.stroke(c, Art.PAL.ink, r * .085);
   }
+  c.restore();
 }
 
 // ---------------------------------------------------------------- 粒子
@@ -1357,6 +1363,9 @@ Art.corridor = function (c, W, H, y, t, danger) {
     const lw = Art.lerp(190, 24, k);
     c.save();
     c.globalAlpha = .85 - k * .3;
+    // 灯りも消失点を向ける。壁も床も収束している中で、ここだけ水平の
+    // 矩形が定規で引いたように並ぶと、画面で最も明るい5つが別の空間法則に従う
+    c.translate(lx, ly); c.rotate(Math.atan2(vy - ly, vx - lx)); c.translate(-lx, -ly);
     Art.roundRect(c, lx - lw / 2, ly, lw, Math.max(4, 16 * (1 - k)), 4);
     c.fillStyle = danger ? '#FFB9B9' : '#FFF0CE'; c.fill();
     c.globalCompositeOperation = 'lighter'; c.globalAlpha = .3;
@@ -1543,9 +1552,13 @@ Art.rigPools = function (c, W, H, y) {
   c.beginPath(); c.rect(0, y, W, H - y); c.clip();
   for (const L of Art.lamps) {
     // 傾いた分だけ着地点がずれる
-    const fx = L.x + (y + 80 - L.y) * Math.tan(L.aim);
-    const fy = y + 96;
-    const g = c.createRadialGradient(fx, fy, 0, fx, fy, W * .10);
+    /* 着地点は灯体の傾きから出す。fy を定数にしていたので、5灯が床の
+     * 同じ奥行き・同じ大きさで着地し、透視図法の床に同じスタンプが
+     * 5個横に並んでいた。傾けた灯りは遠くを照らす。 */
+    const reach = (H - L.y) * (.34 + Math.abs(L.aim) * 1.1);
+    const fy = Math.min(H - 30, y + 62 + reach * .5);
+    const fx = L.x + (fy - L.y) * Math.tan(L.aim);
+    const g = c.createRadialGradient(fx, fy, 0, fx, fy, W * (.085 + Math.abs(L.aim) * .10));
     const tint = L.warm ? '255,206,140' : '176,190,255';
     // 弱く。5つ重なるので、1つを強くすると床の木の色が飛ぶ
     // 板の縞は alpha .05〜.11。それを上回らないと、床でいちばん明るい場所が
@@ -1553,7 +1566,8 @@ Art.rigPools = function (c, W, H, y) {
     g.addColorStop(0, 'rgba(' + tint + ',' + (.12 * L.on).toFixed(3) + ')');
     g.addColorStop(1, 'rgba(' + tint + ',0)');
     c.fillStyle = g;
-    c.beginPath(); c.ellipse(fx, fy, W * .10, (H - y) * .26, 0, 0, TAU); c.fill();
+    const pr = W * (.085 + Math.abs(L.aim) * .10);
+    c.beginPath(); c.ellipse(fx, fy, pr, (H - y) * (.20 + (fy - y) / (H - y) * .16), 0, 0, TAU); c.fill();
   }
   c.restore();
 };

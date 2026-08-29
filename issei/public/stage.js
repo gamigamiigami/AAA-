@@ -318,6 +318,32 @@ function strip(c, st, entries, x, y, w) {
 }
 
 // ---------------------------------------------------------------- だるまさん
+/* 逆光の乗せ方。奥（出口＝消失点）の側の縁だけを光らせ、
+ * 手前側は空気の色で沈める。体そのものは描き直さない。 */
+function backlight(c, x, y, r, p, danger) {
+  const vx = Art.corridorVP === undefined ? W * .84 : Art.corridorVP;
+  const dx = vx - x, dy = (Art.corridorHZ === undefined ? D_Y - 26 : Art.corridorHZ) - y;
+  const d = Math.hypot(dx, dy) || 1;
+  c.save();
+  Art.bodyPath(c, (Art.CAST[p.shape] || Art.CAST.circle).body, x, y, r * .98, r * .98);
+  c.clip();
+  // 奥の側の縁光
+  c.globalCompositeOperation = 'lighter';
+  const g = c.createRadialGradient(x + dx / d * r * 1.0, y + dy / d * r * 1.0, 0,
+                                   x + dx / d * r * 1.0, y + dy / d * r * 1.0, r * 1.5);
+  g.addColorStop(0, danger ? 'rgba(255,120,110,.55)' : 'rgba(224,196,255,.42)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(x - r * 2, y - r * 2, r * 4, r * 4);
+  // 手前側は沈める
+  c.globalCompositeOperation = 'source-over';
+  const s2 = c.createLinearGradient(x + dx / d * r, y + dy / d * r,
+                                    x - dx / d * r * 1.2, y - dy / d * r * 1.2);
+  s2.addColorStop(0, 'rgba(12,4,26,0)');
+  s2.addColorStop(1, danger ? 'rgba(40,2,10,.42)' : 'rgba(12,4,26,.42)');
+  c.fillStyle = s2; c.fillRect(x - r * 2, y - r * 2, r * 4, r * 4);
+  c.restore();
+}
+
 Stage.daruma = function (c, st) {
   const watching = st.watching, cur = st.chant;
   Art.corridor(c, W, H, D_Y, st.tSec, watching);
@@ -369,6 +395,10 @@ Stage.daruma = function (c, st) {
       walk: moving && !watching ? st.tSec * 13 + p.seed : 0,
       pose: p.pose, crestLag: p.crestLag,
       bob: moving && !watching ? -Math.abs(Math.sin(st.tSec * 13 + p.seed)) * r * .16 : 0 });
+    /* 走者も逆光にする。影は奥から手前へ伸ばしているのに、体だけ屋上と同じ
+     * 左上前からの照りを保ったままだった。同じ空間に光源が2つある状態。
+     * 鬼で正しく描けているのだから、走者にも同じ規則を通す。 */
+    backlight(c, x, L.y - r, r, p, watching);
     if (p.you) marker(c, x, L.y - r * 2 - 36 + Math.sin(st.tSec * 4) * 4);
   });
 

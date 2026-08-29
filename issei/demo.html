@@ -44,8 +44,11 @@
      ここにもう1つ置くと同じ絵が320px離れて2度出る。ヒーローは画面のほう。
      見出しは小さな文字で名前だけ残す。 */
   .hero { text-align: center; display: flex; flex-direction: column; gap: 2px; align-items: center; }
+  /* 和文2文字に欧文用のトラッキングを当てると「一　斉」と割れる。
+     「一」はこの太さだと横棒なので、単独で置くとダッシュに読める。
+     字間は詰め、下のロゴと同じ組み方にする。 */
   .hero h1 { font-family: var(--f-disp); font-size: clamp(19px, 4vw, 24px);
-    font-weight: 400; letter-spacing: .3em; text-indent: .3em;
+    font-weight: 400; letter-spacing: .02em;
     color: var(--yellow); margin: 0; }
   .hero .sub { font-family: var(--f-hand); font-size: clamp(13px, 3vw, 17px);
     color: var(--ink-2); transform: rotate(.6deg); }

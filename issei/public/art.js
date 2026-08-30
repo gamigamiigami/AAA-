@@ -686,8 +686,8 @@ const CAST = {
               brow: 'flat',  mouth: 'wide', arm: 'slim' },
   hexagon:  { body: 'gem',    rx: 1.00, ry: 1.04, crest: 'antenna', eye: 'dot',
               brow: 'none',  mouth: 'small', arm: 'claw' },
-  crown:    { body: 'wide',   rx: 1.30, ry:  .74, crest: 'trio',    eye: 'slit',
-              brow: 'thick', mouth: 'wave', arm: 'stout',  cheek: false },
+  crown:    { body: 'wide',   rx: 1.30, ry:  .74, crest: 'trio',    eye: 'sharp',
+              brow: 'flat',  mouth: 'wave', arm: 'stout',  cheek: false },
   moon:     { body: 'peanut', rx:  .86, ry: 1.16, crest: 'hood',    eye: 'tall',
               brow: 'worry', mouth: 'arc', arm: 'stub' }
 };
@@ -1054,6 +1054,11 @@ function face(c, o, cast, rx, ry, r) {
   }
 
   const my = ry * .3;
+  /* 口の幅はキャラの型を通す。感情の形は共通でいいが、幅まで共通にすると
+   * 笑顔以外のすべての状態 —— つまりプレイ中と結果画面という、いちばん
+   * 長く見られる時間帯 —— で顔が同じになり、型を分けた意味が消える。 */
+  const MW = { wide: 1.26, small: .78, wave: 1.06, line: .90 }[cast.mouth] || 1;
+  c.save(); c.scale(MW, 1);
   c.beginPath();
   if (f === 'smile') {
     /* ふだんの口。ここだけキャラごとに変える。画面に出ている時間が

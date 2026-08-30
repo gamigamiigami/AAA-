@@ -100,6 +100,11 @@
 
   /* 結果。直前まで巨大な赤いボタンだった場所が、灰色の空箱に数字だけ、
      では熱が死ぬ。自分の分身が結果の顔をして、一言を言う。数字は添え物。 */
+  /* [hidden] は UA スタイル（詳細度 0,1,0）なので、IDセレクタ（1,0,0）の
+     display 指定に負ける。これに気づかず #res に display:flex を直接書いて
+     いたため hidden が全ライフサイクルで死に、まだ1回も押していない
+     待ち受け画面に「ぴったり！ +0ms」というひな形の文字が出ていた。 */
+  #res[hidden] { display: none; }
   #res { height: 200px; border-radius: 26px; border: 4px solid #241a2e;
     background: linear-gradient(180deg, var(--res-a, #4A2A6B), var(--res-b, #321B4C));
     box-shadow: 0 9px 0 #1B0E2E, 0 14px 20px rgba(0,0,0,.4);

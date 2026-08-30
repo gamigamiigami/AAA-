@@ -244,7 +244,16 @@ function strip(c, st, entries, x, y, w) {
    * 目標を中心にすると6人全員が帯の外に張り付き、見出しと絵が正反対の
    * ことを言う画面になる。実際そうなっていた。
    * 判定している量を、そのまま絵にする。 */
-  const mean = hits.reduce((a2, b2) => a2 + b2.error, 0) / hits.length;
+  /* 中心は平均ではなく中央値。平均は外れ値1人に引きずられるので、
+   * 4人がぴったり揃っていても、1人が大きく外した回は全員が枠の外に出て、
+   * いちばん明るい合格枠が空のまま「ばらけた…」と出る画面になる。
+   * それは判定の説明ではなく判定への反論。
+   * 中央値なら、揃った塊は枠に入り、外した1人だけが外に出る —— 
+   * つまり「誰のせいで失敗したか」がそのまま絵になる。 */
+  const sortedErr = hits.map(e => e.error).sort((a2, b2) => a2 - b2);
+  const mid = sortedErr.length >> 1;
+  const mean = sortedErr.length % 2 ? sortedErr[mid]
+             : (sortedErr[mid - 1] + sortedErr[mid]) / 2;
   const half = w / 2 - 30;
   const px = ms => x + w / 2 + Art.clamp(ms / STRIP_RANGE, -1, 1) * half;
   const dev = e => e.error - mean;
@@ -256,23 +265,37 @@ function strip(c, st, entries, x, y, w) {
   /* 重なった人の逃がし方。縮めるより先に、横へずらして段を使う。
    * 丸を小さくして解決すると、いちばん見せたい「そろった5人」が
    * 7pxの団子になって誰だか分からなくなる。読めない図に意味はない。 */
-  const budget = 56, R = 15, rowH = R * 1.9;
+  /* 逃がし方。段は3段まで（±1）。それ以上に増やすと必ず枠を突き破るし、
+   * 席の数にも限りがある。5〜30人と名乗る以上、人数で壊れない形にする:
+   *   1. 段とわずかな左右ずれで逃がす
+   *   2. 入らなくなったら丸を縮める
+   *   3. それでも入らない人は「＋N」のチップにまとめる
+   * 「30人でも自分が分かる」が根幹なので、自分だけは必ず個別に描く。 */
+  const budget = 56;
   const NUDGE = [0, .85, -.85, 1.7, -1.7];
-  const LEVEL = [0, -1, 1, -2, 2];
-  const placed = [];
-  for (const e of sorted) {
-    const ex = px(dev(e));
-    let best = null;
-    outer:
-    for (const lv of LEVEL) for (const nu of NUDGE) {
-      const cx2 = ex + nu * R;
-      if (!placed.some(q => q.lv === lv && Math.abs(q.x - cx2) < R * 1.95)) {
-        best = { lv, x: cx2 }; break outer;
+  const LEVEL = [0, -1, 1];
+  let R = 15, placed = [], extra = 0;
+  for (;;) {
+    placed = []; extra = 0;
+    const rowH2 = R * 1.9;
+    if (Math.max(...LEVEL) * rowH2 + R > budget) { R -= 1; if (R > 7) continue; }
+    for (const e of sorted) {
+      const ex = px(dev(e));
+      let best = null;
+      outer:
+      for (const lv of LEVEL) for (const nu of NUDGE) {
+        const cx2 = ex + nu * R;
+        if (!placed.some(q => q.lv === lv && Math.abs(q.x - cx2) < R * 1.95)) {
+          best = { lv, x: cx2 }; break outer;
+        }
       }
+      if (!best) { if (e.you) best = { lv: 0, x: ex }; else { extra++; continue; } }
+      placed.push({ e, x: best.x, lv: best.lv, over: Math.abs(dev(e)) > STRIP_RANGE });
     }
-    if (!best) best = { lv: 0, x: ex };
-    placed.push({ e, x: best.x, lv: best.lv, over: Math.abs(dev(e)) > STRIP_RANGE });
+    if (extra === 0 || R <= 8) break;
+    R -= 1;
   }
+  const rowH = R * 1.9;
 
   const top = y - STRIP_H / 2;
   Art.slab(c, x - 22, top, w + 44, STRIP_H, '#3A2358', { depth: 6, r: 24 });
@@ -282,17 +305,26 @@ function strip(c, st, entries, x, y, w) {
    * 「合格」は色ではなく光で示す —— 舞台の光だまりと同じ暖色を当てる。
    * ここだけ明るいので、視線は自然に「そろうべき場所」へ行く。 */
   const okw = px(STRIP_OK) - px(-STRIP_OK);
+  /* 枠の明るさは、中に人がいるかで変える。
+   * 誰も入っていない枠が画面でいちばん明るいと、絵がいちばん大きな声で
+   * 何も無い場所を指すことになる。入っていれば光り、空なら輪郭だけ残す。 */
+  const inBand = placed.filter(q => Math.abs(dev(q.e)) <= STRIP_OK).length;
+  const lit = inBand > 0;
   c.save();
   c.globalCompositeOperation = 'lighter';
   const og = c.createLinearGradient(0, y - budget, 0, y + budget);
-  og.addColorStop(0, 'rgba(255,206,120,.06)');
-  og.addColorStop(.5, 'rgba(255,214,150,.30)');
-  og.addColorStop(1, 'rgba(255,206,120,.06)');
+  og.addColorStop(0, 'rgba(255,206,120,' + (lit ? .06 : .015) + ')');
+  og.addColorStop(.5, 'rgba(255,214,150,' + (lit ? .30 : .06) + ')');
+  og.addColorStop(1, 'rgba(255,206,120,' + (lit ? .06 : .015) + ')');
   c.fillStyle = og;
   Art.roundRect(c, px(-STRIP_OK), y - budget, okw, budget * 2, 12); c.fill();
   c.restore();
   Art.roundRect(c, px(-STRIP_OK), y - budget, okw, budget * 2, 12);
-  Art.stroke(c, 'rgba(255,197,49,.55)', 2);
+  Art.stroke(c, lit ? 'rgba(255,197,49,.55)' : 'rgba(255,197,49,.22)', 2);
+  if (!lit) {
+    Art.label(c, 'ここに そろえば せいこう', x + w / 2, y - budget + 16, 15,
+      'rgba(255,247,232,.42)', { ow: .32 });
+  }
 
   /* 目盛り。範囲を固定しただけでは物差しにならない。刻みが無いと
    * 「この位置が何msか」を画面から読む手段がない。 */
@@ -305,7 +337,7 @@ function strip(c, st, entries, x, y, w) {
     Art.stroke(c, zero ? 'rgba(255,197,49,.75)' : 'rgba(255,247,232,.18)', zero ? 2.5 : 2);
     // 単位は ms に統一する。同じ画面に ms と 秒 が混ざると、自分の値が
     // 帯のどこに当たるかを客に暗算させることになる。
-    Art.label(c, zero ? 'みんなの まんなか' : (ms > 0 ? '+' : '') + ms + 'ms',
+    Art.label(c, zero ? 'みんなの かたまり' : (ms > 0 ? '+' : '') + ms + 'ms',
       tx, ly, zero ? 16 : 14,
       zero ? PAL.focus : 'rgba(255,247,232,.45)', { ow: .34 });
   }
@@ -320,9 +352,13 @@ function strip(c, st, entries, x, y, w) {
   if (Math.abs(mean) >= 60) {
     Art.label(c, 'ぜんいん ' + Math.abs(Math.round(mean)) + 'ms ' +
       (mean > 0 ? 'おそかった' : 'はやかった'),
-      x + w / 2, top + STRIP_H + 16, 18, 'rgba(255,247,232,.55)', { ow: .32 });
+      x + w / 2, top + STRIP_H - 15, 17, 'rgba(255,247,232,.5)', { ow: .32 });
   }
 
+  if (extra > 0) {
+    Art.label(c, '＋' + extra + '人', x + w - 30, y + budget - 6, 18,
+      'rgba(255,247,232,.6)', { ow: .34, align: 'right' });
+  }
   for (const q of placed) {
     const e = q.e, cy = y - q.lv * rowH;
     if (q.over) {
@@ -414,35 +450,43 @@ Stage.daruma = function (c, st) {
   st.players.forEach((p, i) => {
     const L = LANES[i % LANES.length];
     const k = Math.min(1, (p.dist || 0) / (st.goal || 240));
-    const x = D_X0 + (D_X1 - D_X0) * k + L.dx;
-    const r = (p.you ? 34 : 29) * L.scale;
+    const x = D_X0 + (D_X1 - D_X0) * k + L.dx * (1 - k * .30);
+    /* 大きさは「どのレーンか」だけでなく「どこまで進んだか」からも引く。
+     * ゴールへ向かうことは消失点へ向かうことなので、進んでも縮まなければ
+     * 嘘になる。実際、161px 前進しても 1px も変わっていなかった。
+     * ただし遠近をそのまま当てると先頭が豆粒になって誰か分からなくなるので、
+     * 縮み方は控えめにする。ここは絵の正しさより識別を優先する。 */
+    const depth = 1 - k * .30;
+    const r = (p.you ? 34 : 29) * L.scale * depth;
     const moving = p.moving;
-    Art.chara(c, { x, y: L.y - r, r, color: p.color, shape: p.shape, seed: p.seed,
+    // 足元も地平線へ寄せる。x だけ動かすと横に滑るだけで奥へ行かない
+    const fy2 = L.y + (D_HZ - L.y) * k * .30;
+    Art.chara(c, { x, y: fy2 - r, r, color: p.color, shape: p.shape, seed: p.seed,
       face: watching && moving ? 'shock' : moving ? 'joy' : 'flat',
-      look: [1, 0], blink: p.blink > 0, shadowY: L.y, sticker: 'rgba(20,10,40,.5)',
+      look: [1, 0], blink: p.blink > 0, shadowY: fy2, sticker: 'rgba(20,10,40,.5)',
       walk: moving && !watching ? st.tSec * 13 + p.seed : 0,
       pose: p.pose, crestLag: p.crestLag,
       bob: moving && !watching ? -Math.abs(Math.sin(st.tSec * 13 + p.seed)) * r * .16 : 0 });
     /* 走者も逆光にする。影は奥から手前へ伸ばしているのに、体だけ屋上と同じ
      * 左上前からの照りを保ったままだった。同じ空間に光源が2つある状態。
      * 鬼で正しく描けているのだから、走者にも同じ規則を通す。 */
-    backlight(c, x, L.y - r, r, p, watching);
+    backlight(c, x, fy2 - r, r, p, watching);
     /* 自機は最奥のとき最小・最も低コントラストになり、▽が無いと見つからない。
      * 遠近は崩さず、足元の光だまりと縁光で拾わせる。大きさ以外の手段で示す。 */
     if (p.you) {
       c.save(); c.globalCompositeOperation = 'lighter';
-      const pg = c.createRadialGradient(x, L.y, 0, x, L.y, r * 2.4);
+      const pg = c.createRadialGradient(x, fy2, 0, x, fy2, r * 2.4);
       pg.addColorStop(0, 'rgba(255,214,150,.34)');
       pg.addColorStop(1, 'rgba(255,214,150,0)');
       c.fillStyle = pg;
-      c.beginPath(); c.ellipse(x, L.y, r * 2.4, r * .8, 0, 0, Art.TAU); c.fill();
+      c.beginPath(); c.ellipse(x, fy2, r * 2.4, r * .8, 0, 0, Art.TAU); c.fill();
       c.restore();
       c.save();
-      Art.bodyPath(c, (Art.CAST[p.shape] || Art.CAST.circle).body, x, L.y - r, r, r);
+      Art.bodyPath(c, (Art.CAST[p.shape] || Art.CAST.circle).body, x, fy2 - r, r, r);
       Art.stroke(c, 'rgba(255,220,170,.55)', Math.max(1.6, r * .09));
       c.restore();
     }
-    if (p.you) marker(c, x, L.y - r * 2 - 36 + Math.sin(st.tSec * 4) * 4);
+    if (p.you) marker(c, x, fy2 - r * 2 - 36 + Math.sin(st.tSec * 4) * 4);
   });
 
   heading(c, watching ? 'ふりむいた！' : 'だるまさんが……', watching ? 76 : 56,
@@ -502,28 +546,40 @@ Stage.darumaReveal = function (c, st) {
 
 /* 表彰台。床と同じ消失点を持つ立体で、キャラは天面に立ち、影も天面に落ちる。 */
 function podium(c, st, top, label) {
-  const slots = [{ rank: 1, x: W / 2 - 220, h: 74, r: 40 },
-                 { rank: 0, x: W / 2,       h: 116, r: 50 },
-                 { rank: 2, x: W / 2 + 220, h: 54, r: 36 }];
+  /* 表彰台。3回続けて壊れていた場所なので、直した内容を書いておく。
+   *   - 優勝者が台の上に浮いていた。立ち位置を天面より上に取っていたので、
+   *     影だけが天板に落ちて体は宙にあった。天面の上に立たせる。
+   *   - 名前を台の下に置いていたため、下段に並ぶ敗者の顔に直乗りしていた。
+   *     台の前面に入れて、他の誰にも重ならない場所へ移す。
+   *   - 2位と3位が同じ紫だった。銀と銅に分ける。順位は色でも読ませる。 */
+  const slots = [{ rank: 1, x: W / 2 - 220, h: 74,  r: 40, col: '#8E93A8' },
+                 { rank: 0, x: W / 2,       h: 116, r: 50, col: '#C9922E' },
+                 { rank: 2, x: W / 2 + 220, h: 54,  r: 36, col: '#8A5A3C' }];
   const baseY = 600;
-  for (const s of slots.sort((a, b) => b.h - a.h)) {
+  for (const s of slots.sort((a2, b2) => b2.h - a2.h)) {
     const e = top[s.rank]; if (!e) continue;
     const topY = baseY - s.h;
-    const face = Art.podium(c, s.x, topY, baseY, s.rank === 0 ? 176 : 152,
-      s.rank === 0 ? '#C9922E' : '#5B4480', W / 2);
-    const standY = topY - face.depth * .45;
-    Art.contact(c, s.x + face.skew * .4, standY + 4, s.r * .9, .45);
+    const face = Art.podium(c, s.x, topY, baseY, s.rank === 0 ? 176 : 152, s.col, W / 2);
+    // 天面の上に立つ。天板の厚みのぶんだけ下げるのが「乗っている」位置
+    const standY = topY + face.depth * .30;
+    const bob = -Math.abs(Math.sin(st.tSec * (s.rank === 0 ? 6 : 3) + s.rank))
+              * (s.rank === 0 ? 9 : 4);
+    Art.contact(c, s.x + face.skew * .4, standY + 2, s.r * .9, .5);
     Art.chara(c, { x: s.x + face.skew * .4, y: standY - s.r, r: s.r,
       color: e.color, shape: e.shape, seed: e.seed,
       face: s.rank === 0 ? 'joy' : e.caught ? 'sad' : 'flat',
-      pose: Art.POSE[s.rank === 0 ? 'cheer' : e.caught ? 'flop' : 'idle'], armT: st.tSec * 2,
-      bob: -Math.abs(Math.sin(st.tSec * (s.rank === 0 ? 6 : 3) + s.rank)) * (s.rank === 0 ? 9 : 4) });
-    Art.title(c, String(s.rank + 1), s.x, topY + s.h * .5, 40,
-      { fill: s.rank === 0 ? PAL.cream : 'rgba(255,247,232,.75)', extrude: 4 });
-    Art.label(c, e.name, s.x, baseY + 26, 22, PAL.cream, { ow: .3 });
-    Art.label(c, label(e), s.x, baseY + 52, 17, 'rgba(255,247,232,.6)', { ow: .3 });
+      pose: Art.POSE[s.rank === 0 ? 'cheer' : e.caught ? 'flop' : 'idle'],
+      armT: st.tSec * 2, bob });
+
+    // 順位・名前・記録は、すべて台の前面に収める
+    const fx = s.x + face.skew * .2;
+    Art.title(c, String(s.rank + 1), fx, topY + s.h * .34, s.rank === 0 ? 42 : 34,
+      { fill: s.rank === 0 ? PAL.cream : 'rgba(255,247,232,.85)', extrude: 4 });
+    Art.label(c, e.name, fx, topY + s.h * .66, s.rank === 0 ? 23 : 20, PAL.cream, { ow: .32 });
+    Art.label(c, label(e), fx, topY + s.h * .86, 15, 'rgba(255,247,232,.62)', { ow: .32 });
   }
 }
+
 
 /* 常時表示。8人を超えたら上位5人＋自分だけを出す。
  * 6人時の見た目を先に作ると、30人で必ず壊れる。 */

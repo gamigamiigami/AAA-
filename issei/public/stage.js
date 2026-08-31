@@ -408,6 +408,27 @@ function backlight(c, x, y, r, p, danger) {
   c.restore();
 }
 
+/* その場で起きたことを、その場で見せる札。
+ *
+ * 判定は最後に時刻から作り直す設計なので、つかまった瞬間もゴールした瞬間も
+ * 「結果画面まで何も起きない」状態だった。遊んだ人から
+ * 「ゴールしたのか分からない」「見られたペナルティが分からない」と言われた。
+ * 起きたことが画面に出ていないなら、それは起きていないのと同じ。 */
+Stage.stamp = function (c, x, y, text, color, age) {
+  if (age < 0) return;              // 同時に出るときは順番に出す
+  const k = Math.min(1, age * 4.5);
+  const out = Math.max(0, Math.min(1, (age - 1.1) / .5));
+  if (out >= 1) return;
+  c.save();
+  c.globalAlpha = 1 - out;
+  c.translate(x, y - age * 26);
+  const sc = E.outBack(k, 2.6) * (1 - out * .2);
+  c.scale(sc, sc);
+  c.rotate(-.05 + Math.sin(age * 12) * .02 * (1 - k));
+  Art.title(c, text, 0, 0, 40, { fill: color, extrude: 5 });
+  c.restore();
+};
+
 Stage.daruma = function (c, st) {
   const watching = st.watching, cur = st.chant;
   Art.corridor(c, W, H, D_Y, st.tSec, watching);
@@ -447,22 +468,34 @@ Stage.daruma = function (c, st) {
     bob: watching ? Math.sin(st.tSec * 24) * 3 : -Math.abs(Math.sin(st.tSec * 3)) * 5,
     rot: watching ? 0 : .07 });
 
+  /* ゴールした人は走路から出して、旗の脇に並べる。
+   * 到着した全員が同じ座標に重なると、誰が着いたのか分からないし、
+   * 「ゴール！」の札も互いを潰し合う。着いた人は走者ではなく観客なので、
+   * 場所も分ける。 */
+  let arrived = 0;
   st.players.forEach((p, i) => {
     const L = LANES[i % LANES.length];
     const k = Math.min(1, (p.dist || 0) / (st.goal || 240));
-    const x = D_X0 + (D_X1 - D_X0) * k + L.dx * (1 - k * .30);
+    const fin = !!p.fin;
+    const x = fin ? D_X1 - 46 + (arrived % 3) * 52
+                  : D_X0 + (D_X1 - D_X0) * k + L.dx * (1 - k * .30);
     /* 大きさは「どのレーンか」だけでなく「どこまで進んだか」からも引く。
      * ゴールへ向かうことは消失点へ向かうことなので、進んでも縮まなければ
      * 嘘になる。実際、161px 前進しても 1px も変わっていなかった。
      * ただし遠近をそのまま当てると先頭が豆粒になって誰か分からなくなるので、
      * 縮み方は控えめにする。ここは絵の正しさより識別を優先する。 */
-    const depth = 1 - k * .30;
-    const r = (p.you ? 34 : 29) * L.scale * depth;
+    const depth = p.fin ? 1 : 1 - k * .30;
+    const r = (p.you ? 34 : 29) * (p.fin ? 1 : L.scale) * depth;
     const moving = p.moving;
     // 足元も地平線へ寄せる。x だけ動かすと横に滑るだけで奥へ行かない
-    const fy2 = L.y + (D_HZ - L.y) * k * .30;
-    Art.chara(c, { x, y: fy2 - r, r, color: p.color, shape: p.shape, seed: p.seed,
-      face: watching && moving ? 'shock' : moving ? 'joy' : 'flat',
+    const fy2 = fin ? 604 + ((arrived / 3) | 0) * 40
+                    : L.y + (D_HZ - L.y) * k * .30;
+    if (fin) arrived++;
+    /* つかまった人は色を抜いて沈める。誰が脱落しているかが、
+     * 札が消えたあとも一目で分かる必要がある。 */
+    const outCol = p.caught ? Art.mix(p.color, '#6A6070', .62) : p.color;
+    Art.chara(c, { x, y: fy2 - r, r, color: outCol, shape: p.shape, seed: p.seed,
+      face: p.caught ? 'sad' : watching && moving ? 'shock' : moving ? 'joy' : 'flat',
       look: [1, 0], blink: p.blink > 0, shadowY: fy2, sticker: 'rgba(20,10,40,.5)',
       walk: moving && !watching ? st.tSec * 13 + p.seed : 0,
       pose: p.pose, crestLag: p.crestLag,
@@ -487,6 +520,18 @@ Stage.daruma = function (c, st) {
       c.restore();
     }
     if (p.you) marker(c, x, fy2 - r * 2 - 36 + Math.sin(st.tSec * 4) * 4);
+    // ゴールした人は旗のそばで金の輪を持つ。もう走らないことが分かる
+    if (p.fin) {
+      c.save(); c.globalCompositeOperation = 'lighter';
+      const fg = c.createRadialGradient(x, fy2, 0, x, fy2, r * 2.6);
+      fg.addColorStop(0, 'rgba(255,197,49,.42)'); fg.addColorStop(1, 'rgba(255,197,49,0)');
+      c.fillStyle = fg;
+      c.beginPath(); c.ellipse(x, fy2, r * 2.6, r * .9, 0, 0, Art.TAU); c.fill();
+      c.restore();
+    }
+    if (p.stampT !== undefined && p.stampT < 1.6 && p.stampT > -1) {
+      Stage.stamp(c, x, fy2 - r * 2.4, p.stampText, p.stampColor, p.stampT);
+    }
   });
 
   heading(c, watching ? 'ふりむいた！' : 'だるまさんが……', watching ? 76 : 56,

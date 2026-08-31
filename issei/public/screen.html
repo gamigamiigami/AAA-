@@ -29,7 +29,7 @@
 'use strict';
 /* メイン画面。描画はすべて stage.js に任せる。
  * デモと本番で描き分けを持つと必ず食い違い、どちらかが古くなる。 */
-const S = Stage, W = S.W, H = S.H;
+const S = Stage, W = S.W, H = S.H, PAL = Art.PAL;
 const cv = document.getElementById('screen');
 const c = cv.getContext('2d');
 const hintEl = document.getElementById('hint');
@@ -92,6 +92,7 @@ GG.net.onState = (s) => {
       st.sent = 0;
       for (const p of st.players) {
         p.face = 'smile'; p.poseName = 'idle'; p.dist = 0; p.moving = false;
+        p.caught = false; p.fin = false; p.shown = null; p.stampT = undefined;
         if (p.sq) p.sq.to(1);
       }
       // 命令札。何をするのかを一瞬で殴り込む。読ませる文章では遅い。
@@ -186,13 +187,30 @@ function darumaCues(t) {
 function applyLive() {
   if (!live || !gs) return;
   const t = GG.clock.nowServer();
+  let queued = 0;        // 同じ瞬間に複数人が着いたら、札は順番に出す
   for (const p of st.players) {
     const m = live[p.id];
     if (!m) { p.dist = 0; p.moving = false; continue; }
     const held = m.held + (m.moving ? Math.max(0, t - m.at) : 0);
     p.dist = Math.min(st.goal, held / 1000 * (gs.speed || 30));
-    p.moving = m.moving;
-    p.poseName = m.caught ? 'flop' : m.moving ? (st.watching ? 'shock' : 'walk') : 'idle';
+    p.moving = m.moving && !m.caught && !p.fin;
+    p.caught = m.caught;
+    if (!p.fin && !p.caught && p.dist >= st.goal) p.fin = true;
+
+    /* 起きたことを、その場で見せる。判定は最後に時刻から作り直す設計だが、
+     * 遊んでいる本人はその瞬間に何が起きたか知る必要がある。
+     * 表示が無いと「つかまったのか」「ゴールしたのか」が分からない。 */
+    if (p.caught && !p.shown) {
+      p.shown = 'caught';
+      p.stampT = -.32 * queued++; p.stampText = 'つかまった！'; p.stampColor = PAL.danger;
+      Snd.sfx('lose'); shake = 15; hitStop = .1;
+    } else if (p.fin && !p.shown) {
+      p.shown = 'fin';
+      p.stampT = -.32 * queued++; p.stampText = 'ゴール！'; p.stampColor = PAL.gold;
+      Snd.sfx('win'); flash = .3; hitStop = .12;
+    }
+    p.poseName = p.caught ? 'flop' : p.fin ? 'cheer'
+               : p.moving ? (st.watching ? 'shock' : 'walk') : 'idle';
   }
 }
 
@@ -216,6 +234,7 @@ function frame(ms) {
   const beatOn = phase === 'play' && game === 'seino';
   for (const p of st.players) {
     S.stepPlayer(p, dt, st.tSec, { beat: beatOn });
+    if (p.stampT !== undefined) p.stampT += dt;
     if (p.pending && st.revealT >= p.reactAt) {
       p.face = p.pending.face; p.poseName = p.pending.poseName;
       const w = p.poseName === 'cheer';

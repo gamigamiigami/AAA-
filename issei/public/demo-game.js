@@ -109,7 +109,7 @@ function onDown(e) {
     setBtn('おした！', false, true);
     if (navigator.vibrate) navigator.vibrate(18);
   } else {
-    if (g.held[0]) return;
+    if (g.held[0] || YOU.caught || YOU.fin) return;
     g.held[0] = true;
     (g.spans[0] = g.spans[0] || []).push([t, null]);
     Snd.sfx('step');
@@ -140,6 +140,8 @@ function beginRound() {
   for (const p of players) {
     p.face = 'smile'; p.sq.to(1); p.poseName = 'idle'; p.lean = 0;
     p.dist = 0; p.moving = false; p.pending = null;
+    p.caught = false; p.caughtAt = 0; p.fin = false;
+    p.shown = null; p.stampT = undefined;
   }
   if (game === 'seino') {
     g = { target: now() + COUNT_IN * BEAT, endsAt: now() + COUNT_IN * BEAT + 1300,
@@ -403,12 +405,53 @@ function updateDaruma() {
       break;
     }
   }
+  let queued = 0;        // 同じ瞬間に複数人が着いたら、札は順番に出す
   for (const p of players) {
     const spans = g.spans[p.id] || [];
+
+    /* つかまったか・ゴールしたかを、その場で判定する。
+     * 最終判定はサーバ側と同じく最後に時刻から作り直すので、ここは
+     * 「見せるための」判定。結果は同じ規則で出すが、目的が違う ——
+     * 遊んでいる本人が、その瞬間に何が起きたかを知るためのもの。 */
+    if (!p.caught && !p.fin) {
+      for (const ch of g.chants) {
+        if (t < ch.turnAt) break;
+        const seen = spans.some(([a, b]) =>
+          a < ch.watchUntil && (b === null ? t : b) > ch.turnAt);
+        if (seen) { p.caught = true; p.caughtAt = ch.turnAt; break; }
+      }
+    }
+
     let held = 0; p.moving = false;
-    for (const [a, b] of spans) { held += (b === null ? t : b) - a; if (b === null) p.moving = true; }
+    for (const [a, b] of spans) {
+      const end = p.caught ? Math.min(b === null ? t : b, p.caughtAt) : (b === null ? t : b);
+      if (end > a) held += end - a;
+      if (b === null && !p.caught && !p.fin) p.moving = true;
+    }
     p.dist = Math.min(g.goal, held / 1000 * g.speed);
-    p.poseName = p.moving ? (st.watching ? 'shock' : 'walk') : 'idle';
+    if (!p.fin && !p.caught && p.dist >= g.goal) p.fin = true;
+
+    // 状態が変わった瞬間だけ、札と音と手応えを出す
+    if (p.caught && !p.shown) {
+      p.shown = 'caught';
+      p.stampT = -.32 * queued++; p.stampText = 'つかまった！'; p.stampColor = PAL.danger;
+      Snd.sfx('lose'); shake = 15; hitStop = .1;
+      if (p.you && navigator.vibrate) navigator.vibrate([90, 50, 90]);
+      if (p.you) setBtn('つかまった', true, false);
+    } else if (p.fin && !p.shown) {
+      p.shown = 'fin';
+      p.stampT = -.32 * queued++; p.stampText = 'ゴール！'; p.stampColor = PAL.gold;
+      Snd.sfx('win'); flash = .3; hitStop = .12;
+      const L = S.LANES[p.id % S.LANES.length];
+      fx.burst(S.D_X1, L.y - 40, { n: 26, color: [PAL.gold, '#fff', PAL.pink],
+        speed: 420, lift: 180, size: 12, life: 1.6, grav: 700 });
+      if (p.you && navigator.vibrate) navigator.vibrate([40, 60, 40]);
+      if (p.you) setBtn('ゴール！', true, false);
+    }
+    if (p.stampT !== undefined) p.stampT += 1 / 60;
+
+    p.poseName = p.caught ? 'flop' : p.fin ? 'cheer'
+               : p.moving ? (st.watching ? 'shock' : 'walk') : 'idle';
     if (p.moving && !st.watching && Math.random() < .25) {
       const L = S.LANES[p.id % S.LANES.length];
       const x = S.D_X0 + (S.D_X1 - S.D_X0) * (p.dist / g.goal) + L.dx;

@@ -93,7 +93,29 @@ $('#go').onclick = async () => {
   GG.net.listen(me.id, lag);
 };
 
+/* 手元にも、その場で伝える。大画面を見ていない一瞬に つかまっても
+ * ゴールしても、手元が「おしっぱなし」のままだと何が起きたか分からない。
+ * 判定は最後にサーバが時刻から作り直すので、ここは表示だけの話。 */
+let myEnd = null;
+GG.net.onPressed = (n, live) => {
+  if (!live || !me || !state || state.phase !== 'play') return;
+  const m = live[me.id];
+  if (!m) return;
+  const g = state.g || {};
+  const ms = m.held + (m.moving ? Math.max(0, GG.clock.nowServer() - m.at) : 0);
+  const dist = Math.min(g.goal || 240, ms / 1000 * (g.speed || 30));
+  const end = m.caught ? 'caught' : dist >= (g.goal || 240) ? 'fin' : null;
+  if (!end || myEnd === end) return;
+  myEnd = end;
+  const btn = $('#btn');
+  btn.disabled = true; held = false;
+  btn.textContent = end === 'caught' ? 'つかまった' : 'ゴール！';
+  btn.classList.toggle('hit', end === 'fin');
+  if (navigator.vibrate) navigator.vibrate(end === 'caught' ? [90, 50, 90] : [40, 60, 40]);
+};
+
 GG.net.onState = (s) => {
+  myEnd = null;
   state = s;
   const btn = $('#btn');
   const p = state.players.find(x => x.id === (me && me.id));

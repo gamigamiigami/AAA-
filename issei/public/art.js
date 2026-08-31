@@ -106,6 +106,13 @@ Art.shade = function (hex, k) {
   else { r *= 1 + k; g *= 1 + k; b *= 1 + k; }
   return 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')';
 };
+/* 2色を混ぜる。脱落した人の色を抜くのに使う。 */
+Art.mix = function (a, b, k) {
+  const A = rgb(a), B = rgb(b);
+  return 'rgb(' + Math.round(A[0] + (B[0] - A[0]) * k) + ','
+                + Math.round(A[1] + (B[1] - A[1]) * k) + ','
+                + Math.round(A[2] + (B[2] - A[2]) * k) + ')';
+};
 Art.alpha = function (hex, a) { const [r, g, b] = rgb(hex); return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')'; };
 /* 輪郭は真っ黒にしない。その色を深く沈めた色にすると締まりつつ濁らない。 */
 Art.outlineOf = function (hex) {

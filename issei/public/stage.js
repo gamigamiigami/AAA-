@@ -5,7 +5,7 @@
  * 「同じ製品に見えない」状態になる。状態は持たず、渡されたものを描くだけ。
  *
  * 画面設計の原則:
- *   - 金はロゴだけ。「いま操作する場所」は白。体色に金と白は使わない
+ *   - 金はブランドと「成功」。「いま操作する場所」は白。体色に金と白は使わない
  *   - 装飾は必ず見出しより奥。文字の上に何も乗せない
  *   - 床の上に置く物は床と同じ消失点を持つ
  *   - 結果は数字ではなく芝居で見せる。数字は添え物
@@ -100,11 +100,17 @@ Stage.cast = function (c, st, opt) {
   for (const p of st.order) {
     const sp = p.spot, row = p.row, depth = sp.row / 2;
     const r = (p.you ? 48 : 43) * row.s;
-    Art.lightPool(c, sp.x, row.y, r * 2.2, r * .7, '#FFD79B', .1 + depth * .06);
+    /* 足元の光は、その場所に届いている灯りの色で灯す。
+     * 全員に同じ暖色を配ると、5灯が寒色と暖色を撒いている舞台で
+     * 足元だけが誰の光でもない色になり、人と照明が無関係になる。 */
+    const LT = Art.rigLightAt(sp.x, row.y);
+    Art.lightPool(c, sp.x, row.y, r * 2.2, r * .7,
+      LT ? 'rgb(' + LT.tint + ')' : '#FFD79B',
+      (.07 + depth * .05) + (LT ? LT.k * .09 : .03));
     Art.chara(c, { x: sp.x, y: row.y - r, r, color: p.color, shape: p.shape, seed: p.seed,
       face: p.face, squash: p.squash, bob: p.bob * row.s, lean: p.lean, pose: p.pose,
       crestLag: p.crestLag, blink: p.blink > 0, shadowY: row.y + 2, shadowK: .55,
-      armT: st.tSec * 2, rot: sp.tilt, look: opt.forceLook || sp.look });
+      armT: st.tSec * 2, rot: sp.tilt, look: opt.forceLook || sp.look, lit: true });
     Art.label(c, p.name, sp.x, row.y + 26 * row.s, 21 * row.s,
       p.you ? PAL.cream : 'rgba(255,247,232,.55)', { ow: .34 });
     // ▼は頭の飾りの上へ逃がす。冠や角に刺さると、飾りなのか指標なのか読めない
@@ -196,7 +202,7 @@ Stage.seinoReveal = function (c, st) {
   const pop = E.outBack(Math.min(1, st.revealT * 2.6));
   c.save(); c.translate(W / 2, 108); c.scale(pop, pop); c.translate(-W / 2, -108);
   heading(c, L.ok ? 'そろった！' : 'ばらけた…', 82,
-    L.ok ? '#7CE8A0' : '#FF9AA8', 108, L.ok ? -.02 : .015);
+    L.ok ? PAL.win : PAL.lose, 108, L.ok ? -.02 : .015);
   c.restore();
 
   /* 色は「ばらつきの値そのもの」に従わせる。
@@ -211,7 +217,7 @@ Stage.seinoReveal = function (c, st) {
   Art.label(c, 'ばらつき', W / 2 - vw / 2 - 10, 190, 20, 'rgba(255,247,232,.6)',
     { ow: .3, align: 'right' });
   Art.num(c, (has ? sp : '\u2014') + 'ms', W / 2 + 30, 198, 46,
-    tight ? '#39C96A' : PAL.danger, { align: 'center', ow: .34 });
+    tight ? PAL.win : PAL.lose, { align: 'center', ow: .34 });
   // 失敗の理由を分けて言う。「揃わなかった」と「押さない人がいた」は別の話。
   const miss = L.entries.filter(e => e.error === null || e.error === undefined).length;
   Art.label(c, L.ok ? 'ぜんいん +1てん'
@@ -462,10 +468,15 @@ Stage.daruma = function (c, st) {
 
   // 鬼は専用の描画。プレイヤーと同じ関数で色だけ黒くすると敵に見えない
   const ox = D_X1 + 168, oy = D_Y + 236, or = 66;
-  Art.longShadow(c, ox - 30, oy + 2, or * .8, 240, watching ? .6 : .38);
-  Art.contact(c, ox, oy + 4, or * .9, .7);
-  Art.oni(c, { x: ox, y: oy - or, r: or, watching,
-    bob: watching ? Math.sin(st.tSec * 24) * 3 : -Math.abs(Math.sin(st.tSec * 3)) * 5,
+  const obob = watching ? Math.sin(st.tSec * 24) * 3
+                        : -Math.abs(Math.sin(st.tSec * 3)) * 5;
+  Art.longShadow(c, ox, oy + 2, or * .8, 240, watching ? .6 : .38);
+  /* 足元の影は、体が浮いた分だけ広がって薄くなる。
+   * 影を固定したまま体だけ上下させると、鬼が影の上を滑って見える。
+   * 幅も体より少し広く取る。体より細い影は「接地」ではなく別の物体に見える。 */
+  const lift = Math.max(0, -obob) / 5;
+  Art.contact(c, ox, oy + 4, or * (1.05 + lift * .12), .70 - lift * .22);
+  Art.oni(c, { x: ox, y: oy - or, r: or, watching, bob: obob,
     rot: watching ? 0 : .07 });
 
   /* ゴールした人は走路から出して、旗の脇に並べる。
@@ -473,10 +484,12 @@ Stage.daruma = function (c, st) {
    * 「ゴール！」の札も互いを潰し合う。着いた人は走者ではなく観客なので、
    * 場所も分ける。 */
   let arrived = 0;
+  const stamps = [];
   st.players.forEach((p, i) => {
     const L = LANES[i % LANES.length];
     const k = Math.min(1, (p.dist || 0) / (st.goal || 240));
     const fin = !!p.fin;
+    const slot = arrived;
     const x = fin ? D_X1 - 46 + (arrived % 3) * 52
                   : D_X0 + (D_X1 - D_X0) * k + L.dx * (1 - k * .30);
     /* 大きさは「どのレーンか」だけでなく「どこまで進んだか」からも引く。
@@ -494,6 +507,10 @@ Stage.daruma = function (c, st) {
     /* つかまった人は色を抜いて沈める。誰が脱落しているかが、
      * 札が消えたあとも一目で分かる必要がある。 */
     const outCol = p.caught ? Art.mix(p.color, '#6A6070', .62) : p.color;
+    /* 走者にも長い影を落とす。鬼だけが240pxの影を引いていて、走者は
+     * 足元の小さな染みだけ、という状態だった。同じ空間に立っている以上、
+     * 同じ光の規則に従わせる。人数ぶん重なるので1本は薄く。 */
+    Art.longShadow(c, x, fy2 + 1, r * .7, r * 3.4, p.caught ? .14 : .26);
     Art.chara(c, { x, y: fy2 - r, r, color: outCol, shape: p.shape, seed: p.seed,
       face: p.caught ? 'sad' : watching && moving ? 'shock' : moving ? 'joy' : 'flat',
       look: [1, 0], blink: p.blink > 0, shadowY: fy2, sticker: 'rgba(20,10,40,.5)',
@@ -530,9 +547,17 @@ Stage.daruma = function (c, st) {
       c.restore();
     }
     if (p.stampT !== undefined && p.stampT < 1.6 && p.stampT > -1) {
-      Stage.stamp(c, x, fy2 - r * 2.4, p.stampText, p.stampColor, p.stampT);
+      /* ゴールした人は 52px 間隔で並ぶが、「ゴール！」の札は 160px ある。
+       * 全員の頭の上に出すと札どうしが重なって「ゴ・ゴール！」と潰れる。
+       * 着いた順に段を変えて、上へ積む。 */
+      /* 札は集めておいて、全員を描き終えてから最前面にまとめて出す。
+       * ループの中で出すと、あとから描かれた走者が前の人の札を隠して
+       * 「ール！」になる。報せが人の後ろに回る画面は、報せの意味がない。 */
+      stamps.push({ x, y: fy2 - r * 2.4 - (fin ? (slot % 3) * 44 : 0),
+        text: p.stampText, color: p.stampColor, t: p.stampT });
     }
   });
+  for (const s of stamps) Stage.stamp(c, s.x, s.y, s.text, s.color, s.t);
 
   heading(c, watching ? 'ふりむいた！' : 'だるまさんが……', watching ? 76 : 56,
     watching ? '#FFD24A' : '#E8DCFF', 74,
@@ -569,7 +594,8 @@ Stage.darumaReveal = function (c, st) {
   const w = L.entries.find(e => e.fin !== null && e.fin !== undefined);
   const pop = E.outBack(Math.min(1, st.revealT * 2.6));
   c.save(); c.translate(W / 2, 104); c.scale(pop, pop); c.translate(-W / 2, -104);
-  heading(c, w ? w.name + ' の かち！' : 'ぜんいん とどかず', 64, '#FFD24A', 104, -.015);
+  heading(c, w ? w.name + ' の かち！' : 'ぜんいん とどかず', 64,
+    w ? PAL.win : PAL.lose, 104, -.015);
   c.restore();
   podium(c, st, L.entries.slice(0, 3), e =>
     e.caught ? 'つかまった' : (e.fin !== null && e.fin !== undefined) ? 'ゴール'
@@ -614,7 +640,7 @@ function podium(c, st, top, label) {
       color: e.color, shape: e.shape, seed: e.seed,
       face: s.rank === 0 ? 'joy' : e.caught ? 'sad' : 'flat',
       pose: Art.POSE[s.rank === 0 ? 'cheer' : e.caught ? 'flop' : 'idle'],
-      armT: st.tSec * 2, bob });
+      armT: st.tSec * 2, bob, lit: true, litY: baseY });
 
     // 順位・名前・記録は、すべて台の前面に収める
     const fx = s.x + face.skew * .2;

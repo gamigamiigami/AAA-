@@ -79,7 +79,14 @@ Art.PAL = {
   sky1:     '#150B2E',
   wood:     '#C98B4B',
   cream:    '#FFF7E8',
-  gold:     '#FFC531',   // ブランド専用
+  gold:     '#FFC531',   // ブランド
+  /* 成功はブランドの金と同じ色にする。
+   * 以前は緑（#7CE8A0の見出し・#39C96Aの数字・緑の手元カード）と金の帯が
+   * 同じ1回の結果に同居していて、「成功」を4色で言っていた。
+   * 客はそれを4種類の意味だと読む。紫と金で出来た世界に緑の居場所もない。
+   * ブランドの色＝良いことが起きた色、と決めれば、勝ち色は覚える必要すらない。 */
+  win:      '#FFC531',
+  lose:     '#FF9AA8',   // 失敗。danger より明るいのは、大きな文字で読むため
   focus:    '#FFFFFF',   // 機能専用（いま操作する場所）
   focusGlow:'#7FE9FF',
   pink:     '#FF74B4',
@@ -857,6 +864,42 @@ Art.chara = function (c, o) {
   }
 
   face(c, o, cast, rx, ry, r);
+
+  /* 舞台照明を浴びる。床に光だまりを落としておきながら人には当てないと、
+   * 役者は光の中に立っているのに光っていない —— 背景の絵の上に貼った
+   * 切り抜きに見える。舞台に立つ人だけ lit:true で受ける。 */
+  if (o.lit && Art.pools) {
+    /* 光を拾う位置は足元。台の上に立つ人は体の位置ではなく台の足元で拾う
+     * （litY）。体の高さで拾うと、表彰台の1位だけが光の届かない高さに
+     * いることになり、画面でいちばん祝われるべき人が沈む。 */
+    const L = Art.rigLightAt(o.x, o.litY === undefined ? o.y + ry : o.litY);
+    const k = L ? L.k : 0;
+    c.save();
+    Art.bodyPath(c, cast.body, 0, 0, rx, ry); c.clip();
+    /* 光の当たっている人を明るくするだけでは足りない。当たっていない人が
+     * 同じ明るさのままだと、結局「全員が均一に明るい」ままで、光は色の
+     * 飾りにしかならない。当たっていない側は沈める。明暗の差ができて
+     * 初めて、舞台に光の粗密があることが絵に出る。 */
+    if (k < .45) {
+      /* 沈め方には上限がある。ここを深くすると、光の外に立った人が
+       * 「暗い」ではなく「くすんだ別の色」になり、誰なのか分からなくなる。
+       * 大人数で自分を見つけられることが、この画面の存在理由。 */
+      const dg = c.createLinearGradient(0, -ry, 0, ry);
+      const da = (.45 - k) * .22;
+      dg.addColorStop(0, 'rgba(28,14,54,' + (da * .5).toFixed(3) + ')');
+      dg.addColorStop(1, 'rgba(28,14,54,' + da.toFixed(3) + ')');
+      c.fillStyle = dg; c.fillRect(-rx * 1.6, -ry * 1.8, rx * 3.2, ry * 3.4);
+    }
+    if (L && k >= .06) {
+      c.globalCompositeOperation = 'lighter';
+      const wg = c.createLinearGradient(0, -ry * 1.35, 0, ry * .75);
+      wg.addColorStop(0, 'rgba(' + L.tint + ',' + (.62 * k).toFixed(3) + ')');
+      wg.addColorStop(.55, 'rgba(' + L.tint + ',' + (.18 * k).toFixed(3) + ')');
+      wg.addColorStop(1, 'rgba(' + L.tint + ',0)');
+      c.fillStyle = wg; c.fillRect(-rx * 1.6, -ry * 1.8, rx * 3.2, ry * 3.2);
+    }
+    c.restore();
+  }
   c.restore();
 };
 
@@ -1449,6 +1492,32 @@ Art.oni = function (c, o) {
   g.addColorStop(1, watching ? '#12040A' : '#0C0616');
   c.fillStyle = g; c.fill();
 
+  /* 材質。ここまでは「暗い塗り1枚」で、つやのある人形が並ぶ世界に
+   * 唯一の平面が立っている状態だった。逆光だから暗いのであって、
+   * 別の材質で出来ているわけではない。
+   * ただし明るくはできない（シルエットが崩れる）ので、光ではなく
+   * 「反射の面」を足す —— 胸の丸みに沿った弱い照り返しと、
+   * いちばん高い角の稜線にだけ乗る細い艶。 */
+  c.save(); path(); c.clip();
+  const sheen = c.createRadialGradient(-rx * .30, -ry * .10, 0, -rx * .30, -ry * .10, rx * .95);
+  sheen.addColorStop(0, watching ? 'rgba(255,150,140,.16)' : 'rgba(190,165,235,.13)');
+  sheen.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = sheen; c.fillRect(-rx * 1.2, -ry * 1.6, rx * 2.4, ry * 3);
+  /* 底の跳ね返り。床の色が下から回り込む。
+   * 色は必ず「いま敷いてある床」から取る。木の色を書き込んでいたので、
+   * 紫の廊下に立っているのに足元だけ木材の照り返しが出ていた。
+   * 縦のグラデーションで塗ると、丸い体に水平の帯が横切って
+   * 「光」ではなく「模様」になる。底の中心から放射で当てる。 */
+  const bg = c.createRadialGradient(0, ry * .95, 0, 0, ry * .95, rx * 1.15);
+  bg.addColorStop(0, Art.alpha(Art.bounceColor, .30));
+  bg.addColorStop(1, Art.alpha(Art.bounceColor, 0));
+  c.fillStyle = bg; c.fillRect(-rx * 1.2, -ry * .4, rx * 2.4, ry * 1.6);
+  c.restore();
+  // いちばん長い角の稜線
+  c.beginPath();
+  c.moveTo(-rx * .10, -ry * .84); c.lineTo(-rx * .075, -ry * 1.40);
+  Art.stroke(c, watching ? 'rgba(255,170,150,.5)' : 'rgba(214,186,255,.34)', o.r * .045);
+
   /* 縁の光。奥（出口）の側の輪郭だけを光らせる。
    * パスで切り抜いてから、ずらした同じパスを描くと、ずらした逆側に縁が残る。 */
   c.save(); path(); c.clip();
@@ -1489,14 +1558,20 @@ Art.oni = function (c, o) {
 /* 逆光の長い影。奥から光が来る空間で、手前に伸ばす。 */
 Art.longShadow = function (c, x, y, rx, len, strength) {
   c.save();
-  const g = c.createLinearGradient(x, y, x - len * .5, y + len);
+  /* 伸びる向きは光源から決める。左へ倒すと決め打ちにしていたので、
+   * 消失点より右に立つ鬼だけ、光の当たっている側へ影が伸びていた。
+   * 光源と影が食い違う画面は、理由もなく「作り物」に見える。 */
+  const vx = Art.corridorVP === undefined ? x - len : Art.corridorVP;
+  const away = x >= vx ? 1 : -1;                 // 光源と反対側へ倒す
+  const sx = away * len * .3;
+  const g = c.createLinearGradient(x, y, x + sx * 1.7, y + len);
   g.addColorStop(0, 'rgba(6,2,16,' + (strength || .5) + ')');
   g.addColorStop(1, 'rgba(6,2,16,0)');
   c.fillStyle = g;
   c.beginPath();
   c.moveTo(x - rx, y); c.lineTo(x + rx, y);
-  c.lineTo(x - len * .3 + rx * 1.8, y + len);
-  c.lineTo(x - len * .3 - rx * 1.8, y + len);
+  c.lineTo(x + sx + rx * 1.8, y + len);
+  c.lineTo(x + sx - rx * 1.8, y + len);
   c.closePath(); c.fill();
   c.restore();
 };
@@ -1598,6 +1673,7 @@ Art.backdrop = function (c, W, H, y, t) {
  * 床を敷いたあとに呼ぶ。 */
 Art.rigPools = function (c, W, H, y) {
   if (!Art.lamps) return;
+  const pools = [];
   c.save(); c.globalCompositeOperation = 'lighter';
   c.beginPath(); c.rect(0, y, W, H - y); c.clip();
   for (const L of Art.lamps) {
@@ -1619,9 +1695,34 @@ Art.rigPools = function (c, W, H, y) {
     c.fillStyle = g;
     const pr = W * (.085 + Math.abs(L.aim) * .10);
     c.beginPath(); c.ellipse(fx, fy, pr, (H - y) * (.20 + (fy - y) / (H - y) * .16), 0, 0, TAU); c.fill();
+    pools.push({ x: fx, y: fy, r: pr, tint: tint, on: L.on });
   }
   c.restore();
+  Art.pools = pools;   // 人が「その光の中に立っている」ことを描くために使う
 };
+
+/* その位置に当たっている舞台照明。rigPools が置いた光だまりから引く。
+ *
+ * 床だけを照らして人を照らさないと、役者は光の中に立っているのに
+ * 光っていない —— 舞台の写真ではなく、舞台の絵の上に貼った切り抜きになる。
+ * 光っている物・照らされている床・照らされている人を、同じ1つの表から出す。 */
+Art.rigLightAt = function (x, y) {
+  const ps = Art.pools;
+  if (!ps || !ps.length) return null;
+  let k = 0, r = 0, g = 0, b = 0;
+  for (const P of ps) {
+    // 横は光だまりの半径、縦は足元がどれだけその奥行きに近いか
+    const hx = Math.max(0, 1 - Math.abs(x - P.x) / P.r);
+    const hy = Math.max(0, 1 - Math.abs(y - P.y) / 260);
+    const w = hx * hy * P.on;
+    if (w <= 0) continue;
+    const t = P.tint.split(',');
+    r += +t[0] * w; g += +t[1] * w; b += +t[2] * w; k += w;
+  }
+  if (k <= 0) return null;
+  return { tint: (r / k | 0) + ',' + (g / k | 0) + ',' + (b / k | 0), k: Math.min(1, k) };
+};
+
 
 
 window.Art = Art;

@@ -69,8 +69,12 @@ function setBtn(label, disabled, hit) {
  * 自分の分身が結果の顔をして、一言を言う。ミリ秒は添え物。 */
 function showResult(word, sub, tone, face) {
   btn.hidden = true; resEl.hidden = false;
-  const T = { good: ['#2E7A4E', '#1C5334', '#B6FFD2'],
-              near: ['#7A5A1E', '#523A10', '#FFE9A8'],
+  /* 手元の色は大画面と揃える。成功＝金、失敗＝赤。
+   * 手元だけ緑にしていたので、同じ1回の結果を、大画面は金、手元は緑で
+   * 言っていた。同じ出来事は同じ色で言う。
+   * 「おしい」は金でも赤でもない灰青にする —— 報酬でも失敗でもない。 */
+  const T = { good: ['#7A5B12', '#4B3506', '#FFD86B'],
+              near: ['#3E3C63', '#272444', '#D8DBF2'],
               bad:  ['#7A2436', '#511525', '#FFC2CE'] }[tone];
   resEl.style.setProperty('--res-a', T[0]);
   resEl.style.setProperty('--res-b', T[1]);
@@ -434,13 +438,13 @@ function updateDaruma() {
     // 状態が変わった瞬間だけ、札と音と手応えを出す
     if (p.caught && !p.shown) {
       p.shown = 'caught';
-      p.stampT = -.32 * queued++; p.stampText = 'つかまった！'; p.stampColor = PAL.danger;
+      p.stampT = -.55 * queued++; p.stampText = 'つかまった！'; p.stampColor = PAL.danger;
       Snd.sfx('lose'); shake = 15; hitStop = .1;
       if (p.you && navigator.vibrate) navigator.vibrate([90, 50, 90]);
       if (p.you) setBtn('つかまった', true, false);
     } else if (p.fin && !p.shown) {
       p.shown = 'fin';
-      p.stampT = -.32 * queued++; p.stampText = 'ゴール！'; p.stampColor = PAL.gold;
+      p.stampT = -.55 * queued++; p.stampText = 'ゴール！'; p.stampColor = PAL.win;
       Snd.sfx('win'); flash = .3; hitStop = .12;
       const L = S.LANES[p.id % S.LANES.length];
       fx.burst(S.D_X1, L.y - 40, { n: 26, color: [PAL.gold, '#fff', PAL.pink],

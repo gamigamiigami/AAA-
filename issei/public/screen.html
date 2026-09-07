@@ -202,11 +202,11 @@ function applyLive() {
      * 表示が無いと「つかまったのか」「ゴールしたのか」が分からない。 */
     if (p.caught && !p.shown) {
       p.shown = 'caught';
-      p.stampT = -.32 * queued++; p.stampText = 'つかまった！'; p.stampColor = PAL.danger;
+      p.stampT = -.55 * queued++; p.stampText = 'つかまった！'; p.stampColor = PAL.danger;
       Snd.sfx('lose'); shake = 15; hitStop = .1;
     } else if (p.fin && !p.shown) {
       p.shown = 'fin';
-      p.stampT = -.32 * queued++; p.stampText = 'ゴール！'; p.stampColor = PAL.gold;
+      p.stampT = -.55 * queued++; p.stampText = 'ゴール！'; p.stampColor = PAL.win;
       Snd.sfx('win'); flash = .3; hitStop = .12;
     }
     p.poseName = p.caught ? 'flop' : p.fin ? 'cheer'

@@ -21,21 +21,42 @@
     create: function (c) {
       var cx = c.W / 2, cy = 300;
       var n = [1, 2, 2][c.diff - 1];
-      var spd = [340, 400, 470][c.diff - 1];
       var shots = [];
       var order = c.rng.shuffle(DIRS.slice()).slice(0, n);
+
+      /* 画面は 960×540。中心から左右には 480 あるが、上下には 270 しかない。
+       * 同じ速さで飛ばすと、上下から来る弾だけ反応時間が 3 割短くなる。
+       * 難しいのではなく、方向によって別のゲームを遊ばされていた。
+       *
+       * 直し方は「距離を揃える」ではない。上下に 560 の助走はそもそも置けない。
+       * 揃えるのは時間のほうで、飛ぶ距離は画面の都合、速さはその割り算にする。
+       * 遊ぶ人が感じるのは距離ではなく、来ると分かってから当たるまでの間だけ。 */
+      var REACT = [1.05, 0.90, 0.78][c.diff - 1];   // 動き出してから届くまで（秒）
+      var HIT = 74;                                  // タテで受け止める距離
+      var RUN = { left: 500, right: 500, up: 285, down: 262 };
       for (var i = 0; i < n; i++) {
         var d = order[i];
         var v = VEC[d];
         shots.push({
           dir: d, t: 0, delay: 0.35 + i * (c.diff === 3 ? 0.85 : 1.0),
-          x: cx + v[0] * 560, y: cy + v[1] * 400, blocked: 0
+          x: cx + v[0] * RUN[d], y: cy + v[1] * RUN[d], blocked: 0,
+          spd: (RUN[d] - HIT) / REACT
         });
       }
       var facing = OPPOSITE[order[0]];   // 必ず一度は向きを変える必要がある
       var turn = 0, blockPop = 0, blocked = 0;
 
       return {
+        /* QA 用: 次に受けるべき向きと、画面の中心。 */
+        probe: function () {
+          for (var i = 0; i < shots.length; i++) {
+            if (!shots[i].blocked) {
+              return { dir: shots[i].dir, cx: cx, cy: cy, vec: VEC[shots[i].dir] };
+            }
+          }
+          return null;
+        },
+
         update: function (dt) {
           blockPop = Math.max(0, blockPop - dt * 3);
           var d = c.input.dirHit();
@@ -58,10 +79,10 @@
             s.t += dt;
             if (s.t < s.delay) continue;
             var v = VEC[s.dir];
-            s.x -= v[0] * spd * dt;      // 中心に向かって飛ぶ
-            s.y -= v[1] * spd * dt;
+            s.x -= v[0] * s.spd * dt;    // 中心に向かって飛ぶ
+            s.y -= v[1] * s.spd * dt;
             var dist = U.dist(s.x, s.y, cx, cy);
-            if (dist < 74) {
+            if (dist < HIT) {
               if (facing === s.dir) {
                 s.blocked = 0.001; blocked++; blockPop = 1;
                 c.sfx('thud'); c.stop(0.06); c.shake(9, 0.24);

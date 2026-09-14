@@ -15,14 +15,21 @@
 
     create: function (c) {
       var GY = 438;
+      var SPD = 430;
       var hero = { x: c.W / 2, vx: 0 };
-      var pole = { a: c.rng.sign() * 0.05, va: 0, len: 190 };
-      var G = [6.0, 7.8, 9.4][c.diff - 1];      // 倒れやすさ
-      var CTRL = [8.5, 8.0, 7.6][c.diff - 1];   // 移動が棒に効く強さ
-      var LIMIT = 0.62;
-      var gust = 0, nextGust = c.diff >= 2 ? 1.0 : 99;
+      /* まっすぐ立った状態から始める。以前は開幕でもう傾いていたので、
+       * 画面を見て何をするゲームか分かった時にはもう倒れかけていた。 */
+      var pole = { a: 0, va: 0, len: 190 };
+      var G = [4.4, 5.8, 7.0][c.diff - 1];      // 倒れやすさ
+      var CTRL = [3.4, 3.2, 3.0][c.diff - 1];   // 押し戻す強さ
+      var LIMIT = 0.80;                          // ここまで倒れても戻せる
+      var GRACE = 0.55;                          // 最初のこの間は重力が効かない
+      var gust = 0, nextGust = c.diff >= 2 ? 1.8 : 99;
 
       return {
+        /* QA 用: 棒の傾き。ゲーム進行には影響しない。 */
+        probe: function () { return { a: pole.a, va: pole.va, x: hero.x, limit: LIMIT }; },
+
         update: function (dt) {
           if (c.result) {
             pole.va += U.sign(pole.a || 1) * 6 * dt;
@@ -30,13 +37,27 @@
             return;
           }
           var px = hero.x;
-          hero.x = c.input.steerX(hero.x, 70, c.W - 70, 430, dt);
-          var acc = (hero.x - px) / Math.max(dt, 1e-4);
-          hero.vx = U.damp(hero.vx, acc, 0.05, dt);
+          hero.x = c.input.steerX(hero.x, 46, c.W - 46, SPD, dt);
+          var moved = (hero.x - px) / Math.max(dt, 1e-4);
+          hero.vx = U.damp(hero.vx, moved, 0.05, dt);
+
+          /* 押し戻す力は「実際に動いた量」ではなく「動かそうとした量」から取る。
+           *
+           * これが、途中で操作が効かなくなる正体だった。棒を立て直すには
+           * 傾いた側へ走り続けるしかないのに、画面の端に着いた瞬間、移動量が
+           * 0 になって力も 0 になる。壁に張りついたまま、押しても引いても
+           * 何も起きずに倒れていく。遊んでいる側には、ゲームが途中で入力を
+           * 受け付けなくなったようにしか見えない。
+           *
+           * 意思のほうを読めば、端に着いていても押している限り効き続ける。 */
+          var intent = c.input.usingPointer()
+            ? U.clamp((c.input.x - hero.x) / 130, -1, 1)
+            : c.input.axisX();
+          var ctrl = Math.abs(intent) > Math.abs(moved / SPD) ? intent : moved / SPD;
 
           if (c.t > nextGust) {
-            nextGust = c.t + c.rng.range(1.0, 1.7);
-            gust = c.rng.sign() * c.rng.range(1.6, 2.6);
+            nextGust = c.t + c.rng.range(1.1, 1.8);
+            gust = c.rng.sign() * c.rng.range(1.2, 2.0);
             c.sfx('whoosh');
           }
           if (Math.abs(gust) > 0.01) {
@@ -44,10 +65,10 @@
             gust = U.damp(gust, 0, 0.12, dt);
           }
 
-          // 倒立振子っぽい挙動: 傾くほど倒れ、移動で押し戻す
-          pole.va += Math.sin(pole.a) * G * dt;
-          pole.va -= (acc / 900) * CTRL * dt;
-          pole.va *= Math.exp(-0.9 * dt);
+          // 倒立振子っぽい挙動: 傾くほど倒れ、動こうとした側へ押し戻す
+          pole.va += Math.sin(pole.a) * G * U.sat(c.t / GRACE) * dt;
+          pole.va -= ctrl * CTRL * dt;
+          pole.va *= Math.exp(-1.3 * dt);
           pole.a += pole.va * dt;
 
           if (Math.abs(pole.a) > LIMIT) {
@@ -69,7 +90,7 @@
           A.ground(g, GY + 14, A.GROUND.kusa);
 
           // 傾きメーター（危険度の可視化）
-          var k = U.clamp(pole.a / 0.62, -1, 1);
+          var k = U.clamp(pole.a / LIMIT, -1, 1);
           var mw = 300;
           g.block(c.W / 2 - mw / 2, 104, mw, 22, GG.PAL.paper, { r: 11, lw: 2.6 });
           var danger = Math.abs(k);

@@ -51,15 +51,19 @@
   GG.MICROGAMES = [];
   var byId = Object.create(null);
 
+  /* label はキーボード、labelTouch はマウス／指。
+   * どちらを出すかは「直前に何で触ったか」で決める（game.js の命令語）。
+   * 遊ぶ人の大半は画面を触るので、labelTouch はマウスでも指でも
+   * そのまま通じる言い方にしてある。 */
   var CONTROL_HINT = {
-    move:  { icon: 'pad',   label: '← → で うごかす',       labelTouch: 'ドラッグで うごかす' },
-    move2: { icon: 'pad4',  label: '↑↓←→ で うごかす',      labelTouch: 'ドラッグで うごかす' },
-    press: { icon: 'btn',   label: 'スペース か クリック',    labelTouch: 'タップ' },
-    hold:  { icon: 'hold',  label: 'ボタン ながおし',         labelTouch: '長おし' },
-    mash:  { icon: 'mash',  label: 'ボタン れんだ',           labelTouch: 'タップ れんだ' },
-    aim:   { icon: 'aim',   label: 'ねらって クリック',      labelTouch: 'ねらって タップ' },
-    dir:   { icon: 'pad4',  label: '↑↓←→ を えらぶ',        labelTouch: 'スワイプ' },
-    pick:  { icon: 'aim',   label: 'えらんで クリック',      labelTouch: 'えらんで タップ' }
+    move:  { icon: 'pad',   label: '← → で うごかす',       labelTouch: 'よこに うごかす' },
+    move2: { icon: 'pad4',  label: '↑↓←→ で うごかす',      labelTouch: 'すきな ところへ うごかす' },
+    press: { icon: 'btn',   label: 'スペース か クリック',    labelTouch: 'クリック / タップ' },
+    hold:  { icon: 'hold',  label: 'ボタン ながおし',         labelTouch: 'おしっぱなし' },
+    mash:  { icon: 'mash',  label: 'ボタン れんだ',           labelTouch: 'れんだで クリック' },
+    aim:   { icon: 'aim',   label: 'ねらって クリック',      labelTouch: 'ねらって クリック' },
+    dir:   { icon: 'pad4',  label: '↑↓←→ を えらぶ',        labelTouch: 'むけたい むきを クリック' },
+    pick:  { icon: 'aim',   label: 'えらんで クリック',      labelTouch: 'えらんで クリック' }
   };
   GG.CONTROL_HINT = CONTROL_HINT;
 

@@ -58,6 +58,13 @@
     this.lastBeatIdx = -1;
     this.titleT = 0;
     this.newBest = false;
+    /* mode: 'run' は通しプレイ、'free' は 1 本だけ選んで遊ぶ。
+     * free では残機もスコアも動かさず、終わったら一覧に戻る。 */
+    this.mode = 'run';
+    this.titleSel = 0;
+    this.freeSel = 0;
+    this.freeDiff = 1;
+    this.freeLast = null;
     this.demoBg = ['#5b3fa8', '#2a1c4d'];
     this.dpr = 1;
     // ミニゲームは一旦ここへ描き、画風に応じて加工してから本画面へ転送する
@@ -78,6 +85,9 @@
   };
 
   P.startRun = function () {
+    this.mode = 'run';
+    this._forceDef = null;
+    this._forceDiff = 0;
     this.lives = MAX_LIVES;
     this.score = 0;
     this.speedLevel = 0;
@@ -108,6 +118,52 @@
     if (this.gameIndex >= 6 || this.speedLevel >= 2) return 2;
     return 1;
   };
+
+  /* すきなゲームを選んで遊ぶ。
+   * 通しプレイは 4 回まちがえると終わるので、気になった 1 本を
+   * もう一度やる手段がどこにも無かった。練習にも、見せるためにも要る。 */
+  P.startFree = function () {
+    this.mode = 'free';
+    this.freeLast = null;
+    this.fx.clear(); this.uiFx.clear();
+    this.speedLevel = 0;
+    this._applySpeed();
+    this.audio.intensity = 0.6;
+    this.audio.startMusic();
+    this.setState('select');
+  };
+
+  P.playFree = function (def) {
+    this._forceDef = def;
+    this._forceDiff = this.freeDiff;
+    this.lives = MAX_LIVES;
+    this.nextMicrogame();
+  };
+
+  P._freeCells = function () {
+    var list = GG.MICROGAMES, COLS = 6, CW = 146, CH = 88;
+    var rows = Math.ceil(list.length / COLS);
+    var ox = W / 2 - (COLS - 1) * CW / 2;
+    var oy = H / 2 - (rows - 1) * CH / 2 + 22;
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      out.push({
+        def: list[i], i: i, cols: COLS,
+        x: ox + (i % COLS) * CW, y: oy + Math.floor(i / COLS) * CH,
+        w: CW - 12, h: CH - 12
+      });
+    }
+    return out;
+  };
+  P._freeLevels = function () {
+    var out = [];
+    for (var i = 0; i < 3; i++) out.push({ d: i + 1, x: W / 2 - 104 + i * 104, y: 120, w: 92, h: 42 });
+    return out;
+  };
+  P._freeBack = function () { return { x: 92, y: 56, w: 124, h: 42 }; };
+  function inBox(b, x, y) {
+    return x > b.x - b.w / 2 && x < b.x + b.w / 2 && y > b.y - b.h / 2 && y < b.y + b.h / 2;
+  }
 
   P.showInterlude = function (title, sub, color, beats) {
     this.interlude = { title: title, sub: sub, color: color, beats: beats || 3 };
@@ -187,6 +243,12 @@
   };
 
   P._finishMicrogame = function () {
+    if (this.mode === 'free') {
+      this.freeLast = { id: this.cur.def.id, result: this.result, diff: this._forceDiff };
+      this.audio.intensity = 0.6;
+      this.setState('select');
+      return;
+    }
     var won = this.result === 'win';
     this.gameIndex++;
     if (won) {
@@ -229,9 +291,20 @@
     this.input.beginFrame(dtReal);
 
     if (this.input.hit('KeyM')) this.audio.setMuted(!this.audio.muted);
-    if (this.input.hit('Escape') && (this.state === 'play' || this.state === 'prompt')) {
-      this.paused = !this.paused;
-      if (this.paused) this.audio.stopMusic(); else this.audio.startMusic();
+    if (this.input.hit('Escape')) {
+      var inGame = this.state === 'play' || this.state === 'prompt' || this.state === 'result';
+      if (this.mode === 'free' && inGame) {
+        // 好きなゲームを遊んでいる途中は、やめる＝一覧に戻るのが自然
+        this.paused = false;
+        this.audio.sfx('blip');
+        this.setState('select');
+        this.input.endFrame();
+        return;
+      }
+      if (this.state === 'play' || this.state === 'prompt') {
+        this.paused = !this.paused;
+        if (this.paused) this.audio.stopMusic(); else this.audio.startMusic();
+      }
     }
     if (this.paused) { this.input.endFrame(); return; }
 
@@ -247,6 +320,7 @@
 
     switch (this.state) {
       case 'title': this._updTitle(dtReal); break;
+      case 'select': this._updSelect(dtReal); break;
       case 'interlude': this._updInterlude(); break;
       case 'prompt': this._updPrompt(dt); break;
       case 'play': this._updPlay(dt); break;
@@ -266,11 +340,76 @@
         life: 3.2, size: 8, shape: 'star', drag: 0.4
       });
     }
-    if (this.input.actHit || this.input.anyHit) {
-      this.audio.init();
-      this.audio.sfx('select');
-      this.startRun();
+    var inp = this.input;
+    if (inp.anyHitOf(['ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD'])) {
+      this.titleSel = this.titleSel ? 0 : 1;
+      this.audio.init(); this.audio.sfx('blip');
+      return;
     }
+    var btns = this._titleBtns(), i;
+    // マウスを乗せた側が選ばれている状態にする（押す前に、どちらか分かる）
+    if (inp.pointerActive) {
+      for (i = 0; i < btns.length; i++) if (inBox(btns[i], inp.x, inp.y)) this.titleSel = i;
+    }
+    var pick = -1;
+    if (inp.pHit) {
+      for (i = 0; i < btns.length; i++) if (inBox(btns[i], inp.x, inp.y)) pick = i;
+      // ボタン以外を叩いたときは、いちばん素直な「はじめる」と受け取る
+      if (pick < 0) pick = 0;
+      this.titleSel = pick;
+    } else if (inp.actHit) {
+      pick = this.titleSel;
+    }
+    if (pick < 0) return;
+    this.audio.init();
+    this.audio.sfx('select');
+    if (pick === 0) this.startRun(); else this.startFree();
+  };
+
+  P._titleBtns = function () {
+    return [
+      { x: W / 2 - 124, y: H * 0.705, w: 236, h: 62, label: 'はじめる', col: PAL.shu },
+      { x: W / 2 + 124, y: H * 0.705, w: 236, h: 62, label: 'すきなゲーム', col: PAL.ai }
+    ];
+  };
+
+  P._updSelect = function (dt) {
+    this.fx.update(dt);
+    var inp = this.input, cells = this._freeCells(), COLS = cells[0].cols, i;
+
+    if (inp.hit('Escape')) {
+      this.audio.sfx('blip'); this.mode = 'run'; this.setState('title'); return;
+    }
+    var dx = (inp.anyHitOf(['ArrowRight', 'KeyD']) ? 1 : 0) - (inp.anyHitOf(['ArrowLeft', 'KeyA']) ? 1 : 0);
+    var dy = (inp.anyHitOf(['ArrowDown', 'KeyS']) ? 1 : 0) - (inp.anyHitOf(['ArrowUp', 'KeyW']) ? 1 : 0);
+    if (dx || dy) {
+      this.freeSel = U.clamp(this.freeSel + dx + dy * COLS, 0, cells.length - 1);
+      this.audio.sfx('blip');
+    }
+    for (i = 1; i <= 3; i++) {
+      if (inp.hit('Digit' + i)) { this.freeDiff = i; this.audio.sfx('click'); }
+    }
+    if (inp.pointerActive) {
+      for (i = 0; i < cells.length; i++) {
+        if (inBox(cells[i], inp.x, inp.y)) { this.freeSel = i; break; }
+      }
+    }
+    if (inp.pHit) {
+      if (inBox(this._freeBack(), inp.x, inp.y)) {
+        this.audio.sfx('blip'); this.mode = 'run'; this.setState('title'); return;
+      }
+      var lv = this._freeLevels();
+      for (i = 0; i < lv.length; i++) {
+        if (inBox(lv[i], inp.x, inp.y)) { this.freeDiff = lv[i].d; this.audio.sfx('click'); return; }
+      }
+      for (i = 0; i < cells.length; i++) {
+        if (inBox(cells[i], inp.x, inp.y)) {
+          this.audio.sfx('select'); this.playFree(cells[i].def); return;
+        }
+      }
+      return;
+    }
+    if (inp.actHit) { this.audio.sfx('select'); this.playFree(cells[this.freeSel].def); }
   };
 
   P._updInterlude = function () {
@@ -347,6 +486,7 @@
 
     if (this.state === 'title') { this._drawTitle(g); this._drawVignette(g); return; }
     if (this.state === 'gameover') { this._drawGameover(g); this._drawVignette(g); return; }
+    if (this.state === 'select') { this._drawSelect(g); this._drawMuted(g); return; }
 
     var sh = this.fx.shakeOffset();
     var z = 1 + this.fx.zoom;
@@ -432,6 +572,15 @@
   P._drawHud = function (g) {
     var c = g.c, i;
 
+    if (this.mode === 'free') {
+      /* 好きなゲームを 1 本遊んでいるだけなので、残機もスコアも意味を持たない。
+       * 意味の無い数字を置くと、遊ぶ人はそれを読もうとして損をする。 */
+      g.text(this.cur.def.verb, 34, 40,
+        { size: 22, fill: PAL.paper, align: 'left', stroke: PAL.ink, lw: 6 });
+      g.text('レベル ' + this.freeDiff, W - 26, 40,
+        { size: 22, fill: PAL.yamabuki, align: 'right', stroke: PAL.ink, lw: 6 });
+    } else {
+
     // 残機: 顔アイコンを 4 つ。失うと灰色になって傾く。
     for (i = 0; i < MAX_LIVES; i++) {
       var alive = i < this.lives;
@@ -462,6 +611,7 @@
     g.text('×' + label, W - 26, 40, {
       size: 30, fill: PAL.ink, align: 'right', stroke: PAL.paper, lw: 6
     });
+    }
 
     // 制限時間: 導火線つきの爆弾。このジャンルの象徴なので必ず画面に出す。
     if (this.state === 'play' || this.state === 'prompt') {
@@ -525,8 +675,14 @@
     c.translate(W / 2, H * 0.42);
     c.globalAlpha = 1 - out;
     c.scale(1 + out * 0.18, 1 + out * 0.18);
+    /* 命令語は画面の幅に収める。文字数で切ると「たたけ！」と
+     * 「リズムで たたけ！」が同じ大きさで出て、長いほうがはみ出す。
+     * 言いたいことの長さに合わせて、字のほうを譲る。 */
+    var vsize = 96;
+    var vw = g.measure(def.verb, vsize) + def.verb.length * 6;
+    if (vw > W - 120) vsize = Math.floor(vsize * (W - 120) / vw);
     g.textEach(def.verb, 0, 0, {
-      size: 96, fill: PAL.ink, stroke: PAL.paper, lw: 16, letter: 6
+      size: vsize, fill: PAL.ink, stroke: PAL.paper, lw: vsize * 0.17, letter: 6
     }, function (i) {
       var k = U.sat((self.beatsIn() - i * 0.045) / 0.3);
       return {
@@ -539,13 +695,17 @@
 
     // 操作ヒント（小さく、控えめに）
     var hint = GG.CONTROL_HINT[def.control];
+    /* 直前に触った道具の言い方で出す。
+     * マウスで遊んでいる人に「スペース か クリック」と言うと、
+     * 使わないほうの名前が先に来る。読む手間はそのぶん無駄になる。 */
+    var htxt = this.input.pointerActive ? hint.labelTouch : hint.label;
     var ha = U.sat((b - 0.55) / 0.35) * (1 - out);
     c.globalAlpha = ha * 0.95;
     var hy = H * 0.72;
-    var hw = g.measure(hint.label, 19) + 88;
+    var hw = g.measure(htxt, 19) + 88;
     g.block(W / 2 - hw / 2, hy - 22, hw, 44, PAL.paper, { r: 22, lw: 3.4 });
     this._drawControlIcon(g, W / 2 - hw / 2 + 30, hy, hint.icon);
-    g.text(hint.label, W / 2 - hw / 2 + 54, hy + 1, {
+    g.text(htxt, W / 2 - hw / 2 + 54, hy + 1, {
       size: 19, fill: PAL.ink, align: 'left'
     });
     c.restore();
@@ -736,22 +896,115 @@
       { size: 20, fill: PAL.paper });
     c.restore();
 
-    // スタート案内
+    // ふたつの入口
     var pulse = 0.5 + 0.5 * Math.sin(t * 4.4);
-    c.save();
-    c.translate(W / 2, H * 0.70);
-    c.scale(1 + pulse * 0.05, 1 + pulse * 0.05);
-    var bw2 = 440;
-    g.rr(-bw2 / 2, -28, bw2, 56, 28).ink(PAL.shu, 5);
-    g.text('スペース / クリック で スタート', 0, 1,
-      { size: 24, fill: PAL.paper });
-    c.restore();
+    var btns = this._titleBtns();
+    for (var bi = 0; bi < btns.length; bi++) {
+      var b = btns[bi], on = bi === this.titleSel;
+      c.save();
+      c.translate(b.x, b.y);
+      var sc = on ? 1 + pulse * 0.045 : 1;
+      c.scale(sc, sc);
+      if (on) {
+        c.save(); c.globalAlpha = 0.3;
+        g.rr(-b.w / 2 - 9, -b.h / 2 - 9, b.w + 18, b.h + 18, b.h / 2 + 9).fill(PAL.paper);
+        c.restore();
+      }
+      g.rr(-b.w / 2, -b.h / 2, b.w, b.h, b.h / 2).ink(on ? b.col : U.shade(b.col, -0.28), 5);
+      g.text(b.label, 0, 1, { size: 25, fill: PAL.paper });
+      c.restore();
+    }
 
-    g.text('さいこう記録  ' + this.best, W / 2, H * 0.775,
+    g.text('さいこう記録  ' + this.best, W / 2, H * 0.83,
       { size: 20, fill: PAL.ink, stroke: PAL.paper, lw: 5 });
     g.text('M: ミュート   ESC: ポーズ', W / 2, H - 16,
       { size: 13, fill: PAL.ink, stroke: PAL.paper, lw: 4 });
   };
+  /** すきなゲームの一覧。18 本を一望できることそのものが、この画面の中身。 */
+  P._drawSelect = function (g) {
+    var c = g.c, t = this.globalT, i;
+    c.fillStyle = PAL.murasaki;
+    c.fillRect(0, 0, W, H);
+    c.save();
+    c.globalAlpha = 0.13;
+    c.translate(W / 2, H / 2); c.rotate(t * 0.16);
+    for (i = 0; i < 20; i++) {
+      c.save(); c.rotate(i / 20 * U.TAU);
+      g.polyPath([[0, 0], [1000, -60], [1000, 60]]).fill('#ffffff');
+      c.restore();
+    }
+    c.restore();
+
+    g.text('すきな ゲーム', W / 2, 56, { size: 38, fill: PAL.yamabuki, stroke: PAL.ink, lw: 11 });
+
+    // もどる
+    var bk = this._freeBack();
+    g.rr(bk.x - bk.w / 2, bk.y - bk.h / 2, bk.w, bk.h, bk.h / 2).ink(PAL.ai, 3.4);
+    g.text('もどる', bk.x, bk.y + 1, { size: 19, fill: PAL.paper });
+
+    // レベル
+    var lv = this._freeLevels();
+    g.text('レベル', lv[0].x - lv[0].w / 2 - 18, 121,
+      { size: 18, fill: PAL.paper, align: 'right', stroke: PAL.ink, lw: 5 });
+    for (i = 0; i < lv.length; i++) {
+      var L = lv[i], on = L.d === this.freeDiff;
+      c.save();
+      if (on) { c.save(); c.globalAlpha = 0.3;
+        g.rr(L.x - L.w / 2 - 7, L.y - L.h / 2 - 7, L.w + 14, L.h + 14, L.h / 2 + 7).fill(PAL.paper);
+        c.restore(); }
+      g.rr(L.x - L.w / 2, L.y - L.h / 2, L.w, L.h, L.h / 2)
+        .ink(on ? PAL.yamabuki : 'rgba(255,255,255,0.18)', 3.4);
+      g.text(String(L.d), L.x, L.y + 1, { size: 22, fill: on ? PAL.ink : PAL.paper });
+      c.restore();
+    }
+
+    // ゲーム
+    var cells = this._freeCells();
+    for (i = 0; i < cells.length; i++) {
+      var ce = cells[i], sel = i === this.freeSel;
+      var bob = Math.sin(t * 2.4 + i * 0.7) * 2;
+      c.save();
+      c.translate(ce.x, ce.y + bob);
+      if (sel) {
+        var pl = 0.5 + 0.5 * Math.sin(t * 5);
+        c.save(); c.globalAlpha = 0.22 + pl * 0.18;
+        g.rr(-ce.w / 2 - 10, -ce.h / 2 - 10, ce.w + 20, ce.h + 20, 18).fill(PAL.paper);
+        c.restore();
+        c.scale(1.06, 1.06);
+      }
+      g.rr(-ce.w / 2, -ce.h / 2, ce.w, ce.h, 12)
+        .ink(ce.def.bg[0], sel ? 4.6 : 3);
+      // ボスは金の縁で分かるようにする
+      if (ce.def.boss) {
+        g.rr(-ce.w / 2 + 5, -ce.h / 2 + 5, ce.w - 10, ce.h - 10, 8)
+          .stroke(PAL.yamabuki, 2.2);
+      }
+      var vs = 19, vw = g.measure(ce.def.verb, vs);
+      if (vw > ce.w - 16) vs = Math.max(12, Math.floor(vs * (ce.w - 16) / vw));
+      /* 文字の色は札の色から決める。白で固定していたので、黄色や淡い緑の札で
+       * 白い字が沈んで読めなかった。18 枚のうち数枚だけ読めない一覧は、
+       * 一覧として仕事をしていない。 */
+      var light = U.lum(ce.def.bg[0]) > 0.6;
+      g.text(ce.def.verb, 0, 1, {
+        size: vs, fill: light ? PAL.ink : PAL.paper,
+        stroke: light ? PAL.paper : PAL.ink, lw: vs * 0.32
+      });
+      // 直前の結果をその場所に残す
+      if (this.freeLast && this.freeLast.id === ce.def.id) {
+        var won = this.freeLast.result === 'win';
+        g.text(won ? 'クリア！' : 'ざんねん',
+          0, ce.h / 2 - 13, { size: 14, fill: won ? PAL.yamabuki : PAL.kobai,
+            stroke: PAL.ink, lw: 4.5 });
+      }
+      c.restore();
+    }
+
+    g.text(this.input.pointerActive
+      ? 'えらんで クリック    ESC で もどる'
+      : '↑↓←→ えらぶ    スペース あそぶ    1 2 3 レベル    ESC もどる',
+      W / 2, H - 22, { size: 15, fill: PAL.paper, stroke: PAL.ink, lw: 5 });
+  };
+
   P._drawGameover = function (g) {
     var c = g.c, t = this.stateT;
     c.fillStyle = PAL.ai;

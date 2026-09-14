@@ -50,7 +50,23 @@
           if (newPhase !== phase) {
             phase = newPhase; phaseT = 0; wave = 0;
             boss.hitPop = 1;
-            c.sfx('boss'); c.shake(10, 0.3); c.flash(0.16, GG.PAL.shu);
+            /* 段が上がったことと、自分が食らったことを、別の言葉で言う。
+             *
+             * 以前はどちらも「赤い閃光 + 画面の揺れ」だった。何もミスして
+             * いないのに被弾したときと同じ合図が出るので、遊んでいる側は
+             * 自分が失敗したと思う。うまくいっている最中に「しくじった」と
+             * 言われるのは、難しさではなく嘘になる。
+             *
+             * 赤い閃光と大きな揺れは、自分が食らったときだけに取っておく。
+             * 敵が強くなるのは敵の側で起きることなので、敵の色の輪と
+             * 敵自身の膨らみで見せる。 */
+            c.sfx('boss');
+            c.fx.ring(boss.x, boss.y, { r1: 260, color: GG.PAL.murasaki, lw: 10 });
+            c.fx.ring(boss.x, boss.y, { r1: 180, color: GG.PAL.yamabuki, lw: 5 });
+            c.fx.floatText(boss.x, boss.y - 96,
+              ['', 'おこった！', 'ほんき！'][phase],
+              { color: GG.PAL.yamabuki, size: 34, stroke: GG.PAL.ink });
+            c.shake(4, 0.16);
           }
 
           if (!c.result) {

@@ -16,7 +16,7 @@
     create: function (c) {
       var GY = 424;
       var hero = { x: 250, y: GY, vy: 0, air: false, squash: 1, run: 0 };
-      var GRAV = 2800, JUMP = 820;      // 滞空 0.59 秒
+      var GRAV = 2800, JUMP = 820;      // 滞空 0.59 秒。最高到達点 120px
       var n = [2, 2, 3][c.diff - 1];
       var spd = [560, 640, 730][c.diff - 1];
       var obs = [];
@@ -25,7 +25,7 @@
         gap += spd * c.rng.range(0.76, 0.88);   // 滞空より必ず長い間隔にする
         obs.push({
           x: c.W + 40 + gap, w: c.rng.range(38, 54),
-          h: c.rng.range(52, 78), passed: false
+          h: c.rng.range(52, 74), passed: false   // 跳躍 120px より必ず低く
         });
       }
 
@@ -51,8 +51,16 @@
                 dir: Math.PI / 2, spread: 1.4, size: 6, life: 0.35, gravity: 300
               });
             }
-            // 早めに離すと低くジャンプ（可変ジャンプで操作感を出す）
-            if (hero.air && hero.vy < -260 && !c.input.act) hero.vy += GRAV * 1.4 * dt;
+            /* 跳ぶ高さは一定にする。
+             *
+             * 以前は「早く離すと低く跳ぶ」可変ジャンプだった。キーボードで
+             * 長押しできる人には気持ちのいい仕掛けだが、マウスをカチッと
+             * 一回押しただけだと 57px しか上がらない。障害物は最大 78px。
+             * つまりクリックで遊ぶ人は、どれだけ正確に押しても越えられない。
+             * 同じ画面が、持っている道具で「遊べる／遊べない」に分かれていた。
+             *
+             * 3 秒で終わるミニゲームに跳ぶ高さの使い分けは要らない。
+             * 一回押したら必ず同じ高さ跳ぶ、が答えになる。 */
           }
           if (hero.air) {
             hero.vy += GRAV * dt;
@@ -80,7 +88,7 @@
               }
             }
             if (c.result) continue;
-            var hb = { x: hero.x - 20, y: hero.y - 46, w: 40, h: 46 };
+            var hb = { x: hero.x - 22, y: hero.y - 54, w: 44, h: 54 };
             var ob = { x: o.x, y: GY - o.h, w: o.w, h: o.h };
             if (U.rectHit(hb, ob)) {
               c.sfx('hit');
@@ -119,8 +127,10 @@
             g.block(o.x, GY - o.h + o.w * 0.5, o.w, o.h - o.w * 0.5, '#8a8296', { r: 8 });
           }
 
+          /* ドットの目が粗い画風なので、体そのものを大きく取る。
+           * 小さく描いたものを粗く写すと、画風ではなく事故になる。 */
           A.blob(g, {
-            x: hero.x, y: hero.y - 26, r: 26, color: GG.PAL.asagi,
+            x: hero.x, y: hero.y - 31, r: 31, color: GG.PAL.asagi,
             squash: hero.squash, shadowY: GY + 12,
             rot: hero.air ? -0.18 : Math.sin(hero.run * 18) * 0.06,
             lookX: 0.6, lookY: hero.air ? -0.4 : 0,

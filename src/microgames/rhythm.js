@@ -14,14 +14,16 @@
     style: 'toon',
 
     create: function (c) {
-      // 4分音符でボールが跳ねてきて、着地の瞬間に押す
-      var hits = [3, 3, 4][c.diff - 1];
-      var window0 = [0.20, 0.16, 0.13][c.diff - 1];   // 秒（体感時間）
+      /* ボールが跳ねてきて、着地の瞬間に押す。
+       * 等間隔に並べると、押しているのは拍であってリズムではない。
+       * 短い中にも「タン・タタ・タン」の形を入れて、覚えて返す遊びにする。 */
       var beatSec = 60 / 132;
+      var pattern = [[0, 1, 2], [0, 1, 1.5], [0, 0.5, 1, 2]][c.diff - 1];
+      var window0 = [0.20, 0.16, 0.13][c.diff - 1];   // 秒（体感時間）
       var startT = beatSec * 2;
       var notes = [];
-      for (var i = 0; i < hits; i++) {
-        notes.push({ t: startT + i * beatSec, done: 0, judge: '' });
+      for (var i = 0; i < pattern.length; i++) {
+        notes.push({ t: startT + pattern[i] * beatSec, done: 0, judge: '' });
       }
       var okCount = 0;
       var ballSquash = 1, flashT = 9, comboPop = 0;

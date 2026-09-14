@@ -64,7 +64,9 @@
     el.addEventListener('pointermove', function (e) { pos(e); });
     el.addEventListener('pointerdown', function (e) {
       pos(e);
-      el.setPointerCapture && el.setPointerCapture(e.pointerId);
+      /* 捕捉は「できたら嬉しい」程度のもの。ここで例外が飛ぶと、
+       * この下の pDown / pHit が立たないまま抜けて、押した事実ごと消える。 */
+      try { el.setPointerCapture && el.setPointerCapture(e.pointerId); } catch (err) {}
       self.pDown = true; self.pHit = true; self.anyHit = true; self.mash++;
       e.preventDefault();
     });
@@ -125,10 +127,16 @@
     return null;
   };
 
+  /** いまポインタで操作しているか。ミニゲーム側が「どちらの手つきか」で
+   *  挙動を変えたいときに使う（内部の経過時間を直接見なくて済むように）。 */
+  P.usingPointer = function () {
+    return this.pointerActive && this._pointerIdleT < 1.5;
+  };
+
   /** 横方向の操作。ポインタが使われていればそれを、なければキーを使う。 */
   P.steerX = function (cur, min, max, speed, dt) {
     var v = cur;
-    if (this.pointerActive && this._pointerIdleT < 1.5) {
+    if (this.usingPointer()) {
       v = U.approach(v, this.x, speed * 2.2, dt);
     } else {
       v += this.axisX() * speed * dt;
@@ -136,7 +144,7 @@
     return U.clamp(v, min, max);
   };
   P.steer2D = function (o, bounds, speed, dt) {
-    if (this.pointerActive && this._pointerIdleT < 1.5) {
+    if (this.usingPointer()) {
       o.x = U.approach(o.x, this.x, speed * 2.2, dt);
       o.y = U.approach(o.y, this.y, speed * 2.2, dt);
     } else {

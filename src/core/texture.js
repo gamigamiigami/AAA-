@@ -110,7 +110,11 @@
     this.w = w; this.h = h;
     this.full = makeCanvas(w, h);
     this.fullCtx = this.full.getContext('2d');
-    this.pixDiv = 3;   // ドット絵の粗さ。粗すぎると顔が潰れる
+    /* ドット絵の粗さ。
+     * 3 だと 320×180 相当になり、半径 26 のキャラは 9 ドットしか無い。
+     * 目は 2 ドット、口は 1 ドット —— これは画風ではなく、ただ潰れている。
+     * ドット絵に見せたいのであって、見えなくしたいわけではない。 */
+    this.pixDiv = 2;   // 480×270 相当
     this.small = makeCanvas(Math.ceil(w / this.pixDiv), Math.ceil(h / this.pixDiv));
     this.smallCtx = this.small.getContext('2d');
   }

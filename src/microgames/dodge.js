@@ -70,17 +70,24 @@
           var ctx = g.c;
           A.ground(g, GY + 12, A.GROUND.ishi);
 
-          // 落下予告線（読みやすさのため）
+          /* 落ちてくる先は教えない。
+           *
+           * 以前は玉が出た瞬間から、着地点まで床まで届く赤い線と、床の丸印を
+           * 出していた。読みやすさのつもりだったが、答えを最初に配っていた。
+           * 答えが見えている以上、あとは線の上を外して立っているだけで、
+           * よけるという動作がどこにも無い。
+           *
+           * 玉そのものは空から見えている。それを見て動くのがこのゲームで、
+           * ここに残すのは「もう来る」という直前の気配だけでいい。 */
           ctx.save();
-          ctx.globalAlpha = 0.16;
           for (var i = 0; i < drops.length; i++) {
             var d = drops[i];
-            if (d.dead || d.y > GY - 20) continue;
-            var near = U.sat(1 - (GY - d.y) / 420);
-            ctx.globalAlpha = 0.08 + near * 0.22;
-            ctx.fillStyle = GG.PAL.shu;
-            ctx.fillRect(d.x - 2.5, d.y + d.r, 5, GY - d.y - d.r);
-            g.ellipsePath(d.x, GY + 6, d.r * (0.5 + near * 0.7), d.r * 0.24).fill(GG.PAL.kobai);
+            if (d.dead) continue;
+            var ttl = (GY - d.y) / d.vy;          // 着地までの秒数
+            if (ttl > 0.3 || ttl < 0) continue;
+            var near = 1 - ttl / 0.3;
+            ctx.globalAlpha = near * 0.3;
+            g.ellipsePath(d.x, GY + 6, d.r * (0.35 + near * 0.4), d.r * 0.2).fill(GG.PAL.shu);
           }
           ctx.restore();
 

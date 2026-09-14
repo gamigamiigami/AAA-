@@ -1,11 +1,13 @@
-/* BOSS: きめろ！ — 8拍のリズム譜を最後まで叩ききる。リズム天国オマージュのボス。 */
+/* BOSS: リズムで たたけ！ — 8拍のリズム譜を最後まで叩ききる。リズム天国オマージュのボス。 */
 (function (GG) {
   'use strict';
   var U = GG.U, A = GG.A;
 
   GG.reg({
     id: 'boss_band',
-    verb: 'きめろ！',
+    /* 「きめろ！」では何をすればいいのか分からない。命令語は 1 秒で読んで
+     * その通り手を動かすためのもので、気合いを伝えるためのものではない。 */
+    verb: 'リズムで たたけ！',
     verbEn: 'NAIL IT!',
     control: 'press',
     beats: 16,
@@ -17,10 +19,14 @@
     create: function (c) {
       var beatSec = 60 / 132;
       // 8分・4分を混ぜた譜面。難易度で密度が変わる。
+      /* 譜面は「拍」ではなく「フレーズ」にする。
+       * レベル1が 8 分の等間隔だったので、鳴っているのはメトロノームで、
+       * 叩いていて気持ちのいい瞬間がどこにも無かった。休符を置いて、
+       * 2 小節の呼びかけと返事の形にする。 */
       var patterns = [
-        [0, 1, 2, 3, 4, 5, 6, 7],
-        [0, 1, 1.5, 2, 3, 4, 4.5, 5, 6, 7],
-        [0, 0.5, 1, 2, 2.5, 3, 4, 4.5, 5, 5.5, 6, 7]
+        [0, 1, 1.5, 2, /* 休 */ 4, 5, 5.5, 6],
+        [0, 0.5, 1, 2, 2.5, 3, /* 休 */ 4, 4.5, 5, 6, 6.5, 7],
+        [0, 0.5, 1, 1.5, 2, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 7.5]
       ];
       var pat = patterns[c.diff - 1];
       var startT = beatSec * 3.5;
@@ -29,12 +35,24 @@
       });
       var win0 = [0.19, 0.165, 0.145][c.diff - 1];
       var hits = 0, misses = 0;
-      var maxMiss = 1;
+      /* あと何回まちがえられるのかを、はっきり決めてはっきり出す。
+       * 以前は「あと 1 回」の状態で画面に「のこり 2」と出ていた。
+       * 数え方が画面と中身で 1 ずれていると、慎重に行くか攻めるかを
+       * 決められない。maxMiss は「許される回数」そのもの。 */
+      var maxMiss = [2, 2, 1][c.diff - 1];
       var drumSq = 1, flashT = 9, cheer = 0;
 
       var LANE_Y = 348, JUDGE_X = 250, LEAD = beatSec * 4;
 
       return {
+        /* QA 用: 次のノーツまでの秒数と判定幅。 */
+        probe: function () {
+          for (var i = 0; i < notes.length; i++) {
+            if (!notes[i].done && !notes[i].missed) return { dt: notes[i].t - c.t, win: win0 };
+          }
+          return { dt: Infinity, win: win0 };
+        },
+
         update: function (dt) {
           drumSq = U.damp(drumSq, 1, 0.06, dt);
           flashT += dt;
@@ -169,7 +187,24 @@
           // 進行
           var doneN = notes.filter(function (n) { return n.done; }).length;
           A.gauge(g, c.W / 2 - 190, 88, 380, 22, doneN / notes.length, GG.PAL.yamabuki);
-          A.count(g, c.W / 2, 62, 'ミス のこり ' + Math.max(0, maxMiss - misses + 1), 22);
+          // まちがえられる回数。数ではなく玉で出す（数えなくても残量が分かる）
+          var left = maxMiss - misses;
+          for (var mi = 0; mi < maxMiss; mi++) {
+            var mx = c.W / 2 - (maxMiss - 1) * 21 + mi * 42;
+            ctx.save();
+            if (mi >= left) ctx.globalAlpha = 0.3;
+            g.circlePath(mx, 54, 14).ink(mi < left ? GG.PAL.yamabuki : '#8f8a99', 3);
+            if (mi >= left) {
+              ctx.strokeStyle = GG.PAL.ink; ctx.lineWidth = 3; ctx.lineCap = 'round';
+              ctx.beginPath();
+              ctx.moveTo(mx - 6, 48); ctx.lineTo(mx + 6, 60);
+              ctx.moveTo(mx + 6, 48); ctx.lineTo(mx - 6, 60);
+              ctx.stroke();
+            }
+            ctx.restore();
+          }
+          g.text('ミス', c.W / 2 - maxMiss * 21 - 16, 55,
+            { size: 17, fill: GG.PAL.paper, align: 'right', stroke: GG.PAL.ink, lw: 5 });
         }
       };
     }

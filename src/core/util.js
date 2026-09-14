@@ -75,6 +75,12 @@
     }
     return 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')';
   };
+  /** 見た目の明るさ 0..1。白文字と黒文字のどちらを載せるか決めるのに使う */
+  U.lum = function (hex) {
+    var n = parseInt(hex.slice(1), 16);
+    return ((n >> 16 & 255) * 0.299 + (n >> 8 & 255) * 0.587 + (n & 255) * 0.114) / 255;
+  };
+
   U.alpha = function (hex, a) {
     var n = parseInt(hex.slice(1), 16);
     return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';

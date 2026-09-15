@@ -110,14 +110,21 @@
           ctx.restore();
           A.ground(g, 458, A.GROUND.ishi);
 
-          // 予告インジケータ
+          /* 矢印は「どこから来るか」の印。出したら、最後まで消さない。
+           *
+           * 飛び終わった矢印を消すと、画面が勝手に「もう右からは来ない」と
+           * 教えてしまう。残り 1 発になったころには、矢印が 1 本しか
+           * 残っていないので、どこを向けばいいかを考える必要すら無くなる。
+           * 防ぐ遊びなのに、防ぐ前に答えが出ている。
+           *
+           * ずっと出したままにして、これから飛んでくる矢印だけを光らせる。
+           * 知らせるのは「次はここ」であって、「ここはもう終わった」ではない。 */
           for (var k = 0; k < shots.length; k++) {
             var s = shots[k];
-            if (s.blocked || s.t >= s.delay) continue;
-            var warn = U.sat((s.t) / s.delay);
             var v = VEC[s.dir];
+            var coming = !s.blocked && s.t < s.delay;
             ctx.save();
-            ctx.globalAlpha = 0.25 + 0.55 * Math.abs(Math.sin(c.t * 9));
+            ctx.globalAlpha = coming ? 0.25 + 0.55 * Math.abs(Math.sin(c.t * 9)) : 0.2;
             A.arrow(g, cx + v[0] * 300, cy + v[1] * 200, OPPOSITE[s.dir], 42, GG.PAL.shu);
             ctx.restore();
           }

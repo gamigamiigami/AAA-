@@ -29,18 +29,8 @@ const BOTS = {
   grab: `p => { if (p) click(480, 480); }`,
   // あわせろ！: ノーツが判定に重なったら押す
   rhythm: `p => { if (p.dt < 0.012) click(480, 480); }`,
-  /* リズムで たたけ！: 単音は判定に重なったら押す。
-   * 連打（p.roll）のあいだは人の指の速さで押し続ける。 */
-  boss_band: `p => {
-    if (p.roll && p.dt <= 0) {
-      const now = performance.now();
-      if (now - (window.__rollT || 0) < 143) return;   // 毎秒 7 回
-      window.__rollT = now;
-      click(480, 480);
-      return;
-    }
-    if (!p.roll && p.dt < 0.012) click(480, 480);
-  }`,
+  // リズムで たたけ！: ノーツが判定に重なったら押す
+  boss_band: `p => { if (p.dt < 0.012) click(480, 480); }`,
   // たたけ！: 顔を出したヤツを叩く。ばくだんには手を出さない
   whack: `p => { if (p) click(p.x, p.y); }`,
   // かぞえろ！: 数えた答えのボタンを押す

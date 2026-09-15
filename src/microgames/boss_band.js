@@ -22,48 +22,45 @@
       /* 譜面は「拍」ではなく「フレーズ」にする。
        * レベル1が 8 分の等間隔だったので、鳴っているのはメトロノームで、
        * 叩いていて気持ちのいい瞬間がどこにも無かった。休符を置いて、
-       * 2 小節の呼びかけと返事の形にする。 */
-      /* 譜面は 3 つの部品でできている。
-       *   呼びかけ（表拍）→ 連打 → 返し
-       * レベルが上がるほど、返しが裏拍になり、連打が長くなる。
+       * 呼びかけと返事の形にする。
        *
-       * 短い譜面を並べて「叩けたね」で終わっていたのが物足りなさの正体で、
-       * 16 拍あるのに 7 拍しか使っていなかった。最後まで使いきる。 */
-      /* 連打は 8 拍目から 2.5 拍。終わりは 10.5 拍で、次の音は 11 拍。
-       * 半拍の間を空けてあるのは、連打を止めた手がそのまま次の音に
-       * 入れるようにするため。終わった瞬間が次の音だと、叩き続けた人が
-       * そのまま損をする。 */
-      var ROLL_DUR = 2.5;                       // 連打の長さ（拍）
-      var ROLL_NEED = [5, 6, 7][c.diff - 1];    // その間に入れる回数
+       * 連打は「長押しの帯」ではなく、音符の間隔そのもので作る。
+       *   たん たん たたたた
+       * 4 分が続いたあとに 8 分が 4 つ並べば、それだけで手は連打になる。
+       * 別の遊びを差し込む必要はなく、同じ「拍に合わせて叩く」の中で
+       * 速さだけが変わる。帯にすると、そこだけ別のゲームになってしまう。
+       *
+       * レベル3 は 8 分休符で入る。
+       *   たんたんたんたん ／ ッたたたたたん
+       * 表で 4 つ刻ませたあと、小節のアタマを休符にして半拍ずらす。
+       * 拍が変わったのではなく、入り口が変わっただけ —— と気づくまで、
+       * 手はずっと半拍早く出る。裏に落ちたうえに連打も来るので、
+       * 「速い」ではなく「どこに入るか分からない」難しさになる。 */
+      /* 最後の音は 10.5 拍まで。16 拍ぶんあっても、終わりぎわに置いた音は
+       * 画面が結果に切り替わるほうが先に来て、叩く機会が無いまま「ぬけた」に
+       * なることがある。譜面の都合ではなく、こちらの不手際で負けさせない。 */
       var patterns = [
-        { hit: [0, 1, 1.5, 2, /* 休 */ 4, 5, 5.5, 6, /* 連打 */ /* 返し */ 11],
-          roll: 8 },
-        { hit: [0, 0.5, 1, 2, 2.5, 3.5, /* 休 */ 4, 4.5, 5, 6, 6.5, 7.5, 11, 11.5],
-          roll: 8 },
-        /* レベル3は途中で裏拍に落ちる。
-         * 頭の 4 つはきれいな表拍で、体が拍を刻み始めたところで半拍ずれる。
-         * 最初から裏だと「そういう曲」として構えられてしまうので、
-         * 表で安心させてから外す。連打をはさんで、戻ってもまた裏。 */
-        { hit: [0, 1, 2, 3, /* ここから裏 */ 4.5, 5.5, 6.5, 7.5, 11, 11.5],
-          roll: 8 }
+        // たんたんたんたん ／ たんたん たたたた ／ (休) たん たたたん
+        [0, 1, 2, 3,   4, 5, 6, 6.5, 7, 7.5,   9, 10, 10.5],
+        // たんたん たたたん ／ たたたん たたたん ／ たん たたたたたん
+        [0, 1, 2, 2.5, 3,   4, 4.5, 5, 6, 6.5, 7,   8, 8.5, 9, 9.5, 10, 10.5],
+        // たんたんたんたん ／ ッたたたたたん ／ たん たたたん ／ ッたん
+        [0, 1, 2, 3,   4.5, 5, 5.5, 6, 6.5,   8, 8.5, 9, 9.5,   10.5]
       ];
       var pat = patterns[c.diff - 1];
       var startT = beatSec * 3.5;
-      var notes = pat.hit.map(function (b) {
+      var notes = pat.map(function (b) {
         return { t: startT + b * beatSec, done: 0, missed: 0 };
       });
-      notes.push({
-        t: startT + pat.roll * beatSec, done: 0, missed: 0,
-        roll: ROLL_DUR * beatSec, need: ROLL_NEED, got: 0
-      });
-      notes.sort(function (a, b) { return a.t - b.t; });
-      var win0 = [0.19, 0.155, 0.125][c.diff - 1];
+      /* 判定幅は 8 分の間隔（0.23 秒）の半分より狭くする。
+       * 広いと、連打のうち 1 回の入力がどの音符のものか決められない。 */
+      var win0 = [0.14, 0.12, 0.10][c.diff - 1];
       var hits = 0, misses = 0;
       /* あと何回まちがえられるのかを、はっきり決めてはっきり出す。
        * 以前は「あと 1 回」の状態で画面に「のこり 2」と出ていた。
        * 数え方が画面と中身で 1 ずれていると、慎重に行くか攻めるかを
        * 決められない。maxMiss は「許される回数」そのもの。 */
-      var maxMiss = [2, 2, 1][c.diff - 1];
+      var maxMiss = [3, 3, 2][c.diff - 1];
       var drumSq = 1, flashT = 9, cheer = 0;
 
       var LANE_Y = 348, JUDGE_X = 250, LEAD = beatSec * 4;
@@ -72,11 +69,9 @@
         /* QA 用: 次のノーツまでの秒数と判定幅。 */
         probe: function () {
           for (var i = 0; i < notes.length; i++) {
-            var n = notes[i];
-            if (n.done || n.missed) continue;
-            return { dt: n.t - c.t, win: win0, roll: n.roll || 0, need: n.need || 0, got: n.got || 0 };
+            if (!notes[i].done && !notes[i].missed) return { dt: notes[i].t - c.t, win: win0 };
           }
-          return { dt: Infinity, win: win0, roll: 0 };
+          return { dt: Infinity, win: win0 };
         },
 
         update: function (dt) {
@@ -86,28 +81,11 @@
           if (c.result) return;
 
           var i, n;
-          /* 連打の最中は、1 回ずつの正確さを見ない。数だけ数える。
-           * 8 分より細かい間隔に判定幅を当てると、1 回の入力が
-           * どの音符のものか決められなくなる。連打は別の遊びとして扱う。 */
-          var roll = null;
-          for (i = 0; i < notes.length; i++) {
-            n = notes[i];
-            if (n.roll && !n.done && !n.missed && c.t >= n.t && c.t <= n.t + n.roll) roll = n;
-          }
-          if (roll) {
-            if (c.input.actHit) {
-              roll.got++;
-              drumSq = 0.7; flashT = 0; cheer = 1;
-              c.sfx('pop');
-              c.fx.burst(JUDGE_X, LANE_Y, {
-                n: 6, color: [GG.PAL.yamabuki, GG.PAL.paper], speed: 240, size: 6
-              });
-            }
-          } else if (c.input.actHit) {
+          if (c.input.actHit) {
             var best = -1, bestD = 9;
             for (i = 0; i < notes.length; i++) {
               n = notes[i];
-              if (n.done || n.missed || n.roll) continue;
+              if (n.done || n.missed) continue;
               var d = Math.abs(c.t - n.t);
               if (d < bestD) { bestD = d; best = i; }
             }
@@ -134,23 +112,6 @@
 
           for (i = 0; i < notes.length; i++) {
             n = notes[i];
-            if (n.roll) {
-              if (!n.done && !n.missed && c.t > n.t + n.roll) {
-                if (n.got >= n.need) {
-                  n.done = 2; hits++;
-                  c.sfx('levelup'); cheer = 1;
-                  c.fx.ring(JUDGE_X, LANE_Y, { r1: 150, color: GG.PAL.yamabuki, lw: 8 });
-                  c.fx.floatText(JUDGE_X, LANE_Y - 84, 'れんだ せいこう！',
-                    { color: GG.PAL.yamabuki, size: 28 });
-                } else {
-                  n.missed = 1; misses++;
-                  c.sfx('hit'); c.shake(9, 0.22);
-                  c.fx.floatText(JUDGE_X, LANE_Y - 84, 'たりない！', { color: GG.PAL.shu, size: 28 });
-                  if (misses > maxMiss) { c.lose(); return; }
-                }
-              }
-              continue;
-            }
             if (!n.done && !n.missed && c.t > n.t + win0) {
               n.missed = 1; misses++;
               c.sfx('hit'); c.shake(8, 0.2);
@@ -223,25 +184,10 @@
           }
           for (var k = 0; k < notes.length; k++) {
             var n = notes[k];
-            if (n.done && !n.roll) continue;
+            if (n.done) continue;
             var prog = (c.t - (n.t - LEAD)) / LEAD;
             if (prog < -0.02) continue;
             ctx.save();
-            if (n.roll) {
-              // 連打は長い帯。帯が判定サークルに重なっているあいだ叩き続ける
-              var x0 = noteX(n.t), x1 = noteX(n.t + n.roll);
-              var live = c.t >= n.t && c.t <= n.t + n.roll;
-              ctx.globalAlpha = n.missed ? 0.3 : (n.done ? Math.max(0, 1 - (c.t - n.t - n.roll)) : 1);
-              g.rr(Math.min(x0, x1) - 22, LANE_Y - 24, Math.abs(x1 - x0) + 44, 48, 24)
-                .ink(n.missed ? '#b3aeb8' : GG.PAL.yamabuki, 4);
-              g.text('れんだ！', (x0 + x1) / 2, LANE_Y, { size: 22, fill: GG.PAL.ink });
-              if (live) {
-                g.text(n.got + ' / ' + n.need, JUDGE_X, LANE_Y - 74,
-                  { size: 30, fill: GG.PAL.paper, stroke: GG.PAL.ink, lw: 6 });
-              }
-              ctx.restore();
-              continue;
-            }
             ctx.globalAlpha = n.missed ? 0.28 : U.sat(prog * 8);
             if (n.missed) ctx.globalAlpha *= Math.max(0, 1 - (c.t - n.t - 0.2));
             g.orb(noteX(n.t), LANE_Y, 22, n.missed ? '#b3aeb8' : GG.PAL.shu, { shadow: false });

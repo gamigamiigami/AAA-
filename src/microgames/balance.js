@@ -20,11 +20,28 @@
       /* まっすぐ立った状態から始める。以前は開幕でもう傾いていたので、
        * 画面を見て何をするゲームか分かった時にはもう倒れかけていた。 */
       var pole = { a: 0, va: 0, len: 190 };
-      var G = [4.4, 5.8, 7.0][c.diff - 1];      // 倒れやすさ
-      var CTRL = [3.4, 3.2, 3.0][c.diff - 1];   // 押し戻す強さ
-      var LIMIT = 0.80;                          // ここまで倒れても戻せる
+      /* 倒れやすさと、押し戻せる強さの関係。
+       *
+       * この 2 つは別々に決めてはいけない。傾き a のとき棒を倒す力は
+       * sin(a)*G、押し戻せる力は最大 CTRL なので、CTRL < G*sin(LIMIT) だと
+       * 「まだ倒れていないのに、もう絶対に戻せない角度」が生まれる。
+       * 画面にはまだ余裕があるように見えるのに、何をしても倒れる時間が続く。
+       * さっきまでの設定がまさにそれで、レベル3は a=0.44 を超えた時点で
+       * 詰んでいるのに、限界は 0.80 に描かれていた。
+       *
+       * だから CTRL は G*sin(LIMIT) から決める（余裕 1.25 倍）。
+       * 限界の手前はどこからでも必ず戻せる。
+       *
+       * そのうえで難しさは G ——「倒れる速さ」——で作る。レベル3は
+       * レベル1の 2 倍の速さで倒れるので、同じ角度でも考える時間が半分になる。
+       * 立て直せるかどうかではなく、間に合うかどうかの勝負になる。 */
+      var LIMIT = [0.80, 0.76, 0.70][c.diff - 1];
+      var G = [4.4, 6.6, 9.2][c.diff - 1];
+      var CTRL = G * Math.sin(LIMIT) * 1.25;
       var GRACE = 0.55;                          // 最初のこの間は重力が効かない
-      var gust = 0, nextGust = c.diff >= 2 ? 1.8 : 99;
+      // 突風。レベルが上がるほど早く、強く来る
+      var gust = 0, nextGust = [99, 1.6, 1.0][c.diff - 1];
+      var gustPow = [0, 1.5, 2.4][c.diff - 1];
 
       return {
         /* QA 用: 棒の傾き。ゲーム進行には影響しない。 */
@@ -56,8 +73,8 @@
           var ctrl = Math.abs(intent) > Math.abs(moved / SPD) ? intent : moved / SPD;
 
           if (c.t > nextGust) {
-            nextGust = c.t + c.rng.range(1.1, 1.8);
-            gust = c.rng.sign() * c.rng.range(1.2, 2.0);
+            nextGust = c.t + c.rng.range(1.1, 1.8) / (1 + (c.diff - 1) * 0.3);
+            gust = c.rng.sign() * c.rng.range(gustPow * 0.7, gustPow * 1.15);
             c.sfx('whoosh');
           }
           if (Math.abs(gust) > 0.01) {

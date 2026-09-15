@@ -20,7 +20,7 @@
 
     create: function (c) {
       var cx = c.W / 2, cy = 300;
-      var n = [1, 2, 2][c.diff - 1];
+      var n = [1, 2, 3][c.diff - 1];
       var shots = [];
       var order = c.rng.shuffle(DIRS.slice()).slice(0, n);
 
@@ -31,14 +31,14 @@
        * 直し方は「距離を揃える」ではない。上下に 560 の助走はそもそも置けない。
        * 揃えるのは時間のほうで、飛ぶ距離は画面の都合、速さはその割り算にする。
        * 遊ぶ人が感じるのは距離ではなく、来ると分かってから当たるまでの間だけ。 */
-      var REACT = [1.05, 0.90, 0.78][c.diff - 1];   // 動き出してから届くまで（秒）
+      var REACT = [1.05, 0.88, 0.66][c.diff - 1];   // 動き出してから届くまで（秒）
       var HIT = 74;                                  // タテで受け止める距離
       var RUN = { left: 500, right: 500, up: 285, down: 262 };
       for (var i = 0; i < n; i++) {
         var d = order[i];
         var v = VEC[d];
         shots.push({
-          dir: d, t: 0, delay: 0.35 + i * (c.diff === 3 ? 0.85 : 1.0),
+          dir: d, t: 0, delay: 0.35 + i * [1.0, 1.0, 0.78][c.diff - 1],
           x: cx + v[0] * RUN[d], y: cy + v[1] * RUN[d], blocked: 0,
           spd: (RUN[d] - HIT) / REACT
         });

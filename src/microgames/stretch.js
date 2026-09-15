@@ -24,8 +24,15 @@
       var len = 0, growing = false, released = false;
       var fall = 0, walk = 0, hero = { x: leftEdge - 40, y: GY - 30 };
       var bridgeA = 0;   // 倒れ角
+      var WALK = 620;    // 歩く速さ（px/秒）
+      var START_X = leftEdge - 40;
 
       return {
+        /* QA 用: いまの長さと、届かせたい範囲。ゲーム進行には影響しない。 */
+        probe: function () {
+          return { len: len, lo: gap, hi: gap + platW, released: released };
+        },
+
         update: function (dt) {
           if (c.result && !released) return;
 
@@ -59,21 +66,37 @@
             return;
           }
 
-          // 歩く
+          /* 歩き方は勝ち負けで変えない。棒の上を端まで歩いて、
+           * 足の下に陸が無ければ、そこから落ちる。それだけ。
+           *
+           * 以前は伸ばしすぎたときだけ、まだ棒の上にいるのに谷の真ん中で
+           * 落ちはじめていた。橋はそこに架かっているのに落ちるので、
+           * 何が起きたのか分からない。長すぎて失敗、という理屈は合っていても、
+           * 目の前で起きていることが理屈と別だった。
+           *
+           * 短すぎれば棒の先で足場が切れて落ちる。長すぎれば向こう岸を
+           * 通り越して、はみ出した先で落ちる。どちらも「陸が無いところまで
+           * 歩いた」だけなので、画面を見れば理由が分かる。 */
+          var tip = leftEdge + len;
+          var goalX = this._ok ? rightEdge + platW / 2 : tip;
+          walk += dt;
+          var reached = Math.min(1, walk * WALK / Math.max(1, goalX - START_X));
+          hero.x = U.lerp(START_X, goalX, reached);
+
+          if (reached < 1) return;
           if (this._ok) {
-            walk += dt;
-            hero.x = U.lerp(leftEdge - 40, rightEdge + platW / 2, U.sat(walk / 0.55));
-            if (walk > 0.55 && !c.result) {
+            if (!c.result) {
               c.sfx('levelup');
               c.fx.confetti(hero.x, GY - 60, 26);
               c.win();
             }
-          } else {
-            fall += dt;
-            hero.x = U.lerp(leftEdge - 40, leftEdge + Math.min(len, gap) * 0.9, U.sat(fall / 0.35));
-            hero.y = GY - 30 + Math.max(0, fall - 0.3) * 900;
-            if (fall > 0.45 && !c.result) { c.sfx('lose'); c.lose(); }
+            return;
           }
+          // 棒の先まで来てしまった。足の下には何も無い
+          fall += dt;
+          if (fall === dt) { c.sfx('whoosh'); c.shake(6, 0.2); }
+          hero.y = GY - 30 + fall * fall * 1400;
+          if (fall > 0.42 && !c.result) { c.sfx('lose'); c.lose(); }
         },
 
         draw: function (g) {
@@ -124,7 +147,7 @@
           A.blob(g, {
             x: hero.x, y: hero.y, r: 26, color: GG.PAL.asagi,
             shadowY: hero.y < GY ? GY - 12 : undefined,
-            rot: fall > 0.3 ? (c.t * 6) % 6.28 : Math.sin(walk * 20) * 0.08,
+            rot: fall > 0.08 ? (c.t * 7) % 6.28 : Math.sin(walk * 20) * 0.08,
             lookX: 0.7,
             mouth: c.result === 'lose' ? 'sad' : (growing ? 'o' : 'smile')
           });

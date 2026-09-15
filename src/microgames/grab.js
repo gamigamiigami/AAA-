@@ -1,11 +1,14 @@
-/* つかめ！ — ベルトコンベアで流れてくるおたからを、ワクの中でつかむ。 */
+/* たからを つかめ！ — ベルトコンベアで流れてくるおたからを、ワクの中でつかむ。 */
 (function (GG) {
   'use strict';
   var U = GG.U, A = GG.A;
 
   GG.reg({
     id: 'grab',
-    verb: 'つかめ！',
+    /* 「つかめ！」だと、何を掴むのかも、掴んではいけない物があることも
+     * 伝わらない。掴む対象を命令語に入れておけば、ベルトに乗っている物を
+     * 見た瞬間に「これは掴む物か、そうでないか」で見られる。 */
+    verb: 'たからを つかめ！',
     verbEn: 'GRAB!',
     control: 'press',
     beats: 8,
@@ -192,23 +195,44 @@
               g.polyPath([[0, -32], [0, 30], [-28, -6]]).fill('rgba(255,255,255,0.35)');
               ctx.restore();
             } else {
-              /* ガラクタは「ガラクタの形」で描く。
-               * 以前は灰色の箱に × を書いていたが、宝を運ぶベルトに
-               * 「× と書かれた箱」が乗っている理由はどこにも無い。
-               * 記号ではなく物を置けば、説明はいらない。 */
+              /* 宝でない物は、ひと目で「ごみ」と分かる物にする。
+               *
+               * × を書いた箱 → 石ころ、と直してきたが、まだ足りない。
+               * 石は宝石と同じ「拾う価値のあるもの」の仲間に見える。
+               * 掴んでいいか迷う物を流したら、それは判断ではなく賭けになる。
+               * くしゃくしゃの紙くずに、ハエを飛ばす。迷う余地を無くす。 */
               ctx.save();
-              ctx.translate(ix, iy); ctx.rotate(Math.sin(it.rot * 0.7) * 0.1);
+              ctx.translate(ix, iy); ctx.rotate(Math.sin(it.rot * 0.7) * 0.08);
               var rng = new U.RNG(it.seed), pts = [];
-              for (var v = 0; v < 9; v++) {
-                var a = v / 9 * U.TAU, rr = 26 * rng.range(0.74, 1.12);
-                pts.push([Math.cos(a) * rr, Math.sin(a) * rr * 0.86 + 4]);
+              for (var v = 0; v < 11; v++) {
+                var a = v / 11 * U.TAU, rr = 27 * rng.range(0.62, 1.15);
+                pts.push([Math.cos(a) * rr, Math.sin(a) * rr * 0.88 + 3]);
               }
-              g.polyPath(pts).ink('#8d8797', 4);
+              g.polyPath(pts).ink('#b9b2a4', 3.6);
               ctx.save();
               g.polyPath(pts); ctx.clip();
-              g.ellipsePath(-9, -12, 13, 8, -0.5).fill('rgba(255,255,255,0.32)');
-              g.ellipsePath(6, 9, 16, 11, 0.3).fill('rgba(0,0,0,0.14)');
+              // しわ
+              ctx.strokeStyle = 'rgba(90,84,74,0.45)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+              for (var cr = 0; cr < 4; cr++) {
+                ctx.beginPath();
+                ctx.moveTo(rng.range(-24, 4), rng.range(-22, 22));
+                ctx.lineTo(rng.range(-4, 24), rng.range(-22, 22));
+                ctx.stroke();
+              }
+              g.ellipsePath(-8, -11, 12, 7, -0.5).fill('rgba(255,255,255,0.4)');
+              g.ellipsePath(7, 11, 15, 10, 0.3).fill('rgba(0,0,0,0.13)');
               ctx.restore();
+              // ハエ
+              for (var fI = 0; fI < 2; fI++) {
+                var fa = c.t * (3.4 + fI * 1.1) + fI * 2.4;
+                var fx2 = Math.cos(fa) * (34 + fI * 7), fy2 = Math.sin(fa * 1.7) * 20 - 26;
+                g.circlePath(fx2, fy2, 3.2).fill('#3a3a42');
+                ctx.save();
+                ctx.globalAlpha = 0.5;
+                g.ellipsePath(fx2 - 3, fy2 - 3, 4, 2, -0.6).fill('#ffffff');
+                g.ellipsePath(fx2 + 3, fy2 - 3, 4, 2, 0.6).fill('#ffffff');
+                ctx.restore();
+              }
               ctx.restore();
             }
             ctx.restore();

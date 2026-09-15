@@ -15,8 +15,16 @@ const ROOT = path.resolve(__dirname, '..');
 const BOTS = {
   // とべ！: 衝突までの時間が 0.3 秒を切ったら跳ぶ
   jump: `p => { if (!p.air && p.ttc < 0.27) click(480, 270); }`,
-  // れんだ！: ひたすらクリック
-  mash: `p => { click(480, 470); }`,
+  /* れんだ！: 人の指の速さでクリックする。
+   * 毎フレーム（毎秒 60 回）叩くと、どんな設定でも勝ててしまい、
+   * 「クリックで届くか」を確かめたことにならない。速い人ぶんの
+   * 毎秒 7 回に制限して、それで押し切れることを条件にする。 */
+  mash: `p => {
+    const now = performance.now();
+    if (now - (window.__mashT || 0) < 143) return;   // 毎秒 7 回
+    window.__mashT = now;
+    click(480, 470);
+  }`,
   // つかめ！: ワクにお宝が入った瞬間に押す
   grab: `p => { if (p) click(480, 480); }`,
   // あわせろ！: ノーツが判定に重なったら押す
@@ -27,6 +35,9 @@ const BOTS = {
   stopneedle: `p => { if (!p.stopped && Math.abs(p.p - p.c) < p.half * 0.3) click(480, 480); }`,
   // あつめろ！: 星の真下にカゴを運ぶ
   catch: `p => { if (p) move(p.x, 400); }`,
+  // のばせ！: ちょうど届く長さになったら離す
+  stretch: `p => { if (p.released) { up(); return; }
+    if (p.len < (p.lo + p.hi) / 2 - 8) down(480, 480); else up(); }`,
   // さがせ！: ちがう 1 つをクリック
   odd: `p => { if (p) click(p.x, p.y); }`,
   // ふせげ！: 飛んでくる側にタテを向ける（中心からその向きをクリック）
@@ -35,9 +46,10 @@ const BOTS = {
   escape: `p => { if (p) move(p.x, p.y); }`,
   // ささえろ！: 倒れる側へ体を運んで棒を押し戻す
   balance: `p => {
-    const u = p.va + p.a * 3;                 // これを 0 に寄せたい
-    const dir = u > 0 ? 1 : -1;               // 進む向き（傾いた側）
-    move(Math.max(40, Math.min(920, p.x + dir * 260)), 380);
+    // 角速度を -3a に寄せる。加減はカーソルの距離で出す（130px で全力）
+    const u = p.va + p.a * 3;
+    const ctrl = Math.max(-1, Math.min(1, u * 2.2));
+    move(Math.max(40, Math.min(920, p.x + ctrl * 130)), 380);
   }`
 };
 
@@ -68,12 +80,23 @@ const BOTS = {
           cv.dispatchEvent(new PointerEvent('pointerdown', at(vx, vy)));
           window.dispatchEvent(new PointerEvent('pointerup', at(vx, vy)));
         };
+        // 長押し用（control: 'hold' のゲーム）
+        let held = false;
+        const down = (vx, vy) => {
+          if (held) return; held = true;
+          move(vx, vy);
+          cv.dispatchEvent(new PointerEvent('pointerdown', at(vx, vy)));
+        };
+        const up = () => {
+          if (!held) return; held = false;
+          window.dispatchEvent(new PointerEvent('pointerup', at(480, 480)));
+        };
         const bot = eval('(' + body + ')');
         G.debug.jump(id, diff);
         const started = performance.now();
         (function tick() {
-          if (g.result) { resolve(g.result); return; }
-          if (performance.now() - started > 20000) { resolve('TIMEOUT'); return; }
+          if (g.result) { up(); resolve(g.result); return; }
+          if (performance.now() - started > 20000) { up(); resolve('TIMEOUT'); return; }
           if (g.state === 'play' && g.cur && g.cur.inst.probe) {
             try { bot(g.cur.inst.probe()); } catch (e) { resolve('BOTERR:' + e.message); return; }
           }

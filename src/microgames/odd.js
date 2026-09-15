@@ -14,34 +14,30 @@
     style: 'sketch',
 
     create: function (c) {
-      var grid = [[3, 2], [4, 3], [6, 3]][c.diff - 1];
+      /* レベル3だけ人数を減らして、代わりに全員の目を別々の間で動かす。
+       * 数で難しくするのをやめ、「動いているせいで見比べにくい」で難しくする。 */
+      var grid = [[3, 2], [4, 3], [4, 2]][c.diff - 1];
       var COLS = grid[0], ROWS = grid[1];
-      var cw = COLS >= 6 ? 146 : 152, ch = ROWS === 2 ? 122 : 104;
+      var cw = COLS >= 5 ? 146 : 152, ch = ROWS === 2 ? 122 : 104;
       var ox = c.W / 2 - (COLS - 1) * cw / 2;
-      var oy = ROWS === 2 ? 250 : 176;
+      var oy = ROWS === 2 ? 232 : 176;
       var baseCol = c.rng.pick([GG.PAL.shu, GG.PAL.ai, GG.PAL.murasaki, GG.PAL.wakaba]);
       var oddIdx = c.rng.int(0, COLS * ROWS - 1);
 
       /* ちがうのは、ぜんぶで 1 つ。ちがい方も 1 種類だけ。
        *
-       * 以前は「1 つだけ色を薄くする」と決めておきながら、全員の目の向きを
-       * バラバラの位相で動かしていた。つまり画面には、意図した差が 1 つと、
-       * 意図していない差が全員ぶん出ていた。探している側からすれば
-       * 「複数ちがう」ようにしか見えず、正解がどれか決められない。
+       * 以前は「1 つだけ色を薄くする」だったが、色の濃淡は並べた瞬間に
+       * 見つかってしまう。探している気にならない。顔のつくりに変えた。
+       * 口、目、ほっぺ、おでこの印 —— どれも「同じ顔が並んでいる」中で
+       * 1 箇所だけ違う、という見え方になる。
        *
-       * それでいて上のレベルでは、肝心の色の差を -0.17 まで薄めていた。
-       * 見えない差を探させるのは難しさではなく、当てずっぽうにすること。
-       *
-       * 直し方は 2 つ。
-       *  1. 差は「色」か「顔」のどちらか一方だけ。それ以外は完全に同じ値。
-       *     向きも口も、全員が同じ式から出る。
-       *  2. 差の大きさはレベルで薄めない。難しさは「数の多さ」で出す。
-       *
-       * 上下の揺れの位相だけは、ずらしたままにしておく。
-       * 全員が同じ拍で揺れると機械の列になるし、揺れの位相は「どれが違うか」
-       * の手がかりにはならない —— 見比べれば同じ動きをしていると分かる。 */
-      var mode = c.diff === 1 ? 'color' : c.rng.pick(['color', 'face']);
-      var oddCol = mode === 'color' ? U.shade(baseCol, -0.40) : baseCol;
+       * 差はレベルで薄めない。見えない差を探させるのは難しさではなく、
+       * 当てずっぽうにすること。難しさは、数と、動きで作る。 */
+      var mode = c.rng.pick(['mouth', 'eyes', 'cheek', 'mark']);
+      /* レベル3は全員の目が別々の間で左右に動く。動きは手がかりにならない
+       * （見比べれば同じ動きをしている）が、視線が揺れているぶん、
+       * 顔の一箇所だけの違いは格段に見つけにくくなる。 */
+      var liveEyes = c.diff === 3;
 
       var cells = [];
       for (var r = 0; r < ROWS; r++) {
@@ -108,13 +104,18 @@
               g.circlePath(0, 0, 60).fill('#ffffff');
               ctx.restore();
             }
+            var odd = ce.odd;
             A.blob(g, {
-              x: 0, y: 0, r: 42, color: ce.odd ? oddCol : baseCol, feet: false,
-              // 向きは全員そろえる。ここに位相を混ぜると差が 2 種類になる
-              lookX: Math.sin(c.t * 1.8) * 0.5,
-              mouth: (ce.odd && mode === 'face') ? 'sad' : 'smile',
-              blink: false
+              x: 0, y: 0, r: 42, color: baseCol, feet: false,
+              /* レベル1・2 は全員そろえる（位相を混ぜると差が 2 種類になる）。
+               * レベル3 は全員ばらばら —— ただし違う 1 人も同じ規則で動く。 */
+              lookX: (liveEyes ? Math.sin(c.t * 2.1 + ce.ph) : Math.sin(c.t * 1.8)) * 0.62,
+              mouth: (odd && mode === 'mouth') ? 'sad' : 'smile',
+              cheeks: !(odd && mode === 'cheek'),
+              blink: odd && mode === 'eyes'
             });
+            // おでこの印
+            if (odd && mode === 'mark') A.star(g, 0, -31, 11, GG.PAL.yamabuki, c.t * 1.2);
             ctx.restore();
           }
         }

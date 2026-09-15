@@ -44,9 +44,11 @@
       .fill('rgba(255,255,255,0.85)');
     c.restore();
 
-    // ほっぺ
-    g.ellipsePath(-rx * 0.58, ry * 0.2, rx * 0.18, ry * 0.12).fill('rgba(232,17,45,0.3)');
-    g.ellipsePath(rx * 0.58, ry * 0.2, rx * 0.18, ry * 0.12).fill('rgba(232,17,45,0.3)');
+    // ほっぺ（cheeks:false で消せる。「1 つだけ違う」を作るのに使う）
+    if (o.cheeks !== false) {
+      g.ellipsePath(-rx * 0.58, ry * 0.2, rx * 0.18, ry * 0.12).fill('rgba(232,17,45,0.3)');
+      g.ellipsePath(rx * 0.58, ry * 0.2, rx * 0.18, ry * 0.12).fill('rgba(232,17,45,0.3)');
+    }
 
     // 顔
     g.eyes(0, -ry * 0.16, rx * 0.35, r * 0.17, o.lookX, o.lookY, o.blink);

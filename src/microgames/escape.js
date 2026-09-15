@@ -38,9 +38,20 @@
        *
        * 穴を開ければ、縦の棒は壁ではなく門になる。
        * 「横に逃げて、穴の高さに合わせて、抜ける」——避ける動作が生まれる。 */
+      var FIRE_X0 = area.x + area.w + 40, FIRE_R = 17;
+      function fireX(l, t) { return FIRE_X0 - (t - l.t0) * l.spd; }
+
       function hits(ls, x, y, t, pad) {
         for (var i = 0; i < ls.length; i++) {
-          var l = ls[i], p = laserPos(l, t), rad = TH / 2 + HITR + pad;
+          var l = ls[i];
+          if (l.f) {
+            if (t < l.t0) continue;
+            var fx = fireX(l, t);
+            if (fx < area.x - 60) continue;
+            if (U.dist(x, y, fx, l.y) < FIRE_R + HITR + pad) return true;
+            continue;
+          }
+          var p = laserPos(l, t), rad = TH / 2 + HITR + pad;
           if (l.v) {
             if (Math.abs(x - p) >= rad) continue;
             if (Math.abs(y - l.gapY) < GAP / 2 - HITR - pad) continue;   // 穴の中
@@ -85,7 +96,21 @@
         function mark(t) {
           safe.fill(1);
           for (k = 0; k < ls.length; k++) {
-            var l = ls[k], p = laserPos(l, t), rad = TH / 2 + HITR + PAD;
+            var l = ls[k];
+            if (l.f) {
+              if (t < l.t0) continue;
+              var fx = fireX(l, t);
+              if (fx < box.x - 60 || fx > box.x + box.w + 60) continue;
+              var fr = FIRE_R + HITR + PAD;
+              for (i = 0; i < NX; i++) {
+                if (Math.abs(cellX(i) - fx) >= fr) continue;
+                for (j = 0; j < NY; j++) {
+                  if (U.dist(cellX(i), cellY(j), fx, l.y) < fr) safe[j * NX + i] = 0;
+                }
+              }
+              continue;
+            }
+            var p = laserPos(l, t), rad = TH / 2 + HITR + PAD;
             if (l.v) {
               for (i = 0; i < NX; i++) {
                 if (Math.abs(cellX(i) - p) >= rad) continue;
@@ -158,11 +183,40 @@
       }
 
       function build(n, mul) {
+        /* 何を何本置くかを先に決める。
+         *
+         * 縦の門ばかり 4 枚になると、部屋は「門・門・門・門」の一本道になり、
+         * 遊びが「4 回くぐる」だけの作業になる。しかも門は幅を取るので、
+         * 横に逃げる余地が消えて、ただ窮屈なだけの部屋になっていた。
+         * 縦はレベルごとに本数の上限を決め、残りは別の種類の危険で埋める。
+         *
+         * 火の玉は奥（右）から飛んでくる。棒と違って向きが違うので、
+         * 「横に動く」だけでは避けられない。同じ部屋に別の避け方を持ち込む。 */
+        var maxV = [1, 2, 3][c.diff - 1];
+        var types = ['v'];                       // 1 本目は必ず縦の門
+        if (c.diff >= 2) types.push('f');        // 火の玉も必ず 1 つ
+        while (types.length < n) {
+          var vN = 0;
+          for (var q = 0; q < types.length; q++) if (types[q] === 'v') vN++;
+          var pool = ['h', 'f'];
+          if (vN < maxV) pool.push('v');
+          types.push(c.rng.pick(pool));
+        }
+
         var ls = [];
-        for (var i = 0; i < n; i++) {
-          var vertical = i === 0 ? true : c.rng.chance(0.55);
+        for (var i = 0; i < types.length; i++) {
+          var kind = types[i];
+          if (kind === 'f') {
+            ls.push({
+              f: true,
+              y: c.rng.range(area.y + 40, area.y + area.h - 40),
+              t0: c.rng.range(0.55, Math.max(0.8, c.duration * 0.72)),
+              spd: c.rng.range(300, 420) * mul
+            });
+            continue;
+          }
           var amp = c.rng.range(50, 100), p;
-          if (vertical) {
+          if (kind === 'v') {
             // ドアの真上で門を閉じない。棒が行き来する範囲ごと外す
             var lo = area.x + 150, hi = goal.x - 80 - amp;
             if (hi <= lo) continue;
@@ -171,7 +225,7 @@
             p = c.rng.range(area.y + 60, area.y + area.h - 60);
           }
           ls.push({
-            v: vertical, p: p, amp: amp,
+            v: kind === 'v', p: p, amp: amp,
             spd: c.rng.range(1.6, 2.6) * mul,
             ph: c.rng.range(0, 6.28), th: TH,
             // 門の高さ。部屋の上下に寄せすぎると穴が壁に埋まる
@@ -243,6 +297,7 @@
           ctx.globalAlpha = 0.10;
           for (i = 0; i < lasers.length; i++) {
             var lq = lasers[i];
+            if (lq.f) continue;
             if (lq.v) g.rr(lq.p - lq.amp - 6, area.y, lq.amp * 2 + 12, area.h, 8).fill(GG.PAL.ai);
             else g.rr(area.x, lq.p - lq.amp - 6, area.w, lq.amp * 2 + 12, 8).fill(GG.PAL.ai);
           }
@@ -261,7 +316,38 @@
 
           // レーザー
           for (i = 0; i < lasers.length; i++) {
-            var l = lasers[i], p = laserPos(l, c.t);
+            var l = lasers[i];
+            if (l.f) {
+              ctx.save();
+              /* 来るとわかる時間を先に渡す。奥から飛んでくる物は、
+               * 画面に入った時にはもう目の前にいる。 */
+              var lead = c.t - l.t0;
+              if (lead < 0) {
+                if (lead > -0.75) {
+                  ctx.globalAlpha = 0.3 + 0.45 * Math.abs(Math.sin(c.t * 12));
+                  A.arrow(g, area.x + area.w - 22, l.y, 'left', 34, GG.PAL.kuchiba);
+                }
+                ctx.restore(); continue;
+              }
+              var fx = fireX(l, c.t);
+              if (fx < area.x - 70) { ctx.restore(); continue; }
+              // 尾
+              ctx.globalAlpha = 0.5;
+              for (var tI = 1; tI <= 4; tI++) {
+                var tx = fx + tI * 17, tr = FIRE_R * (1 - tI * 0.18);
+                ctx.globalAlpha = 0.42 - tI * 0.08;
+                g.circlePath(tx, l.y + Math.sin(c.t * 22 + tI) * 3, tr)
+                  .fill(tI < 3 ? GG.PAL.kuchiba : GG.PAL.shu);
+              }
+              ctx.globalAlpha = 1;
+              g.circlePath(fx, l.y, FIRE_R + 4).fill(GG.PAL.shu);
+              g.circlePath(fx, l.y, FIRE_R).ink(GG.PAL.kuchiba, 3);
+              g.circlePath(fx - 3, l.y - 3, FIRE_R * 0.46).fill(GG.PAL.yamabuki);
+              g.circlePath(fx - 4, l.y - 4, FIRE_R * 0.2).fill('#fffbe0');
+              ctx.restore();
+              continue;
+            }
+            var p = laserPos(l, c.t);
             ctx.save();
             if (l.v) {
               // 上下 2 本 + そのあいだの門

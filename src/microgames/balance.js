@@ -26,8 +26,8 @@
        * sin(a)*G、押し戻せる力は最大 CTRL なので、CTRL < G*sin(LIMIT) だと
        * 「まだ倒れていないのに、もう絶対に戻せない角度」が生まれる。
        * 画面にはまだ余裕があるように見えるのに、何をしても倒れる時間が続く。
-       * さっきまでの設定がまさにそれで、レベル3は a=0.44 を超えた時点で
-       * 詰んでいるのに、限界は 0.80 に描かれていた。
+       * 昔の設定がまさにそれで、レベル3は a=0.44 を超えた時点で詰んでいるのに、
+       * 限界は 0.80 に描かれていた。
        *
        * だから CTRL は G*sin(LIMIT) から決める（余裕 1.25 倍）。
        * 限界の手前はどこからでも必ず戻せる。
@@ -35,22 +35,44 @@
        * そのうえで難しさは G ——「倒れる速さ」——で作る。レベル3は
        * レベル1の 2 倍の速さで倒れるので、同じ角度でも考える時間が半分になる。
        * 立て直せるかどうかではなく、間に合うかどうかの勝負になる。 */
-      var LIMIT = [0.80, 0.76, 0.70][c.diff - 1];
+      var LIMIT = [0.95, 0.90, 0.84][c.diff - 1];
       var G = [4.4, 6.6, 9.2][c.diff - 1];
       var CTRL = G * Math.sin(LIMIT) * 1.25;
       var GRACE = 0.55;                          // 最初のこの間は重力が効かない
+      /* 負けるのは「もう戻せない角度に入った瞬間」ではなく「棒が倒れきった時」。
+       *
+       * 限界を越えた時点で結果は決まっているが、その瞬間に画面を止めると、
+       * 遊んでいる側には棒がまだ斜めに立って見える。まだ行けたはずだ、と思う。
+       * 結果が同じでも、納得できるかどうかは別の話で、そこは演出の仕事になる。
+       * 越えたら操作を切り、重力だけで地面まで倒し、倒れきってから負けにする。 */
+      var FALLEN = 1.45;                         // ほぼ真横。ここまで来たら誰が見ても倒れている
+      var doomed = 0;                            // 限界を越えてからの経過時間
       // 突風。レベルが上がるほど早く、強く来る
       var gust = 0, nextGust = [99, 1.6, 1.0][c.diff - 1];
       var gustPow = [0, 1.5, 2.4][c.diff - 1];
 
       return {
         /* QA 用: 棒の傾き。ゲーム進行には影響しない。 */
-        probe: function () { return { a: pole.a, va: pole.va, x: hero.x, limit: LIMIT }; },
+        probe: function () { return { a: pole.a, va: pole.va, x: hero.x, limit: LIMIT, doomed: !!doomed }; },
 
         update: function (dt) {
           if (c.result) {
             pole.va += U.sign(pole.a || 1) * 6 * dt;
             pole.a += pole.va * dt;
+            return;
+          }
+          if (doomed) {
+            // もう操作は効かない。倒れていくところを最後まで見せる
+            doomed += dt;
+            pole.va += U.sign(pole.a) * (G + 5) * dt;
+            pole.a += pole.va * dt;
+            /* 時間切れのほうが先に来ると、倒れかけのまま勝ちになってしまう。
+             * このゲームの既定は勝ちなので、倒れると決まった時点で間に合わせる。 */
+            if (Math.abs(pole.a) > FALLEN || c.timeLeft < 0.12) {
+              c.sfx('hit'); c.shake(12, 0.35);
+              c.fx.burst(hero.x, GY - 120, { n: 16, color: [GG.PAL.shu, '#fff'], speed: 300, size: 8 });
+              c.lose();
+            }
             return;
           }
           var px = hero.x;
@@ -89,9 +111,8 @@
           pole.a += pole.va * dt;
 
           if (Math.abs(pole.a) > LIMIT) {
-            c.sfx('hit'); c.shake(12, 0.35);
-            c.fx.burst(hero.x, GY - 120, { n: 16, color: [GG.PAL.shu, '#fff'], speed: 300, size: 8 });
-            c.lose();
+            doomed = 1e-4;
+            c.sfx('whoosh');
           }
         },
 
@@ -129,7 +150,7 @@
             shadowY: GY + 14,
             lookX: U.clamp(pole.a * 2, -1, 1), lookY: -0.7,
             rot: U.clamp(pole.a * 0.25, -0.2, 0.2),
-            mouth: c.result === 'lose' ? 'sad' : (Math.abs(pole.a) > 0.4 ? 'o' : 'smile')
+            mouth: (c.result === 'lose' || doomed) ? 'sad' : (Math.abs(pole.a) > 0.4 ? 'o' : 'smile')
           });
         }
       };

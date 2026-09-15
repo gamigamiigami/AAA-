@@ -20,7 +20,7 @@
       var SPD = 400;
       var HITR = 16;          // 体の半径 20 より小さく取る。めり込んでから死ぬ
       var TH = 18;            // レーザーの太さ
-      var GAP = 116;          // 縦バーの通り穴（体が通れる高さ）
+      var GAP = 128;          // 縦バーの通り穴（体が通れる高さ）
 
       var box = { x: area.x + 20, y: area.y + 20, w: area.w - 40, h: area.h - 40 };
 
@@ -62,191 +62,294 @@
       }
 
       /* ------------------------------------------------------------------
-       * 盤面は「作ってから、解けるか確かめる」。
+       * 盤面は「作ってから、確かめてから配る」。
        *
-       * 門にしただけでは、まだ配られた盤面が解ける保証はない。穴の高さが
-       * 横バーの真下にあれば、やはり通れない。そこで配る前に、時間つきの
-       * 迷路として実際に解いてみる。解けなければ捨てて引き直す。
-       * 解くときの駒は本人より遅く（0.92 倍）、棒も本物より太く（+10px）
-       * 扱う。ギリギリ一本道だけが残った盤面を「解けた」と言わないため。
+       * 確かめることは 3 つある。
+       *
+       *   1. スタート地点が、始まってしばらく完全に空いていること。
+       *      始まった瞬間に棒と重なっていたら、何をする遊びかを読む前に
+       *      終わっている。それは難易度ではなく事故。
+       *
+       *   2. ゴールまでの道が、実際にあること。
+       *
+       *   3. どこへ逃げても詰まないこと。
+       *      道が 1 本あるだけでは足りない。棒と棒のあいだに入ってしまい、
+       *      まだ当たってもいないのに、もう何をしても当たるしかない —— という
+       *      場所が部屋の中にあってはいけない。遊ぶ側から見ると、それは
+       *      「避けたのに死んだ」としか見えない。
+       *
+       * 3 を確かめるには、逆から数える。最後の瞬間から時間をさかのぼって
+       * 「ここから生き残れるか」「ここからゴールへ行けるか」を全部の升に
+       * 書き込み、そのうえで「行ける升」を前から広げて、行ける升の中に
+       * 生き残れない升が 1 つでもあれば、その盤面は捨てる。
+       *
+       * 行ける升を数えるときの駒は本人と同じ速さ・同じ太さ（甘く）、
+       * 生き残れるかを数えるときの駒は本人より遅く・棒は太め（辛く）にする。
+       * 甘く見た「行ける場所」の全部が、辛く見ても助かる —— を条件にすれば、
+       * 判定の誤差は安全側にだけ倒れる。
        * ---------------------------------------------------------------- */
-      var SIM_DT = 1 / 30, SIM_SPD = SPD * 0.92, PAD = 10;
+      /* 時間の刻みは 1/20 秒。1/30 でも答えは同じだが、升の数が倍になり、
+       * 盤面を 1 枚検分するのに 3 倍の手間がかかる。ミニゲームが始まる
+       * その瞬間に何十枚も検分するので、ここが重いと画面が一瞬固まる。 */
+      var SIM_DT = 1 / 20, SIM_SPD = SPD * 0.96, PAD = 8;
       var step = SIM_SPD * SIM_DT;
       var NX = Math.floor(box.w / step) + 1, NY = Math.floor(box.h / step) + 1;
-      var STEPS = Math.ceil(c.duration * 0.88 / SIM_DT);
+      var STEPS = Math.ceil(c.duration / SIM_DT);
       var N = NX * NY;
+      /* 「ゴールへ間に合わなくなった」までは詰みに数えない。
+       * 逆方向へ走り続ければ、どんな部屋でも持ち時間は足りなくなる。
+       * それは盤面の罪ではなく、その回の遊び方。ここで捨てているのは
+       * 「当たっていないのに、もう当たるしかない」場所だけ。 */
 
       function cellX(i) { return box.x + i * step; }
       function cellY(j) { return box.y + j * step; }
 
-      var goalCells = [];
+      var goalCell = new Uint8Array(N), goalAny = 0;
       for (var gj = 0; gj < NY; gj++) {
         for (var gi = 0; gi < NX; gi++) {
-          if (U.dist(cellX(gi), cellY(gj), goal.x, goal.y) < goal.r - 8) goalCells.push(gj * NX + gi);
+          if (U.dist(cellX(gi), cellY(gj), goal.x, goal.y) < goal.r - 8) {
+            goalCell[gj * NX + gi] = 1; goalAny = 1;
+          }
         }
       }
 
-      function solve(ls) {
-        if (!goalCells.length) return null;
-        var cur = new Uint8Array(N), nxt = new Uint8Array(N), safe = new Uint8Array(N);
-        var trail = [];
+      // 作業用の板。引き直すたびに作り直すと重いので、一度だけ確保して使い回す
+      function planes(n) {
+        var a = [];
+        for (var k = 0; k <= n; k++) a.push(new Uint8Array(N));
+        return a;
+      }
+      var safeV = planes(STEPS), safeR = planes(STEPS);
+      var canLive = planes(STEPS), canGoal = planes(STEPS), reach = planes(STEPS);
+      var DI = [0, 1, -1, 0, 0, 1, 1, -1, -1], DJ = [0, 0, 0, 1, -1, 1, -1, 1, -1];
+
+      /** その時刻に立てる升を out に塗る。pad が大きいほど辛く見る */
+      function mark(out, ls, t, pad) {
+        out.fill(1);
         var i, j, k;
-
-        // その時刻に立てる升を塗る
-        function mark(t) {
-          safe.fill(1);
-          for (k = 0; k < ls.length; k++) {
-            var l = ls[k];
-            if (l.f) {
-              if (t < l.t0) continue;
-              var fx = fireX(l, t);
-              if (fx < box.x - 60 || fx > box.x + box.w + 60) continue;
-              var fr = FIRE_R + HITR + PAD;
-              for (i = 0; i < NX; i++) {
-                if (Math.abs(cellX(i) - fx) >= fr) continue;
-                for (j = 0; j < NY; j++) {
-                  if (U.dist(cellX(i), cellY(j), fx, l.y) < fr) safe[j * NX + i] = 0;
-                }
-              }
-              continue;
-            }
-            var p = laserPos(l, t), rad = TH / 2 + HITR + PAD;
-            if (l.v) {
-              for (i = 0; i < NX; i++) {
-                if (Math.abs(cellX(i) - p) >= rad) continue;
-                for (j = 0; j < NY; j++) {
-                  if (Math.abs(cellY(j) - l.gapY) < GAP / 2 - HITR - PAD) continue;
-                  safe[j * NX + i] = 0;
-                }
-              }
-            } else {
-              for (j = 0; j < NY; j++) {
-                if (Math.abs(cellY(j) - p) >= rad) continue;
-                for (i = 0; i < NX; i++) safe[j * NX + i] = 0;
-              }
-            }
-          }
-        }
-
-        var si = U.clamp(Math.round((hero.x - box.x) / step), 0, NX - 1);
-        var sj = U.clamp(Math.round((hero.y - box.y) / step), 0, NY - 1);
-        var sIdx = sj * NX + si;
-        /* 出だしの一瞬は必ず安全にしておく。棒がスタート地点を通過中の盤面は、
-         * 解けるかどうか以前に、何が起きたか分からないまま負ける。 */
-        for (var w = 0; w <= 12; w++) {
-          mark(w * SIM_DT);
-          if (!safe[sIdx]) return null;
-        }
-        cur[sIdx] = 1;
-        var z0 = new Int32Array(N); z0.fill(-1);
-        trail.push(z0);
-
-        /* 斜めも許す。遊ぶ人はカーソルを好きな向きへ引くので、縦と横を
-         * 同時に詰められる。斜めを禁じると、部屋を横断するだけで持ち時間を
-         * 使い切ってしまう。 */
-        var DI = [0, 1, -1, 0, 0, 1, 1, -1, -1], DJ = [0, 0, 0, 1, -1, 1, -1, 1, -1];
-        for (var s = 0; s < STEPS; s++) {
-          mark((s + 1) * SIM_DT);
-          var prev = new Int32Array(N); prev.fill(-1);
-          nxt.fill(0);
-          var alive = 0;
-          for (j = 0; j < NY; j++) {
+        for (k = 0; k < ls.length; k++) {
+          var l = ls[k];
+          if (l.f) {
+            if (t < l.t0) continue;
+            var fx = fireX(l, t);
+            if (fx < box.x - 60 || fx > box.x + box.w + 60) continue;
+            var fr = FIRE_R + HITR + pad;
             for (i = 0; i < NX; i++) {
-              if (!cur[j * NX + i]) continue;
-              for (var m = 0; m < 9; m++) {            // その場 + 8 方向
-                var ni = i + DI[m], nj = j + DJ[m];
-                if (ni < 0 || nj < 0 || ni >= NX || nj >= NY) continue;
-                var nIdx = nj * NX + ni;
-                if (nxt[nIdx] || !safe[nIdx]) continue;
-                nxt[nIdx] = 1; prev[nIdx] = j * NX + i; alive++;
+              if (Math.abs(cellX(i) - fx) >= fr) continue;
+              for (j = 0; j < NY; j++) {
+                if (U.dist(cellX(i), cellY(j), fx, l.y) < fr) out[j * NX + i] = 0;
               }
             }
-          }
-          trail.push(prev);
-          var tmp = cur; cur = nxt; nxt = tmp;
-          if (!alive) return null;
-          for (k = 0; k < goalCells.length; k++) {
-            if (!cur[goalCells[k]]) continue;
-            // 道をほどく。QA の自動プレイが辿る道しるべになる
-            var path = [], q = trail.length - 1, node = goalCells[k];
-            while (q >= 1) {
-              path.push({ x: cellX(node % NX), y: cellY((node / NX) | 0), t: q * SIM_DT });
-              node = trail[q][node];
-              if (node < 0) return null;
-              q--;
-            }
-            path.reverse();
-            return path;
-          }
-        }
-        return null;
-      }
-
-      function build(n, mul) {
-        /* 何を何本置くかを先に決める。
-         *
-         * 縦の門ばかり 4 枚になると、部屋は「門・門・門・門」の一本道になり、
-         * 遊びが「4 回くぐる」だけの作業になる。しかも門は幅を取るので、
-         * 横に逃げる余地が消えて、ただ窮屈なだけの部屋になっていた。
-         * 縦はレベルごとに本数の上限を決め、残りは別の種類の危険で埋める。
-         *
-         * 火の玉は奥（右）から飛んでくる。棒と違って向きが違うので、
-         * 「横に動く」だけでは避けられない。同じ部屋に別の避け方を持ち込む。 */
-        var maxV = [1, 2, 3][c.diff - 1];
-        var types = ['v'];                       // 1 本目は必ず縦の門
-        if (c.diff >= 2) types.push('f');        // 火の玉も必ず 1 つ
-        while (types.length < n) {
-          var vN = 0;
-          for (var q = 0; q < types.length; q++) if (types[q] === 'v') vN++;
-          var pool = ['h', 'f'];
-          if (vN < maxV) pool.push('v');
-          types.push(c.rng.pick(pool));
-        }
-
-        var ls = [];
-        for (var i = 0; i < types.length; i++) {
-          var kind = types[i];
-          if (kind === 'f') {
-            ls.push({
-              f: true,
-              y: c.rng.range(area.y + 40, area.y + area.h - 40),
-              t0: c.rng.range(0.55, Math.max(0.8, c.duration * 0.72)),
-              spd: c.rng.range(300, 420) * mul
-            });
             continue;
           }
-          var amp = c.rng.range(50, 100), p;
-          if (kind === 'v') {
-            // ドアの真上で門を閉じない。棒が行き来する範囲ごと外す
-            var lo = area.x + 150, hi = goal.x - 80 - amp;
-            if (hi <= lo) continue;
-            p = c.rng.range(lo, hi);
+          var p = laserPos(l, t), rad = TH / 2 + HITR + pad;
+          if (l.v) {
+            for (i = 0; i < NX; i++) {
+              if (Math.abs(cellX(i) - p) >= rad) continue;
+              for (j = 0; j < NY; j++) {
+                if (Math.abs(cellY(j) - l.gapY) < GAP / 2 - HITR - pad) continue;
+                out[j * NX + i] = 0;
+              }
+            }
           } else {
-            p = c.rng.range(area.y + 60, area.y + area.h - 60);
+            for (j = 0; j < NY; j++) {
+              if (Math.abs(cellY(j) - p) >= rad) continue;
+              for (i = 0; i < NX; i++) out[j * NX + i] = 0;
+            }
           }
+        }
+      }
+
+      /* 立ち位置は、盤面を作ってから決める。
+       *
+       * 「始まった瞬間に棒と重なっていた」を無くすには、置いた場所が
+       * 空くまで盤面を引き直す —— より、空いている場所に立たせるほうが早い。
+       * 横棒は部屋を端から端まで塞ぐので、立つ場所を動かせるのは上下だけ。
+       * 最初のしばらく棒が来ない高さを探して、そのうち真ん中に一番近い
+       * ところに立たせる。部屋のどこにも無ければ、その盤面は捨てる。 */
+      function placeHero(ls) {
+        var mid = area.y + area.h / 2, best = -1, bestD = Infinity;
+        for (var y = box.y; y <= box.y + box.h; y += 5) {
+          var ok = true;
+          for (var f = 0; f <= 42 && ok; f++) {      // 体感 0.7 秒ぶん
+            if (hits(ls, hero.x, y, f / 60, 26)) ok = false;
+          }
+          if (!ok) continue;
+          var d = Math.abs(y - mid);
+          if (d < bestD) { bestD = d; best = y; }
+        }
+        if (best < 0) return false;
+        hero.y = best;
+        return true;
+      }
+
+      var sI, sJ, sIdx;
+
+      /** 盤面を検分する。通れば道しるべを返し、だめなら null */
+      function vet(ls) {
+        if (!goalAny) return null;
+        if (!placeHero(ls)) return null;
+        sI = U.clamp(Math.round((hero.x - box.x) / step), 0, NX - 1);
+        sJ = U.clamp(Math.round((hero.y - box.y) / step), 0, NY - 1);
+        sIdx = sJ * NX + sI;
+        var s, i, j, m, idx, nIdx;
+
+        for (s = 0; s <= STEPS; s++) {
+          mark(safeV[s], ls, s * SIM_DT, PAD);
+          mark(safeR[s], ls, s * SIM_DT, 0);
+        }
+
+        // 後ろから: ここから生き残れるか / ここからゴールへ行けるか
+        for (idx = 0; idx < N; idx++) {
+          canLive[STEPS][idx] = safeV[STEPS][idx];
+          canGoal[STEPS][idx] = safeV[STEPS][idx] && goalCell[idx] ? 1 : 0;
+        }
+        for (s = STEPS - 1; s >= 0; s--) {
+          var lv = canLive[s], gl = canGoal[s], pv = canLive[s + 1], pg = canGoal[s + 1];
+          for (j = 0; j < NY; j++) {
+            for (i = 0; i < NX; i++) {
+              idx = j * NX + i;
+              lv[idx] = 0; gl[idx] = 0;
+              if (!safeV[s][idx]) continue;
+              if (goalCell[idx]) { lv[idx] = 1; gl[idx] = 1; continue; }
+              for (m = 0; m < 9; m++) {
+                var ni = i + DI[m], nj = j + DJ[m];
+                if (ni < 0 || nj < 0 || ni >= NX || nj >= NY) continue;
+                nIdx = nj * NX + ni;
+                if (pv[nIdx]) lv[idx] = 1;
+                if (pg[nIdx]) gl[idx] = 1;
+                if (lv[idx] && gl[idx]) break;
+              }
+            }
+          }
+        }
+        if (!canGoal[0][sIdx]) return null;
+        if (!canLive[0][sIdx]) return null;
+
+        // 前から: 行ける升を広げ、そのどれもが詰んでいないことを確かめる
+        reach[0].fill(0); reach[0][sIdx] = 1;
+        for (s = 0; s < STEPS; s++) {
+          var cur = reach[s], nxt = reach[s + 1];
+          nxt.fill(0);
+          for (j = 0; j < NY; j++) {
+            for (i = 0; i < NX; i++) {
+              idx = j * NX + i;
+              if (!cur[idx]) continue;
+              /* 甘く見た升が、辛く見ると危険域に入っている —— そこは
+               * 「かすっている」場所。詰みの判定からは外す（外さないと、
+               * どんな盤面もこの余白のせいで捨てられてしまう）。 */
+              if (safeV[s][idx] && !canLive[s][idx]) return null;
+              if (goalCell[idx]) continue;          // ゴールに着いたらそこで終わり
+              for (m = 0; m < 9; m++) {
+                var ri = i + DI[m], rj = j + DJ[m];
+                if (ri < 0 || rj < 0 || ri >= NX || rj >= NY) continue;
+                nIdx = rj * NX + ri;
+                if (nxt[nIdx] || !safeR[s + 1][nIdx]) continue;
+                nxt[nIdx] = 1;
+              }
+            }
+          }
+        }
+
+        /* 道しるべ。canGoal をたどれば必ずゴールに着く（着けるから 1 が
+         * 立っている）。ゴールへ近づく手を選びながら降りていく。 */
+        var path = [], ci = sI, cj = sJ;
+        for (s = 0; s < STEPS; s++) {
+          if (goalCell[cj * NX + ci]) break;
+          var bi = ci, bj = cj, bd = Infinity;
+          for (m = 0; m < 9; m++) {
+            var ki = ci + DI[m], kj = cj + DJ[m];
+            if (ki < 0 || kj < 0 || ki >= NX || kj >= NY) continue;
+            if (!canGoal[s + 1][kj * NX + ki]) continue;
+            var d = U.dist(cellX(ki), cellY(kj), goal.x, goal.y);
+            if (d < bd) { bd = d; bi = ki; bj = kj; }
+          }
+          if (bd === Infinity) return null;
+          ci = bi; cj = bj;
+          path.push({ x: cellX(ci), y: cellY(cj), t: (s + 1) * SIM_DT });
+        }
+        return path;
+      }
+
+      /* 障害物は「レーン」に分けて置く。
+       *
+       * 詰みは、動く棒どうしが近づいて、あいだの隙間が消えるときに起きる。
+       * 棒ごとに持ち場を決めて、持ち場の境目には必ず体 1 つぶんの余白を
+       * 残しておけば、隙間が消えること自体が起こらない。
+       * 「運が悪いと詰む盤面」を後から捨てるのではなく、
+       * 詰む盤面が作られない置き方にする。
+       *
+       * それでも、そこへ間に合うかどうかは別の話なので、
+       * 作ったあとに時間つきで確かめるのは今までどおり。 */
+      var CLR = 40;              // 持ち場の境目に残す余白（体 + 棒の太さぶん）
+
+      function lanes(lo, hi, n) {
+        var out = [], w = (hi - lo) / n;
+        for (var i = 0; i < n; i++) out.push({ lo: lo + i * w, hi: lo + (i + 1) * w });
+        return c.rng.shuffle(out);
+      }
+
+      function build(comp, mul) {
+        var ls = [], i;
+        var vLanes = lanes(area.x + 150, goal.x - 70, comp.v);
+        var hLanes = lanes(area.y + 52, area.y + area.h - 52, comp.h);
+
+        for (i = 0; i < comp.v; i++) {
+          var vl = vLanes[i];
+          var vAmp = Math.max(18, Math.min(c.rng.range(30, 70), (vl.hi - vl.lo - CLR * 2) / 2));
           ls.push({
-            v: kind === 'v', p: p, amp: amp,
-            spd: c.rng.range(1.6, 2.6) * mul,
+            v: true, p: c.rng.range(vl.lo + CLR + vAmp, vl.hi - CLR - vAmp), amp: vAmp,
+            spd: c.rng.range(1.3, 2.1) * mul,
             ph: c.rng.range(0, 6.28), th: TH,
             // 門の高さ。部屋の上下に寄せすぎると穴が壁に埋まる
             gapY: c.rng.range(area.y + GAP / 2 + 14, area.y + area.h - GAP / 2 - 14)
           });
         }
+        for (i = 0; i < comp.h; i++) {
+          var hl = hLanes[i];
+          var hAmp = Math.max(18, Math.min(c.rng.range(30, 62), (hl.hi - hl.lo - CLR * 2) / 2));
+          ls.push({
+            v: false, p: c.rng.range(hl.lo + CLR + hAmp, hl.hi - CLR - hAmp), amp: hAmp,
+            spd: c.rng.range(1.2, 2.0) * mul, ph: c.rng.range(0, 6.28), th: TH
+          });
+        }
+        /* 火の玉は奥（右）から飛んでくる。棒と違って向きが違うので、
+         * 「横に動く」だけでは避けられない。通り過ぎるものなので、
+         * レーンの隙間を潰すことはない。 */
+        for (i = 0; i < comp.f; i++) {
+          ls.push({
+            f: true,
+            y: c.rng.range(area.y + 40, area.y + area.h - 40),
+            t0: 0.55 + i * 0.9 + c.rng.range(0, 0.6),
+            spd: c.rng.range(300, 420) * mul
+          });
+        }
         return ls;
       }
 
-      var want = [2, 3, 4][c.diff - 1];
+      /* レベルごとの構成。横棒を 1 本までにしているのは、
+       * 部屋の高さが 300 しかなく、2 本だと上下に逃げ場が残らないから。 */
+      var COMP = [{ v: 1, h: 1, f: 0 }, { v: 2, h: 1, f: 1 }, { v: 3, h: 1, f: 1 }];
+      var comp0 = COMP[c.diff - 1];
       var mul = [1, 1.22, 1.4][c.diff - 1];
       var lasers = null, path = null;
       for (var tryN = 0; tryN < 60 && !path; tryN++) {
-        // 何度も外したら本数を落とす。解けない盤面を配るくらいなら易しくする
-        var cand = build(tryN < 40 ? want : Math.max(1, want - 1), mul);
-        var pr = solve(cand);
+        /* 何度も外したら本数を落とす。
+         * 詰む盤面や、そもそも間に合わない盤面を配るくらいなら易しくする。
+         * 40 回・52 回と段を作ってあるのは、いきなり最小構成に落として
+         * 「レベル3なのに棒が 1 本」になるのを避けるため。 */
+        var comp = tryN < 40 ? comp0
+          : (tryN < 52 ? { v: Math.max(1, comp0.v - 1), h: comp0.h, f: Math.max(0, comp0.f - 1) }
+            : { v: 1, h: comp0.h, f: 0 });
+        var cand = build(comp, mul);
+        var pr = vet(cand);
         if (pr) { lasers = cand; path = pr; }
       }
       if (!path) {                       // 保険。ここに来ることはまずない
         lasers = [{ v: true, p: area.x + 320, amp: 80, spd: 1.8, ph: 0, th: TH,
           gapY: area.y + area.h / 2 }];
+        // 検分の途中で動かした立ち位置を、この盤面で取り直す
+        if (!placeHero(lasers)) hero.y = area.y + area.h / 2;
       }
 
       return {

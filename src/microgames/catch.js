@@ -16,18 +16,24 @@
     create: function (c) {
       var BY = 424;                       // カゴの中心Y
       var basket = { x: c.W / 2, tilt: 0, pop: 0 };
-      var need = [3, 4, 5][c.diff - 1];
+      var need = [3, 4, 6][c.diff - 1];
       var got = 0;
       var SPEED = 520;                    // カゴの移動速度（input.steerX と揃える）
-      var vy = [330, 380, 430][c.diff - 1];
+      var vy = [330, 400, 500][c.diff - 1];
+      /* レベル3は「落ちてくる間隔」を詰める。
+       * 星が速くなるだけなら、カゴを置く場所を早めに決めるだけで済む。
+       * 次が来るまでの猶予を削ると、受けた直後にもう次の位置へ走ることになり、
+       * 止まっていられる時間が無くなる。数も 6 個に増やして休みを消す。 */
+      var span = [[185, 235], [165, 205], [128, 158]][c.diff - 1];
+      var REACH = [0.66, 0.74, 0.86][c.diff - 1];
       var stars = [];
       // 直前の星からの猶予時間で届く範囲にしか次の星を置かない。
       // これをやらないと「物理的に間に合わない配置」が生まれてクリア不能になる。
       var y = -60, prevX = c.W / 2, dy = 0;
       for (var i = 0; i < need; i++) {
-        if (i > 0) { dy = c.rng.range(185, 235); y -= dy; }
+        if (i > 0) { dy = c.rng.range(span[0], span[1]); y -= dy; }
         var avail = (i === 0 ? (BY + 60) : dy) / vy;
-        var maxDx = SPEED * avail * 0.66;
+        var maxDx = SPEED * avail * REACH;
         var x = U.clamp(prevX + c.rng.range(-maxDx, maxDx), 110, c.W - 110);
         prevX = x;
         stars.push({

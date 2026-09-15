@@ -190,24 +190,55 @@
     return this;
   };
 
-  /** かわいい目（白目 + 瞳 + ハイライト）。look は視線ベクトル */
-  P.eyes = function (x, y, gap, r, lookX, lookY, blink) {
+  /**
+   * かわいい目（白目 + 瞳 + ハイライト）。look は視線ベクトル。
+   * eye は目の形。true は昔からの「閉じ目」と同じ扱い。
+   *   closed / happy / wink / sleepy / big / angry
+   * 「1 人だけ目が違う」を作るのに使う。閉じ目だけだと違いが 1 種類しか
+   * 作れず、何度か遊べば「閉じてるヤツを探すゲーム」になってしまう。
+   */
+  P.eyes = function (x, y, gap, r, lookX, lookY, eye) {
     var c = this.c;
     lookX = lookX || 0; lookY = lookY || 0;
+    if (eye === true) eye = 'closed';
+    var self = this;
+
+    function lidCurve(ex, down) {
+      c.beginPath();
+      c.moveTo(ex - r, y);
+      c.quadraticCurveTo(ex, y + (down ? r * 0.5 : -r * 0.5), ex + r, y);
+      c.strokeStyle = GG.PAL.ink; c.lineWidth = r * 0.45; c.lineCap = 'round';
+      c.stroke();
+    }
+    function ball(ex, scale) {
+      var rr = r * (scale || 1);
+      self.ellipsePath(ex, y, rr, rr * 1.12).fill('#fff');
+      self.ellipsePath(ex, y, rr, rr * 1.12).stroke(GG.PAL.ink, 2.8);
+      var pr = rr * (scale > 1 ? 0.42 : 0.55);
+      self.circlePath(ex + lookX * rr * 0.35, y + lookY * rr * 0.4, pr).fill(GG.PAL.ink);
+      self.circlePath(ex + lookX * rr * 0.35 - pr * 0.33, y + lookY * rr * 0.4 - pr * 0.4,
+        pr * 0.36).fill('#fff');
+    }
+
     for (var i = -1; i <= 1; i += 2) {
       var ex = x + i * gap;
-      if (blink) {
+      if (eye === 'closed') { lidCurve(ex, true); continue; }
+      if (eye === 'happy') { lidCurve(ex, false); continue; }
+      if (eye === 'wink' && i > 0) { lidCurve(ex, false); continue; }
+      ball(ex, eye === 'big' ? 1.32 : 1);
+      if (eye === 'sleepy') {
+        // 上まぶたを半分かぶせる
+        c.save();
+        this.ellipsePath(ex, y, r, r * 1.12); c.clip();
+        this.rr(ex - r * 1.2, y - r * 1.4, r * 2.4, r * 1.35, 0).fill(GG.PAL.ink);
+        c.restore();
+      } else if (eye === 'angry') {
         c.beginPath();
-        c.moveTo(ex - r, y); c.quadraticCurveTo(ex, y + r * 0.5, ex + r, y);
-        c.strokeStyle = GG.PAL.ink; c.lineWidth = r * 0.45; c.lineCap = 'round';
+        c.moveTo(ex - i * r * 1.15, y - r * 1.5);
+        c.lineTo(ex + i * r * 1.05, y - r * 0.85);
+        c.strokeStyle = GG.PAL.ink; c.lineWidth = r * 0.36; c.lineCap = 'round';
         c.stroke();
-        continue;
       }
-      this.ellipsePath(ex, y, r, r * 1.12).fill('#fff');
-      this.ellipsePath(ex, y, r, r * 1.12).stroke(GG.PAL.ink, 2.8);
-      this.circlePath(ex + lookX * r * 0.35, y + lookY * r * 0.4, r * 0.55).fill(GG.PAL.ink);
-      this.circlePath(ex + lookX * r * 0.35 - r * 0.18, y + lookY * r * 0.4 - r * 0.22, r * 0.2)
-        .fill('#fff');
     }
     return this;
   };

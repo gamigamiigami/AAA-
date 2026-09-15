@@ -37,7 +37,7 @@
 
   /* ミニゲームが宣言できる画風。質感はポストエフェクトで一括して掛かるので、
    * ミニゲーム側は 1 行 style を書くだけでよい。 */
-  GG.STYLES = ['toon', 'pixel', 'clay', 'paper', 'sketch', 'retro'];
+  GG.STYLES = ['toon', 'clay', 'paper', 'sketch', 'retro'];
 
   var services = Object.create(null);
   GG.provide = function (name, obj) { services[name] = obj; return obj; };

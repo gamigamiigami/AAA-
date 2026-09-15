@@ -11,7 +11,7 @@
     beats: 8,
     defaultResult: 'win',
     bg: ['#ff8000', '#f07000'],
-    style: 'pixel',
+    style: 'toon',
 
     create: function (c) {
       var GY = 424;

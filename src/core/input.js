@@ -22,7 +22,11 @@
     this.pDown = false;
     this.pHit = false;
     this.pRel = false;
-    this.pointerActive = false;        // 直近にポインタが使われたか
+    /* 遊ぶ人はマウスを使う。だから最初からポインタ扱いで始める。
+     * false から始めると、まだ何も触っていない最初の 1 本で
+     * 「スペース か クリック」とキーボードの言い方が出てしまう。
+     * キーを押した時だけ、キーボードの言い方に切り替える。 */
+    this.pointerActive = true;         // 直近にポインタが使われたか
     this.anyHit = false;               // 何かしらの入力があったフレーム
     this.mash = 0;                     // 連打カウンタ（毎フレームの新規押下数）
     this.map = function (cx, cy) { return { x: cx, y: cy }; };

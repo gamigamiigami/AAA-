@@ -70,7 +70,6 @@
     // ミニゲームは一旦ここへ描き、画風に応じて加工してから本画面へ転送する
     this.scene = new GG.TEX.Scene(W, H);
     this.gFull = new GG.G(this.scene.fullCtx);
-    this.gSmall = new GG.G(this.scene.smallCtx);
   }
   var P = Game.prototype;
 
@@ -499,7 +498,7 @@
       this._drawInterludeBg(g);
     } else if (this.cur) {
       var def = this.cur.def;
-      var sg = def.style === 'pixel' ? this.gSmall : this.gFull;
+      var sg = this.gFull;
       this.scene.begin(def.style);
       this.drawBackdrop(sg, def);
       this.cur.inst.draw(sg);

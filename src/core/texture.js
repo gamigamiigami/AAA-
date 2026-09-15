@@ -110,28 +110,22 @@
     this.w = w; this.h = h;
     this.full = makeCanvas(w, h);
     this.fullCtx = this.full.getContext('2d');
-    /* ドット絵の粗さ。
-     * 3 だと 320×180 相当になり、半径 26 のキャラは 9 ドットしか無い。
-     * 目は 2 ドット、口は 1 ドット —— これは画風ではなく、ただ潰れている。
-     * ドット絵に見せたいのであって、見えなくしたいわけではない。 */
-    this.pixDiv = 2;   // 480×270 相当
-    this.small = makeCanvas(Math.ceil(w / this.pixDiv), Math.ceil(h / this.pixDiv));
-    this.smallCtx = this.small.getContext('2d');
   }
 
-  /** 描画先のコンテキストを返す。pixel の場合は低解像度側 */
+  /* ドット絵の画風はやめた。
+   *
+   * 低解像度に描いてから拡大する以上、キャラの目や口はどうやっても数ドットに
+   * なる。粗さを 1/3 から 1/2 まで戻しても、絵が汚いという感想は変わらなかった。
+   * ドット絵は「粗く描く」ことではなく「そのドット数で成立する絵を描く」ことで、
+   * それは 18 本ぶんの絵を描き直す仕事になる。
+   * 売り物の画面として見たとき、いま出せる答えは「やらない」だった。 */
+
+  /** 描画先のコンテキストを返す */
   Scene.prototype.begin = function (style) {
     this.style = style;
-    var c;
-    if (style === 'pixel') {
-      c = this.smallCtx;
-      c.setTransform(1 / this.pixDiv, 0, 0, 1 / this.pixDiv, 0, 0);
-      c.clearRect(0, 0, this.w, this.h);
-    } else {
-      c = this.fullCtx;
-      c.setTransform(1, 0, 0, 1, 0, 0);
-      c.clearRect(0, 0, this.w, this.h);
-    }
+    var c = this.fullCtx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, this.w, this.h);
     c.globalAlpha = 1;
     c.globalCompositeOperation = 'source-over';
     return c;
@@ -142,13 +136,7 @@
     var st = this.style, w = this.w, h = this.h;
     dst.save();
 
-    if (st === 'pixel') {
-      dst.imageSmoothingEnabled = false;
-      dst.drawImage(this.small, 0, 0, w, h);
-      dst.imageSmoothingEnabled = true;
-    } else {
-      dst.drawImage(this.full, 0, 0);
-    }
+    dst.drawImage(this.full, 0, 0);
 
     dst.globalCompositeOperation = 'source-over';
     // 質感は「言われないと気づかないが、無いと物足りない」程度に留める
@@ -173,7 +161,6 @@
       dst.fillStyle = TEX.grain(dst, 0.09);
       dst.fillRect(0, 0, w, h);
     }
-    // pixel は加工なし（ドットのエッジを濁らせない）
     dst.restore();
   };
 

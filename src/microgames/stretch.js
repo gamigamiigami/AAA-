@@ -11,7 +11,7 @@
     beats: 8,
     defaultResult: 'lose',
     bg: ['#ffb000', '#f0a000'],
-    style: 'pixel',
+    style: 'clay',
 
     create: function (c) {
       var GY = 400;

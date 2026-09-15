@@ -51,7 +51,7 @@
     }
 
     // 顔
-    g.eyes(0, -ry * 0.16, rx * 0.35, r * 0.17, o.lookX, o.lookY, o.blink);
+    g.eyes(0, -ry * 0.16, rx * 0.35, r * 0.17, o.lookX, o.lookY, o.eye || o.blink);
     var m = o.mouth || 'smile';
     c.strokeStyle = GG.PAL.ink; c.lineWidth = r * 0.11; c.lineCap = 'round';
     c.beginPath();
